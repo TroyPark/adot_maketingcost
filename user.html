@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사용자 페이지 - Marketing Cost Compilater</title>
+    <link rel="icon" type="image/png" href="image/symbol_white.png">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <!-- React CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #001236 0%, #002856 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .branch-badge {
+            display: inline-block;
+            background: #f07c00;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(240, 124, 0, 0.3);
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header p {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            gap: 12px;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(240, 124, 0, 0.2);
+            color: #f07c00;
+            border-left-color: #f07c00;
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .nav-item span {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .user-info-sidebar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: #f07c00;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .user-details .name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-details .role {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .logout-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #f07c00;
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 30px;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            color: #001236;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .content-area {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #001236 0%, #002856 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 18, 54, 0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: #f07c00;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #e07000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(240, 124, 0, 0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-preview {
+            background: #e8f4fd;
+            border: 1px solid #b8daff;
+            color: #004085;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-preview:hover {
+            background: #cce5ff;
+            border-color: #99caff;
+        }
+
+        .section-title {
+            color: #001236;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        /* 테이블 스타일 */
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            color: #001236;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table .amount {
+            font-weight: 600;
+            color: #001236;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .category-badge.online {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .category-badge.offline {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .category-badge.event {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .category-badge.material {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .category-badge.other {
+            background: #eceff1;
+            color: #546e7a;
+        }
+
+        .empty-table {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-table svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-table p {
+            font-size: 14px;
+        }
+
+        /* 슬라이드 패널 (Drawer) */
+        .drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .drawer-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: -450px;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 30px rgba(0, 0, 0, 0.15);
+            z-index: 201;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .drawer form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .drawer.open {
+            right: 0;
+        }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #eee;
+            background: linear-gradient(135deg, #001236 0%, #002856 100%);
+            color: white;
+        }
+
+        .drawer-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .drawer-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .drawer-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .drawer-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .drawer-footer {
+            padding: 20px 24px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 12px;
+        }
+
+        .drawer-footer .btn {
+            flex: 1;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* 비용 등록 폼 */
+        .cost-form {
+            display: grid;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group label .required {
+            color: #dc3545;
+            margin-left: 2px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #f07c00;
+            box-shadow: 0 0 0 3px rgba(240, 124, 0, 0.1);
+        }
+
+        /* 테이블 액션 버튼 */
+        .table-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        /* 모달 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            color: #001236;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* 이미지 미리보기 모달 */
+        .image-modal {
+            background: rgba(0, 0, 0, 0.95);
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .image-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .image-modal-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .image-modal-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .image-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .image-modal-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            min-height: 400px;
+        }
+
+        .image-modal-body img {
+            max-width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .image-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .image-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .image-nav-btn.prev {
+            left: 20px;
+        }
+
+        .image-nav-btn.next {
+            right: 20px;
+        }
+
+        .image-modal-footer {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .image-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .image-dot.active {
+            background: #f07c00;
+        }
+
+        /* 선택된 행 */
+        .data-table tbody tr.selected {
+            background: #fff3e0;
+        }
+
+        /* 삭제 버튼 영역 */
+        .delete-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .delete-action-bar span {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* 이미지 업로드 */
+        .image-upload-area {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .image-upload-area:hover {
+            border-color: #f07c00;
+            background: #fff8f0;
+        }
+
+        .image-upload-area.has-image {
+            border-style: solid;
+            border-color: #f07c00;
+            padding: 10px;
+        }
+
+        .image-upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 10px;
+            color: #999;
+        }
+
+        .image-upload-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .image-upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .image-preview {
+            position: relative;
+            display: inline-block;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 6px;
+        }
+
+        .image-remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .image-remove-btn:hover {
+            background: #c82333;
+        }
+
+        /* 다중 이미지 미리보기 */
+        .image-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-preview-item .image-remove-btn {
+            top: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+        }
+
+        .image-count-info {
+            font-size: 13px;
+            color: #666;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .image-count-info.error {
+            color: #dc3545;
+        }
+
+        .image-count-info.success {
+            color: #28a745;
+        }
+
+        .image-count-info.warning {
+            color: #f07c00;
+            font-weight: 600;
+        }
+
+        @media (max-width: 500px) {
+            .drawer {
+                width: 100%;
+                right: -100%;
+            }
+        }
+
+        /* 설정 페이지 스타일 */
+        .settings-section {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .settings-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+        }
+
+        .settings-item-info h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .settings-item-info p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 로딩 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-size: 16px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+            }
+
+            .sidebar-header h1,
+            .sidebar-header p,
+            .nav-item span,
+            .user-details,
+            .logout-btn span {
+                display: none;
+            }
+
+            .nav-item {
+                justify-content: center;
+                padding: 14px;
+            }
+
+            .main-content {
+                margin-left: 70px;
+                padding: 20px;
+            }
+
+            .user-info-sidebar {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">로딩 중...</div>
+    </div>
+
+    <!-- Firebase 설정 -->
+    <script src="firebase.js"></script>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const ADMIN_EMAIL = 'admin@dshare.co.kr';
+        
+
+        // 아이콘 컴포넌트
+        const Icons = {
+            Cost: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+            ),
+            Settings: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            )
+        };
+
+        // 카테고리 정보
+        const categories = {
+            online: { label: '온라인 광고', className: 'online' },
+            offline: { label: '오프라인 광고', className: 'offline' },
+            event: { label: '이벤트/프로모션', className: 'event' },
+            material: { label: '홍보물 제작', className: 'material' },
+            other: { label: '기타', className: 'other' }
+        };
+
+        // 마케팅 비용 페이지
+        function MarketingCostPage({ user, userInfo }) {
+            const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+            const [costs, setCosts] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [formData, setFormData] = useState({
+                category: '',
+                amount: '',
+                date: new Date().toISOString().split('T')[0],
+                description: ''
+            });
+            
+            // 이미지 업로드 상태 (최소 3개, 최대 5개)
+            const [imageFiles, setImageFiles] = useState([]);
+            const [imagePreviews, setImagePreviews] = useState([]);
+            const MIN_IMAGES = 3;
+            const MAX_IMAGES = 5;
+            
+            // 선택 및 삭제 관련 상태
+            const [selectedCosts, setSelectedCosts] = useState([]);
+            const [showDeleteModal, setShowDeleteModal] = useState(false);
+            const [deletePassword, setDeletePassword] = useState('');
+            const [isDeleting, setIsDeleting] = useState(false);
+            
+            // 비용 등록 로딩 상태
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            
+            // 이미지 미리보기 모달 상태
+            const [showImageModal, setShowImageModal] = useState(false);
+            const [previewImages, setPreviewImages] = useState([]);
+            const [currentImageIndex, setCurrentImageIndex] = useState(0);
+            
+            // Round 배정 비용 관련 상태
+            const [currentRound, setCurrentRound] = useState(null);
+            const [branchBudget, setBranchBudget] = useState(0);
+
+            // Firestore에서 비용 목록 로드
+            useEffect(() => {
+                if (!user) return;
+
+                const unsubscribe = db.collection('costs')
+                    .where('userId', '==', user.uid)
+                    .onSnapshot((snapshot) => {
+                        const costsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        // 날짜 기준 내림차순 정렬 (클라이언트에서)
+                        costsData.sort((a, b) => {
+                            const dateA = new Date(a.date);
+                            const dateB = new Date(b.date);
+                            return dateB - dateA;
+                        });
+                        setCosts(costsData);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('비용 목록 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, [user]);
+
+            // 현재 진행 중인 Round와 배정 비용 로드
+            useEffect(() => {
+                if (!userInfo?.branchName) return;
+
+                const today = new Date().toISOString().split('T')[0];
+
+                // 현재 날짜에 해당하는 Round 찾기
+                const roundsUnsubscribe = db.collection('rounds')
+                    .onSnapshot(async (snapshot) => {
+                        const roundsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+
+                        // 현재 날짜가 포함된 Round 찾기
+                        const activeRound = roundsData.find(round => {
+                            return today >= round.startDate && today <= round.endDate;
+                        });
+
+                        if (activeRound) {
+                            setCurrentRound(activeRound);
+
+                            // 해당 Round의 지점 배정 비용 가져오기
+                            try {
+                                const budgetDoc = await db.collection('roundBudgets').doc(activeRound.id).get();
+                                if (budgetDoc.exists) {
+                                    const budgets = budgetDoc.data().budgets || {};
+                                    setBranchBudget(budgets[userInfo.branchName] || 0);
+                                }
+                            } catch (error) {
+                                console.error('배정 비용 로드 오류:', error);
+                            }
+                        } else {
+                            setCurrentRound(null);
+                            setBranchBudget(0);
+                        }
+                    });
+
+                return () => roundsUnsubscribe();
+            }, [userInfo?.branchName]);
+
+            // Round 기간 내 사용 비용 계산
+            const getRoundUsedAmount = () => {
+                if (!currentRound) return 0;
+                
+                return costs.filter(cost => {
+                    const costDate = cost.date;
+                    return costDate >= currentRound.startDate && costDate <= currentRound.endDate;
+                }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+            };
+
+            // 금액 포맷 (표시용)
+            const formatAmount = (amount) => {
+                return new Intl.NumberFormat('ko-KR', {
+                    style: 'currency',
+                    currency: 'KRW'
+                }).format(amount);
+            };
+
+            // 금액 입력 포맷 (콤마 추가)
+            const formatInputAmount = (value) => {
+                // 숫자만 추출
+                const numericValue = value.replace(/[^\d]/g, '');
+                // 콤마 추가
+                return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            };
+
+            // 콤마 제거하고 숫자로 변환
+            const parseAmount = (value) => {
+                return value.replace(/,/g, '');
+            };
+
+            // 금액 입력 핸들러
+            const handleAmountChange = (e) => {
+                const formatted = formatInputAmount(e.target.value);
+                setFormData({...formData, amount: formatted});
+            };
+
+            // 이미지 업로드 핸들러 (다중)
+            const handleImageChange = async (e) => {
+                const files = Array.from(e.target.files);
+                if (!files.length) return;
+
+                // 최대 개수 체크
+                const remainingSlots = MAX_IMAGES - imageFiles.length;
+                if (files.length > remainingSlots) {
+                    alert(`최대 ${MAX_IMAGES}개까지만 업로드 가능합니다. ${remainingSlots}개만 추가됩니다.`);
+                }
+
+                const filesToAdd = files.slice(0, remainingSlots);
+                const validFiles = [];
+                const validPreviews = [];
+
+                // 파일 형식 및 크기 검증
+                const validTypes = ['image/jpeg', 'image/png'];
+                const MAX_WIDTH = 3500;
+                const MAX_HEIGHT = 3500;
+                
+                for (const file of filesToAdd) {
+                    // 형식 검증
+                    if (!validTypes.includes(file.type)) {
+                        alert(`${file.name}: JPG 또는 PNG 파일만 업로드 가능합니다.`);
+                        continue;
+                    }
+                    
+                    // 이미지 크기(픽셀) 검증
+                    const dimensionCheck = await validateImageDimensions(file);
+                    if (!dimensionCheck.valid) {
+                        alert(`${file.name}: ${dimensionCheck.message}`);
+                        continue;
+                    }
+                    
+                    validFiles.push(file);
+                }
+
+                if (validFiles.length === 0) {
+                    e.target.value = '';
+                    return;
+                }
+
+                // 미리보기 생성
+                let loadedCount = 0;
+                validFiles.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        validPreviews[index] = event.target.result;
+                        loadedCount++;
+                        
+                        if (loadedCount === validFiles.length) {
+                            setImageFiles(prev => [...prev, ...validFiles]);
+                            setImagePreviews(prev => [...prev, ...validPreviews]);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                e.target.value = '';
+            };
+
+            // 개별 이미지 제거
+            const handleImageRemove = (index) => {
+                setImageFiles(prev => prev.filter((_, i) => i !== index));
+                setImagePreviews(prev => prev.filter((_, i) => i !== index));
+            };
+
+            // 모든 이미지 제거
+            const handleImageRemoveAll = () => {
+                setImageFiles([]);
+                setImagePreviews([]);
+            };
+
+            // 날짜 포맷
+            const formatDate = (dateValue) => {
+                if (!dateValue) return '-';
+                // Firestore Timestamp 처리
+                const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+                return date.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            };
+
+            // 이번 달 비용 계산
+            const getMonthlyTotal = () => {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                
+                return costs
+                    .filter(cost => {
+                        const costDate = new Date(cost.date);
+                        return costDate.getMonth() === currentMonth && costDate.getFullYear() === currentYear;
+                    })
+                    .reduce((sum, cost) => sum + Number(cost.amount), 0);
+            };
+
+            // 총 비용 계산
+            const getTotalAmount = () => {
+                return costs.reduce((sum, cost) => sum + Number(cost.amount), 0);
+            };
+
+            // 폼 제출 (Firestore에 저장)
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                
+                const numericAmount = parseAmount(formData.amount);
+                
+                if (!formData.category || !numericAmount || !formData.date) {
+                    alert('필수 항목을 모두 입력해주세요.');
+                    return;
+                }
+
+                // 이미지 개수 검증 (필수 - 최소 3개)
+                if (imageFiles.length < MIN_IMAGES) {
+                    alert(`증빙 이미지는 최소 ${MIN_IMAGES}개 이상 업로드해주세요. (현재 ${imageFiles.length}개)`);
+                    return;
+                }
+
+                setIsSubmitting(true);
+
+                try {
+                    // 먼저 Firestore에 비용 데이터 저장 (costId 필요)
+                    const costDocRef = await db.collection('costs').add({
+                        userId: user.uid,
+                        userEmail: user.email,
+                        branchName: userInfo?.branchName || '',
+                        category: formData.category,
+                        amount: Number(numericAmount),
+                        date: formData.date,
+                        description: formData.description,
+                        imageCount: imageFiles.length,
+                        images: [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    const costId = costDocRef.id;
+
+                    // 이미지가 있으면 Storage에 업로드
+                    if (imageFiles.length > 0) {
+                        const uploadResult = await uploadImages(imageFiles, user.uid, costId);
+                        
+                        if (uploadResult.success && uploadResult.images.length > 0) {
+                            // Firestore 문서에 이미지 정보 업데이트
+                            await costDocRef.update({
+                                images: uploadResult.images,
+                                imageCount: uploadResult.images.length
+                            });
+                        }
+                    }
+
+                    setFormData({
+                        category: '',
+                        amount: '',
+                        date: new Date().toISOString().split('T')[0],
+                        description: ''
+                    });
+                    setImageFiles([]);
+                    setImagePreviews([]);
+                    setIsDrawerOpen(false);
+                    alert('비용이 등록되었습니다.');
+                } catch (error) {
+                    console.error('비용 등록 오류:', error);
+                    alert('비용 등록에 실패했습니다.');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            // 체크박스 - 개별 선택
+            const handleSelectCost = (id) => {
+                setSelectedCosts(prev => {
+                    if (prev.includes(id)) {
+                        return prev.filter(costId => costId !== id);
+                    } else {
+                        return [...prev, id];
+                    }
+                });
+            };
+
+            // 체크박스 - 전체 선택
+            const handleSelectAll = () => {
+                if (selectedCosts.length === costs.length) {
+                    setSelectedCosts([]);
+                } else {
+                    setSelectedCosts(costs.map(cost => cost.id));
+                }
+            };
+
+            // 삭제 모달 열기
+            const openDeleteModal = () => {
+                if (selectedCosts.length === 0) {
+                    alert('삭제할 항목을 선택해주세요.');
+                    return;
+                }
+                setDeletePassword('');
+                setShowDeleteModal(true);
+            };
+
+            // 이미지 미리보기 열기
+            const openImagePreview = (images) => {
+                if (!images || images.length === 0) {
+                    alert('등록된 이미지가 없습니다.');
+                    return;
+                }
+                setPreviewImages(images);
+                setCurrentImageIndex(0);
+                setShowImageModal(true);
+            };
+
+            // 이전/다음 이미지
+            const handlePrevImage = () => {
+                setCurrentImageIndex(prev => prev > 0 ? prev - 1 : previewImages.length - 1);
+            };
+
+            const handleNextImage = () => {
+                setCurrentImageIndex(prev => prev < previewImages.length - 1 ? prev + 1 : 0);
+            };
+
+            // 비밀번호 확인 후 삭제 실행
+            const handleConfirmDelete = async (e) => {
+                e.preventDefault();
+                
+                if (!deletePassword) {
+                    alert('비밀번호를 입력해주세요.');
+                    return;
+                }
+
+                setIsDeleting(true);
+
+                try {
+                    // 비밀번호 확인 (재인증)
+                    const credential = firebase.auth.EmailAuthProvider.credential(
+                        user.email,
+                        deletePassword
+                    );
+                    await user.reauthenticateWithCredential(credential);
+
+                    // 선택된 비용의 이미지도 함께 삭제
+                    for (const costId of selectedCosts) {
+                        // Storage에서 이미지 삭제
+                        await deleteCostImages(user.uid, costId);
+                    }
+
+                    // Firestore에서 비용 데이터 삭제
+                    const batch = db.batch();
+                    selectedCosts.forEach(id => {
+                        const docRef = db.collection('costs').doc(id);
+                        batch.delete(docRef);
+                    });
+                    await batch.commit();
+
+                    alert(`${selectedCosts.length}개 항목이 삭제되었습니다.`);
+                    setSelectedCosts([]);
+                    setShowDeleteModal(false);
+                } catch (error) {
+                    console.error('삭제 오류:', error);
+                    if (error.code === 'auth/wrong-password') {
+                        alert('비밀번호가 올바르지 않습니다.');
+                    } else {
+                        alert('삭제에 실패했습니다: ' + error.message);
+                    }
+                } finally {
+                    setIsDeleting(false);
+                    setDeletePassword('');
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
+                        <p>비용 목록을 불러오는 중...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">마케팅 비용</h2>
+                        <p className="page-subtitle">마케팅 비용을 등록하고 관리합니다</p>
+                    </div>
+
+                    {/* Round 배정 비용 카드 */}
+                    {currentRound && branchBudget > 0 && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #001236 0%, #002856 100%)',
+                            borderRadius: '12px',
+                            padding: '24px',
+                            marginBottom: '20px',
+                            color: 'white'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '16px'
+                            }}>
+                                <div>
+                                    <h3 style={{fontSize: '14px', opacity: 0.9, marginBottom: '4px'}}>
+                                        {currentRound.name}
+                                    </h3>
+                                    <p style={{fontSize: '12px', opacity: 0.7}}>
+                                        {currentRound.startDate} ~ {currentRound.endDate}
+                                    </p>
+                                </div>
+                                <div style={{
+                                    background: getRoundUsedAmount() > branchBudget ? '#dc3545' : '#f07c00',
+                                    padding: '6px 14px',
+                                    borderRadius: '20px',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                }}>
+                                    {branchBudget > 0 ? Math.round((getRoundUsedAmount() / branchBudget) * 100) : 0}% 사용
+                                </div>
+                            </div>
+                            
+                            {/* 프로그레스 바 */}
+                            <div style={{
+                                background: 'rgba(255,255,255,0.2)',
+                                borderRadius: '10px',
+                                height: '12px',
+                                marginBottom: '16px',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    width: `${Math.min((getRoundUsedAmount() / branchBudget) * 100, 100)}%`,
+                                    height: '100%',
+                                    background: getRoundUsedAmount() > branchBudget ? '#dc3545' : '#f07c00',
+                                    transition: 'width 0.5s ease'
+                                }} />
+                            </div>
+                            
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px'}}>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 비용</div>
+                                    <div style={{fontSize: '20px', fontWeight: '700'}}>{formatAmount(branchBudget)}</div>
+                                </div>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>사용 비용</div>
+                                    <div style={{fontSize: '20px', fontWeight: '700'}}>{formatAmount(getRoundUsedAmount())}</div>
+                                </div>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 비용</div>
+                                    <div style={{
+                                        fontSize: '20px', 
+                                        fontWeight: '700',
+                                        color: branchBudget - getRoundUsedAmount() < 0 ? '#ff6b6b' : '#4ade80'
+                                    }}>
+                                        {formatAmount(branchBudget - getRoundUsedAmount())}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <h3>이번 달 비용</h3>
+                            <div className="value">{formatAmount(getMonthlyTotal())}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>누적 비용</h3>
+                            <div className="value">{formatAmount(getTotalAmount())}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>등록된 항목</h3>
+                            <div className="value">{costs.length}</div>
+                        </div>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="table-header">
+                            <h3 className="section-title" style={{marginBottom: 0}}>비용 목록</h3>
+                            <button className="btn" onClick={() => setIsDrawerOpen(true)}>
+                                + 비용 등록
+                            </button>
+                        </div>
+
+                        {costs.length === 0 ? (
+                            <div className="empty-table">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    <path d="M12 11v6M9 14h6"/>
+                                </svg>
+                                <p>등록된 비용이 없습니다.</p>
+                                <p style={{marginTop: '8px', color: '#bbb'}}>위의 '비용 등록' 버튼을 클릭하여 비용을 추가하세요.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {selectedCosts.length > 0 && (
+                                    <div className="delete-action-bar">
+                                        <span>{selectedCosts.length}개 선택됨</span>
+                                        <button className="btn btn-sm btn-danger" onClick={openDeleteModal}>
+                                            선택 삭제
+                                        </button>
+                                    </div>
+                                )}
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{width: '50px'}}>
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={selectedCosts.length === costs.length && costs.length > 0}
+                                                    onChange={handleSelectAll}
+                                                    style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                                />
+                                            </th>
+                                            <th>날짜</th>
+                                            <th>항목</th>
+                                            <th>금액</th>
+                                            <th>설명</th>
+                                            <th style={{width: '80px'}}>증빙</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {costs.map(cost => (
+                                            <tr key={cost.id} className={selectedCosts.includes(cost.id) ? 'selected' : ''}>
+                                                <td>
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={selectedCosts.includes(cost.id)}
+                                                        onChange={() => handleSelectCost(cost.id)}
+                                                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                                    />
+                                                </td>
+                                                <td>{formatDate(cost.date)}</td>
+                                                <td>
+                                                    <span className={`category-badge ${categories[cost.category]?.className}`}>
+                                                        {categories[cost.category]?.label || cost.category}
+                                                    </span>
+                                                </td>
+                                                <td className="amount">{formatAmount(cost.amount)}</td>
+                                                <td>{cost.description || '-'}</td>
+                                                <td>
+                                                    {cost.images && cost.images.length > 0 ? (
+                                                        <button 
+                                                            className="btn-preview"
+                                                            onClick={() => openImagePreview(cost.images)}
+                                                        >
+                                                            📷 {cost.images.length}
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{color: '#999', fontSize: '12px'}}>-</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </>
+                        )}
+                    </div>
+
+                    {/* 삭제 확인 모달 */}
+                    {showDeleteModal && (
+                        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>삭제 확인</h3>
+                                    <button className="modal-close" onClick={() => setShowDeleteModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleConfirmDelete}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '15px', color: '#666'}}>
+                                            선택한 <strong style={{color: '#dc3545'}}>{selectedCosts.length}개</strong> 항목을 삭제하려면 비밀번호를 입력하세요.
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={deletePassword}
+                                                onChange={(e) => setDeletePassword(e.target.value)}
+                                                placeholder="비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowDeleteModal(false)}
+                                            disabled={isDeleting}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-danger btn-sm"
+                                            disabled={isDeleting}
+                                        >
+                                            {isDeleting ? '삭제 중...' : '삭제'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 이미지 미리보기 모달 */}
+                    {showImageModal && previewImages.length > 0 && (
+                        <div className="modal-overlay" onClick={() => setShowImageModal(false)}>
+                            <div className="image-modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="image-modal-header">
+                                    <h3>증빙 이미지 ({currentImageIndex + 1} / {previewImages.length})</h3>
+                                    <button className="image-modal-close" onClick={() => setShowImageModal(false)}>
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="image-modal-body">
+                                    {previewImages.length > 1 && (
+                                        <button className="image-nav-btn prev" onClick={handlePrevImage}>
+                                            ‹
+                                        </button>
+                                    )}
+                                    <img 
+                                        src={previewImages[currentImageIndex]?.url} 
+                                        alt={`증빙 이미지 ${currentImageIndex + 1}`}
+                                    />
+                                    {previewImages.length > 1 && (
+                                        <button className="image-nav-btn next" onClick={handleNextImage}>
+                                            ›
+                                        </button>
+                                    )}
+                                </div>
+                                {previewImages.length > 1 && (
+                                    <div className="image-modal-footer">
+                                        {previewImages.map((_, index) => (
+                                            <div 
+                                                key={index}
+                                                className={`image-dot ${index === currentImageIndex ? 'active' : ''}`}
+                                                onClick={() => setCurrentImageIndex(index)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 비용 등록 슬라이드 패널 */}
+                    <div 
+                        className={`drawer-overlay ${isDrawerOpen ? 'open' : ''}`}
+                        onClick={() => setIsDrawerOpen(false)}
+                    />
+                    <div className={`drawer ${isDrawerOpen ? 'open' : ''}`}>
+                        <div className="drawer-header">
+                            <h3>비용 등록</h3>
+                            <button className="drawer-close" onClick={() => setIsDrawerOpen(false)}>
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit}>
+                            <div className="drawer-content">
+                                {/* 지점명 표시 */}
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #f07c00 0%, #ff9a3c 100%)',
+                                    color: 'white',
+                                    padding: '16px 20px',
+                                    borderRadius: '10px',
+                                    marginBottom: '24px',
+                                    textAlign: 'center',
+                                    boxShadow: '0 4px 15px rgba(240, 124, 0, 0.3)'
+                                }}>
+                                    <div style={{fontSize: '12px', opacity: 0.9, marginBottom: '4px'}}>등록 지점</div>
+                                    <div style={{fontSize: '18px', fontWeight: '700'}}>
+                                        {userInfo?.branchName || '지점 미설정'}
+                                    </div>
+                                </div>
+
+                                <div className="cost-form">
+                                    <div className="form-group">
+                                        <label>비용 항목 <span className="required">*</span></label>
+                                        <select 
+                                            value={formData.category}
+                                            onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                            required
+                                        >
+                                            <option value="">항목을 선택하세요</option>
+                                            <option value="online">온라인 광고</option>
+                                            <option value="offline">오프라인 광고</option>
+                                            <option value="event">이벤트/프로모션</option>
+                                            <option value="material">홍보물 제작</option>
+                                            <option value="other">기타</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>금액 (원) <span className="required">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="금액을 입력하세요"
+                                            value={formData.amount}
+                                            onChange={handleAmountChange}
+                                            required
+                                            inputMode="numeric"
+                                            style={{textAlign: 'right'}}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>날짜 <span className="required">*</span></label>
+                                        <input 
+                                            type="date"
+                                            value={formData.date}
+                                            onChange={(e) => setFormData({...formData, date: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>설명</label>
+                                        <textarea 
+                                            rows="4" 
+                                            placeholder="비용에 대한 설명을 입력하세요"
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                        />
+                                    </div>
+                                    
+                                    {/* 증빙 이미지 업로드 (필수, 최소 3개 ~ 최대 5개) */}
+                                    <div className="form-group">
+                                        <label>증빙 이미지 <span className="required">*</span></label>
+                                        
+                                        {/* 이미지 미리보기 그리드 */}
+                                        {imagePreviews.length > 0 && (
+                                            <div className="image-preview-grid">
+                                                {imagePreviews.map((preview, index) => (
+                                                    <div key={index} className="image-preview-item">
+                                                        <img src={preview} alt={`증빙 이미지 ${index + 1}`} />
+                                                        <button 
+                                                            type="button"
+                                                            className="image-remove-btn"
+                                                            onClick={() => handleImageRemove(index)}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* 이미지 추가 영역 */}
+                                        {imageFiles.length < MAX_IMAGES && (
+                                            <label className="image-upload-area">
+                                                <input 
+                                                    type="file"
+                                                    accept="image/jpeg, image/png"
+                                                    onChange={handleImageChange}
+                                                    multiple
+                                                    style={{display: 'none'}}
+                                                />
+                                                <svg className="image-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                    <polyline points="21 15 16 10 5 21"/>
+                                                </svg>
+                                                <div className="image-upload-text">클릭하여 이미지 추가</div>
+                                                <div className="image-upload-hint">JPG, PNG 파일만 가능 (여러 장 선택 가능)</div>
+                                            </label>
+                                        )}
+
+                                        {/* 이미지 개수 안내 */}
+                                        <div className={`image-count-info ${imageFiles.length >= MIN_IMAGES ? 'success' : 'warning'}`}>
+                                            {imageFiles.length} / {MAX_IMAGES}장 (최소 {MIN_IMAGES}장 필수)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="drawer-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => setIsDrawerOpen(false)}
+                                    disabled={isSubmitting}
+                                >
+                                    취소
+                                </button>
+                                <button type="submit" className="btn" disabled={isSubmitting}>
+                                    {isSubmitting ? '업로드 중...' : '등록'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // 설정 페이지
+        function SettingsPage({ user, userInfo }) {
+            const [showPasswordModal, setShowPasswordModal] = useState(false);
+            const [passwordForm, setPasswordForm] = useState({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            const [isChanging, setIsChanging] = useState(false);
+
+            // 비밀번호 변경
+            const handlePasswordChange = async (e) => {
+                e.preventDefault();
+
+                if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+                    alert('모든 항목을 입력해주세요.');
+                    return;
+                }
+
+                if (passwordForm.newPassword.length < 6) {
+                    alert('새 비밀번호는 6자 이상이어야 합니다.');
+                    return;
+                }
+
+                if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                    alert('새 비밀번호가 일치하지 않습니다.');
+                    return;
+                }
+
+                setIsChanging(true);
+
+                try {
+                    // 현재 비밀번호로 재인증
+                    const credential = firebase.auth.EmailAuthProvider.credential(
+                        user.email,
+                        passwordForm.currentPassword
+                    );
+                    await user.reauthenticateWithCredential(credential);
+
+                    // 비밀번호 변경
+                    await user.updatePassword(passwordForm.newPassword);
+
+                    alert('비밀번호가 변경되었습니다.');
+                    setShowPasswordModal(false);
+                    setPasswordForm({
+                        currentPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                    });
+                } catch (error) {
+                    console.error('비밀번호 변경 오류:', error);
+                    if (error.code === 'auth/wrong-password') {
+                        alert('현재 비밀번호가 올바르지 않습니다.');
+                    } else if (error.code === 'auth/weak-password') {
+                        alert('새 비밀번호가 너무 약합니다. 더 강력한 비밀번호를 사용해주세요.');
+                    } else {
+                        alert('비밀번호 변경에 실패했습니다: ' + error.message);
+                    }
+                } finally {
+                    setIsChanging(false);
+                }
+            };
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">설정</h2>
+                        <p className="page-subtitle">계정 설정을 관리합니다</p>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="settings-section">
+                            <h3 className="section-title">계정 정보</h3>
+                            <div className="settings-item">
+                                <div className="settings-item-info">
+                                    <h4>이메일</h4>
+                                    <p>{user?.email}</p>
+                                </div>
+                            </div>
+                            <div className="settings-item">
+                                <div className="settings-item-info">
+                                    <h4>이름</h4>
+                                    <p>{userInfo?.displayName || '미설정'}</p>
+                                </div>
+                            </div>
+                            <div className="settings-item">
+                                <div className="settings-item-info">
+                                    <h4>지점명</h4>
+                                    <p>{userInfo?.branchName || '미설정'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="settings-section">
+                            <h3 className="section-title">보안</h3>
+                            <div className="settings-item">
+                                <div className="settings-item-info">
+                                    <h4>비밀번호 변경</h4>
+                                    <p>계정 비밀번호를 변경합니다</p>
+                                </div>
+                                <button 
+                                    className="btn" 
+                                    style={{padding: '8px 16px', fontSize: '12px'}}
+                                    onClick={() => setShowPasswordModal(true)}
+                                >
+                                    변경
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 비밀번호 변경 모달 */}
+                    {showPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>비밀번호 변경</h3>
+                                    <button className="modal-close" onClick={() => setShowPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handlePasswordChange}>
+                                    <div className="modal-body">
+                                        <div className="form-group">
+                                            <label>현재 비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={passwordForm.currentPassword}
+                                                onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                                                placeholder="현재 비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>새 비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={passwordForm.newPassword}
+                                                onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                                                placeholder="새 비밀번호 (6자 이상)"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>새 비밀번호 확인</label>
+                                            <input 
+                                                type="password"
+                                                value={passwordForm.confirmPassword}
+                                                onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                                                placeholder="새 비밀번호를 다시 입력하세요"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowPasswordModal(false)}
+                                            disabled={isChanging}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isChanging}
+                                        >
+                                            {isChanging ? '변경 중...' : '변경'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 사이드바 컴포넌트
+        function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout }) {
+            const menuItems = [
+                { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
+                { id: 'settings', name: '설정', icon: Icons.Settings }
+            ];
+
+            return (
+                <aside className="sidebar">
+                    <div className="sidebar-header">
+                        {userInfo?.branchName && (
+                            <div className="branch-badge">
+                                {userInfo.branchName}
+                            </div>
+                        )}
+                        <h1>마케팅 비용 관리</h1>
+                        <p>Marketing Cost Compilater</p>
+                    </div>
+
+                    <nav className="sidebar-nav">
+                        {menuItems.map(item => (
+                            <div
+                                key={item.id}
+                                className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(item.id)}
+                            >
+                                <item.icon />
+                                <span>{item.name}</span>
+                            </div>
+                        ))}
+                    </nav>
+
+                    <div className="sidebar-footer">
+                        <div className="user-info-sidebar">
+                            <div className="user-avatar">
+                                {userInfo?.displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="user-details">
+                                <div className="name">{userInfo?.displayName || user?.email}</div>
+                                <div className="role">사용자</div>
+                            </div>
+                        </div>
+                        <button className="logout-btn" onClick={onLogout}>
+                            로그아웃
+                        </button>
+                    </div>
+                </aside>
+            );
+        }
+
+        // 메인 앱 컴포넌트
+        function App() {
+            const [currentPage, setCurrentPage] = useState('cost');
+            const [user, setUser] = useState(null);
+            const [userInfo, setUserInfo] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            // Firestore에서 사용자 정보 가져오기
+            const fetchUserInfo = async (uid) => {
+                try {
+                    const doc = await db.collection('users').doc(uid).get();
+                    if (doc.exists) {
+                        setUserInfo(doc.data());
+                    }
+                } catch (error) {
+                    console.error('사용자 정보 가져오기 오류:', error);
+                }
+            };
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+                    if (!currentUser) {
+                        window.location.href = 'index.html';
+                    } else if (currentUser.email === ADMIN_EMAIL) {
+                        window.location.href = 'admin.html';
+                    } else {
+                        setUser(currentUser);
+                        fetchUserInfo(currentUser.uid);
+                        setLoading(false);
+                    }
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            const handleLogout = async () => {
+                if (confirm('로그아웃 하시겠습니까?')) {
+                    const result = await logout();
+                    if (result.success) {
+                        window.location.href = 'index.html';
+                    } else {
+                        alert('로그아웃 실패: ' + result.message);
+                    }
+                }
+            };
+
+            if (loading) {
+                return <div className="loading">로딩 중...</div>;
+            }
+
+            const renderPage = () => {
+                switch (currentPage) {
+                    case 'cost':
+                        return <MarketingCostPage user={user} userInfo={userInfo} />;
+                    case 'settings':
+                        return <SettingsPage user={user} userInfo={userInfo} />;
+                    default:
+                        return <MarketingCostPage user={user} userInfo={userInfo} />;
+                }
+            };
+
+            return (
+                <div className="app-container">
+                    <Sidebar
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        user={user}
+                        userInfo={userInfo}
+                        onLogout={handleLogout}
+                    />
+                    <main className="main-content">
+                        {renderPage()}
+                    </main>
+                </div>
+            );
+        }
+
+        // React 렌더링
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

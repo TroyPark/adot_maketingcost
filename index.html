@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - Marketing Cost Compilater</title>
+    <link rel="icon" type="image/png" href="image/symbol_white.png">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #001236 0%, #002856 50%, #001236 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .login-header h1 {
+            color: #001236;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .login-header h2 {
+            color: #666;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #001236;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background-color: #f9f9f9;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #f07c00;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(240, 124, 0, 0.15);
+        }
+
+        .form-group input::placeholder {
+            color: #999;
+        }
+
+        .password-container {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            transition: color 0.3s ease;
+        }
+
+        .password-toggle:hover {
+            color: #f07c00;
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 16px;
+            background: #f07c00;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(240, 124, 0, 0.3);
+        }
+
+        .login-button:hover {
+            background: #e07000;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(240, 124, 0, 0.5);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .logo-white {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .logo-white img {
+            max-width: 200px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+
+            .login-header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>로그인</h1>
+            <h2>지점 마케팅 비용 관리 시스템</h2> 
+            <p>Marketing Cost Compilater에 오신 것을 환영합니다</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">이메일</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    placeholder="이메일을 입력하세요" 
+                    required 
+                    autocomplete="username"
+                >
+                <div class="error-message" id="emailError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">비밀번호</label>
+                <div class="password-container">
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="비밀번호를 입력하세요" 
+                        required 
+                        autocomplete="current-password"
+                    >
+                    <button type="button" class="password-toggle" id="passwordToggle">
+                        <span id="toggleText">보기</span>
+                    </button>
+                </div>
+                <div class="error-message" id="passwordError"></div>
+            </div>
+
+            <div class="error-message" id="loginError"></div>
+
+            <button type="submit" class="login-button">로그인</button>
+        </form>
+    </div>
+
+    <div class="logo-white">
+        <img src="image/logd_white.png" alt="Logo">
+    </div>
+
+    <!-- Firebase 설정 -->
+    <script src="firebase.js"></script>
+    
+    <script>
+        // 비밀번호 보기/숨기기 토글
+        const passwordToggle = document.getElementById('passwordToggle');
+        const passwordInput = document.getElementById('password');
+        const toggleText = document.getElementById('toggleText');
+
+        passwordToggle.addEventListener('click', function() {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleText.textContent = '숨기기';
+            } else {
+                passwordInput.type = 'password';
+                toggleText.textContent = '보기';
+            }
+        });
+
+        // 폼 제출 처리
+        const loginForm = document.getElementById('loginForm');
+        const emailError = document.getElementById('emailError');
+        const passwordError = document.getElementById('passwordError');
+        const loginError = document.getElementById('loginError');
+        const loginButton = document.querySelector('.login-button');
+
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // 에러 메시지 초기화
+            emailError.classList.remove('show');
+            passwordError.classList.remove('show');
+            loginError.classList.remove('show');
+            emailError.textContent = '';
+            passwordError.textContent = '';
+            loginError.textContent = '';
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            // 기본 유효성 검사
+            let isValid = true;
+
+            if (!email) {
+                emailError.textContent = '이메일을 입력해주세요.';
+                emailError.classList.add('show');
+                isValid = false;
+            }
+
+            if (!password) {
+                passwordError.textContent = '비밀번호를 입력해주세요.';
+                passwordError.classList.add('show');
+                isValid = false;
+            } else if (password.length < 6) {
+                passwordError.textContent = '비밀번호는 최소 6자 이상이어야 합니다.';
+                passwordError.classList.add('show');
+                isValid = false;
+            }
+
+            if (!isValid) {
+                return;
+            }
+
+            // 로그인 버튼 비활성화
+            loginButton.disabled = true;
+            loginButton.textContent = '로그인 중...';
+
+            // Firebase 로그인
+            const result = await loginWithEmail(email, password);
+            
+            if (result.success) {
+                console.log('로그인 성공:', result.user.email);
+                
+                // 관리자 이메일 확인 후 페이지 분기
+                if (result.user.email === 'admin@dshare.co.kr') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'user.html';
+                }
+            } else {
+                loginError.textContent = result.message;
+                loginError.classList.add('show');
+                loginButton.disabled = false;
+                loginButton.textContent = '로그인';
+            }
+        });
+
+        // 로그인 상태 확인 (이미 로그인되어 있으면 페이지 이동)
+        onAuthStateChange(function(user) {
+            if (user) {
+                console.log('이미 로그인됨:', user.email);
+                
+                // 관리자 이메일 확인 후 페이지 분기
+                if (user.email === 'admin@dshare.co.kr') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'user.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
