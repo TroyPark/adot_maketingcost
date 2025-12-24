@@ -929,6 +929,11 @@
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                 </svg>
             ),
+            Inquiry: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            ),
             Settings: () => (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="3"/>
@@ -1778,16 +1783,24 @@
         }
 
         // 설정 페이지
-        function SettingsPage({ user, userInfo }) {
+        function SettingsPage({ user, userInfo, setUserInfo, isEmailVerified, setIsEmailVerified }) {
             const [showPasswordModal, setShowPasswordModal] = useState(false);
+            const [showMarketingPasswordModal, setShowMarketingPasswordModal] = useState(false);
             const [passwordForm, setPasswordForm] = useState({
                 currentPassword: '',
                 newPassword: '',
                 confirmPassword: ''
             });
+            const [marketingPasswordForm, setMarketingPasswordForm] = useState({
+                newMarketingPassword: '',
+                confirmMarketingPassword: ''
+            });
             const [isChanging, setIsChanging] = useState(false);
+            const [isChangingMarketing, setIsChangingMarketing] = useState(false);
+            const [isSendingEmail, setIsSendingEmail] = useState(false);
+            const [emailSent, setEmailSent] = useState(false);
 
-            // 비밀번호 변경
+            // 계정 비밀번호 변경
             const handlePasswordChange = async (e) => {
                 e.preventDefault();
 
@@ -1840,6 +1853,93 @@
                 }
             };
 
+            // 이메일 인증 링크 전송
+            const sendVerificationEmail = async () => {
+                setIsSendingEmail(true);
+
+                try {
+                    const actionCodeSettings = {
+                        url: window.location.origin + window.location.pathname + '?marketingPasswordChange=true',
+                        handleCodeInApp: true
+                    };
+
+                    await firebase.auth().sendSignInLinkToEmail(user.email, actionCodeSettings);
+                    
+                    // 이메일 저장 (링크 확인용)
+                    localStorage.setItem('emailForSignIn', user.email);
+                    localStorage.setItem('marketingPasswordPending', 'true');
+                    
+                    setEmailSent(true);
+                    alert(`인증 이메일이 ${user.email}로 전송되었습니다.\n이메일의 링크를 클릭하여 인증을 완료해주세요.`);
+                } catch (error) {
+                    console.error('인증 이메일 전송 오류:', error);
+                    alert('인증 이메일 전송에 실패했습니다: ' + error.message);
+                } finally {
+                    setIsSendingEmail(false);
+                }
+            };
+
+            // 마케팅 비용 비밀번호 설정/변경 (이메일 인증 완료 후)
+            const handleMarketingPasswordChange = async (e) => {
+                e.preventDefault();
+
+                if (!marketingPasswordForm.newMarketingPassword || !marketingPasswordForm.confirmMarketingPassword) {
+                    alert('모든 항목을 입력해주세요.');
+                    return;
+                }
+
+                if (marketingPasswordForm.newMarketingPassword.length < 4) {
+                    alert('마케팅 비용 비밀번호는 4자 이상이어야 합니다.');
+                    return;
+                }
+
+                if (marketingPasswordForm.newMarketingPassword !== marketingPasswordForm.confirmMarketingPassword) {
+                    alert('새 비밀번호가 일치하지 않습니다.');
+                    return;
+                }
+
+                setIsChangingMarketing(true);
+
+                try {
+                    // Firestore에 마케팅 비용 비밀번호 저장
+                    await db.collection('users').doc(user.uid).update({
+                        marketingPassword: marketingPasswordForm.newMarketingPassword
+                    });
+
+                    // 로컬 상태 업데이트
+                    setUserInfo({
+                        ...userInfo,
+                        marketingPassword: marketingPasswordForm.newMarketingPassword
+                    });
+
+                    // 이메일 인증 상태 초기화
+                    setIsEmailVerified(false);
+                    localStorage.removeItem('marketingPasswordPending');
+
+                    alert('마케팅 비용 비밀번호가 설정되었습니다.');
+                    setShowMarketingPasswordModal(false);
+                    setMarketingPasswordForm({
+                        newMarketingPassword: '',
+                        confirmMarketingPassword: ''
+                    });
+                } catch (error) {
+                    console.error('마케팅 비용 비밀번호 설정 오류:', error);
+                    alert('비밀번호 설정에 실패했습니다: ' + error.message);
+                } finally {
+                    setIsChangingMarketing(false);
+                }
+            };
+
+            // 마케팅 비밀번호 모달 열기
+            const openMarketingPasswordModal = () => {
+                if (isEmailVerified) {
+                    setShowMarketingPasswordModal(true);
+                } else {
+                    setEmailSent(false);
+                    setShowMarketingPasswordModal(true);
+                }
+            };
+
             return (
                 <div>
                     <div className="page-header">
@@ -1874,8 +1974,8 @@
                             <h3 className="section-title">보안</h3>
                             <div className="settings-item">
                                 <div className="settings-item-info">
-                                    <h4>비밀번호 변경</h4>
-                                    <p>계정 비밀번호를 변경합니다</p>
+                                    <h4>계정 비밀번호 변경</h4>
+                                    <p>로그인 비밀번호를 변경합니다</p>
                                 </div>
                                 <button 
                                     className="btn" 
@@ -1885,15 +1985,49 @@
                                     변경
                                 </button>
                             </div>
+                            <div className="settings-item">
+                                <div className="settings-item-info">
+                                    <h4>마케팅 비용 비밀번호</h4>
+                                    <p style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        마케팅 비용 페이지 접근 비밀번호 [★원장님 전용]
+                                        {userInfo?.marketingPassword ? (
+                                            <span style={{
+                                                background: '#e8f5e9',
+                                                color: '#388e3c',
+                                                padding: '2px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: '600'
+                                            }}>설정됨</span>
+                                        ) : (
+                                            <span style={{
+                                                background: '#ffebee',
+                                                color: '#c62828',
+                                                padding: '2px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: '600'
+                                            }}>미설정</span>
+                                        )}
+                                    </p>
+                                </div>
+                                <button 
+                                    className="btn" 
+                                    style={{padding: '8px 16px', fontSize: '12px'}}
+                                    onClick={openMarketingPasswordModal}
+                                >
+                                    {userInfo?.marketingPassword ? '변경' : '설정'}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* 비밀번호 변경 모달 */}
+                    {/* 계정 비밀번호 변경 모달 */}
                     {showPasswordModal && (
                         <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
                             <div className="modal" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
-                                    <h3>비밀번호 변경</h3>
+                                    <h3>계정 비밀번호 변경</h3>
                                     <button className="modal-close" onClick={() => setShowPasswordModal(false)}>×</button>
                                 </div>
                                 <form onSubmit={handlePasswordChange}>
@@ -1951,16 +2085,779 @@
                             </div>
                         </div>
                     )}
+
+                    {/* 마케팅 비용 비밀번호 설정 모달 */}
+                    {showMarketingPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowMarketingPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+                                <div className="modal-header">
+                                    <h3>🔒 마케팅 비용 비밀번호 {userInfo?.marketingPassword ? '변경' : '설정'}</h3>
+                                    <button className="modal-close" onClick={() => setShowMarketingPasswordModal(false)}>×</button>
+                                </div>
+                                
+                                {/* 이메일 인증이 완료되지 않은 경우 */}
+                                {!isEmailVerified ? (
+                                    <div className="modal-body">
+                                        <div style={{
+                                            background: '#e3f2fd',
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            marginBottom: '20px',
+                                            textAlign: 'center'
+                                        }}>
+                                            <div style={{fontSize: '40px', marginBottom: '12px'}}>📧</div>
+                                            <h4 style={{color: '#1565c0', marginBottom: '8px'}}>이메일 인증 필요</h4>
+                                            <p style={{fontSize: '13px', color: '#666', lineHeight: '1.5'}}>
+                                                마케팅 비용 비밀번호를 {userInfo?.marketingPassword ? '변경' : '설정'}하려면<br/>
+                                                이메일 인증이 필요합니다.
+                                            </p>
+                                        </div>
+                                        
+                                        <div style={{
+                                            background: '#f8f9fa',
+                                            padding: '14px',
+                                            borderRadius: '8px',
+                                            marginBottom: '20px'
+                                        }}>
+                                            <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>인증 이메일 발송 주소</div>
+                                            <div style={{fontSize: '15px', fontWeight: '600', color: '#333'}}>{user?.email}</div>
+                                        </div>
+
+                                        {emailSent && (
+                                            <div style={{
+                                                background: '#e8f5e9',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '13px',
+                                                color: '#2e7d32'
+                                            }}>
+                                                ✅ 인증 이메일이 전송되었습니다. 이메일을 확인해주세요.
+                                            </div>
+                                        )}
+
+                                        <div className="modal-footer" style={{borderTop: 'none', paddingTop: 0}}>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => setShowMarketingPasswordModal(false)}
+                                            >
+                                                취소
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-sm"
+                                                onClick={sendVerificationEmail}
+                                                disabled={isSendingEmail}
+                                            >
+                                                {isSendingEmail ? '전송 중...' : (emailSent ? '다시 전송' : '인증 이메일 보내기')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* 이메일 인증 완료 후 비밀번호 설정 */
+                                    <form onSubmit={handleMarketingPasswordChange}>
+                                        <div className="modal-body">
+                                            <div style={{
+                                                background: '#e8f5e9',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '13px',
+                                                color: '#2e7d32'
+                                            }}>
+                                                ✅ 이메일 인증이 완료되었습니다. 새 비밀번호를 설정해주세요.
+                                            </div>
+                                            <div className="form-group">
+                                                <label>새 마케팅 비용 비밀번호</label>
+                                                <input 
+                                                    type="password"
+                                                    value={marketingPasswordForm.newMarketingPassword}
+                                                    onChange={(e) => setMarketingPasswordForm({...marketingPasswordForm, newMarketingPassword: e.target.value})}
+                                                    placeholder="4자 이상"
+                                                    required
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>새 마케팅 비용 비밀번호 확인</label>
+                                                <input 
+                                                    type="password"
+                                                    value={marketingPasswordForm.confirmMarketingPassword}
+                                                    onChange={(e) => setMarketingPasswordForm({...marketingPasswordForm, confirmMarketingPassword: e.target.value})}
+                                                    placeholder="비밀번호를 다시 입력하세요"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="modal-footer">
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => {
+                                                    setShowMarketingPasswordModal(false);
+                                                    setIsEmailVerified(false);
+                                                }}
+                                                disabled={isChangingMarketing}
+                                            >
+                                                취소
+                                            </button>
+                                            <button 
+                                                type="submit" 
+                                                className="btn btn-sm"
+                                                disabled={isChangingMarketing}
+                                            >
+                                                {isChangingMarketing ? '설정 중...' : '설정'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 지점 문의 창구 페이지
+        function InquiryPage({ user, userInfo }) {
+            const [inquiries, setInquiries] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showWriteModal, setShowWriteModal] = useState(false);
+            const [showDetailModal, setShowDetailModal] = useState(false);
+            const [showEditModal, setShowEditModal] = useState(false);
+            const [showDeleteModal, setShowDeleteModal] = useState(false);
+            const [selectedInquiry, setSelectedInquiry] = useState(null);
+            const [formData, setFormData] = useState({
+                title: '',
+                content: '',
+                position: ''
+            });
+            const [editFormData, setEditFormData] = useState({
+                title: '',
+                content: '',
+                position: ''
+            });
+            const [deletePassword, setDeletePassword] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [isDeleting, setIsDeleting] = useState(false);
+
+            // 직책 옵션
+            const positionOptions = ['원장', '부원장', '실장', '강사'];
+
+            // 내 지점 문의글 로드
+            useEffect(() => {
+                if (!user || !userInfo?.branchName) {
+                    setLoading(false);
+                    return;
+                }
+
+                const unsubscribe = db.collection('inquiries')
+                    .where('branchName', '==', userInfo.branchName)
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        // 최신순 정렬
+                        data.sort((a, b) => {
+                            const dateA = a.createdAt?.toDate?.() || new Date(0);
+                            const dateB = b.createdAt?.toDate?.() || new Date(0);
+                            return dateB - dateA;
+                        });
+                        setInquiries(data);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('문의글 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, [user, userInfo?.branchName]);
+
+            // 날짜 포맷
+            const formatDate = (timestamp) => {
+                if (!timestamp) return '-';
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            // 글 작성
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+
+                if (!formData.position) {
+                    alert('작성자(직책)를 선택해주세요.');
+                    return;
+                }
+                if (!formData.title.trim() || !formData.content.trim()) {
+                    alert('제목과 내용을 입력해주세요.');
+                    return;
+                }
+
+                setIsSubmitting(true);
+
+                try {
+                    await db.collection('inquiries').add({
+                        userId: user.uid,
+                        userEmail: user.email,
+                        userName: userInfo?.displayName || '',
+                        position: formData.position,
+                        branchName: userInfo?.branchName || '',
+                        team: userInfo?.team || '',
+                        title: formData.title.trim(),
+                        content: formData.content.trim(),
+                        status: 'pending',
+                        reply: '',
+                        repliedAt: null,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('문의가 등록되었습니다.');
+                    setFormData({ title: '', content: '', position: '' });
+                    setShowWriteModal(false);
+                } catch (error) {
+                    console.error('문의 등록 오류:', error);
+                    alert('문의 등록에 실패했습니다.');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            // 상세보기
+            const openDetail = (inquiry) => {
+                setSelectedInquiry(inquiry);
+                setShowDetailModal(true);
+            };
+
+            // 수정 모달 열기
+            const openEditModal = (e) => {
+                e.stopPropagation();
+                setEditFormData({
+                    title: selectedInquiry.title,
+                    content: selectedInquiry.content,
+                    position: selectedInquiry.position || ''
+                });
+                setShowDetailModal(false);
+                setShowEditModal(true);
+            };
+
+            // 수정 저장
+            const handleEdit = async (e) => {
+                e.preventDefault();
+
+                if (!editFormData.position) {
+                    alert('작성자(직책)를 선택해주세요.');
+                    return;
+                }
+                if (!editFormData.title.trim() || !editFormData.content.trim()) {
+                    alert('제목과 내용을 입력해주세요.');
+                    return;
+                }
+
+                setIsSubmitting(true);
+
+                try {
+                    await db.collection('inquiries').doc(selectedInquiry.id).update({
+                        title: editFormData.title.trim(),
+                        content: editFormData.content.trim(),
+                        position: editFormData.position,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('문의가 수정되었습니다.');
+                    setShowEditModal(false);
+                    setSelectedInquiry(null);
+                } catch (error) {
+                    console.error('문의 수정 오류:', error);
+                    alert('문의 수정에 실패했습니다.');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            // 삭제 모달 열기
+            const openDeleteModal = (e) => {
+                e.stopPropagation();
+                setDeletePassword('');
+                setShowDetailModal(false);
+                setShowDeleteModal(true);
+            };
+
+            // 삭제 실행
+            const handleDelete = async (e) => {
+                e.preventDefault();
+
+                if (!deletePassword) {
+                    alert('비밀번호를 입력해주세요.');
+                    return;
+                }
+
+                setIsDeleting(true);
+
+                try {
+                    // 비밀번호 확인 (재인증)
+                    const credential = firebase.auth.EmailAuthProvider.credential(
+                        user.email,
+                        deletePassword
+                    );
+                    await user.reauthenticateWithCredential(credential);
+
+                    // 삭제 실행
+                    await db.collection('inquiries').doc(selectedInquiry.id).delete();
+
+                    alert('문의가 삭제되었습니다.');
+                    setShowDeleteModal(false);
+                    setSelectedInquiry(null);
+                } catch (error) {
+                    console.error('삭제 오류:', error);
+                    if (error.code === 'auth/wrong-password') {
+                        alert('비밀번호가 올바르지 않습니다.');
+                    } else {
+                        alert('삭제에 실패했습니다: ' + error.message);
+                    }
+                } finally {
+                    setIsDeleting(false);
+                    setDeletePassword('');
+                }
+            };
+
+            // 상태 배지
+            const getStatusBadge = (status) => {
+                const styles = {
+                    pending: { bg: '#fff3e0', color: '#f57c00', text: '대기중' },
+                    answered: { bg: '#e8f5e9', color: '#388e3c', text: '답변완료' }
+                };
+                const style = styles[status] || styles.pending;
+                return (
+                    <span style={{
+                        background: style.bg,
+                        color: style.color,
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-block'
+                    }}>
+                        {style.text}
+                    </span>
+                );
+            };
+
+            if (loading) {
+                return (
+                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
+                        <p>문의 목록을 불러오는 중...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">지점 문의 창구</h2>
+                        <p className="page-subtitle">본사에 문의사항을 남기고 답변을 확인합니다</p>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="table-header">
+                            <h3 className="section-title" style={{marginBottom: 0}}>
+                                내 문의 목록 ({inquiries.length}건)
+                            </h3>
+                            <button className="btn" onClick={() => setShowWriteModal(true)}>
+                                + 문의 작성
+                            </button>
+                        </div>
+
+                        {inquiries.length === 0 ? (
+                            <div className="empty-table">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                <p>등록된 문의가 없습니다.</p>
+                                <p style={{marginTop: '8px', color: '#bbb'}}>위의 '문의 작성' 버튼을 클릭하여 문의를 남겨보세요.</p>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
+                                        <th style={{width: '100px', whiteSpace: 'nowrap'}}>상태</th>
+                                        <th style={{width: '40%'}}>제목</th>
+                                        <th style={{width: '90px'}}>작성자</th>
+                                        <th style={{width: '160px'}}>작성일</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {inquiries.map((inquiry, index) => (
+                                        <tr 
+                                            key={inquiry.id}
+                                            onClick={() => openDetail(inquiry)}
+                                            style={{cursor: 'pointer'}}
+                                        >
+                                            <td style={{textAlign: 'center', color: '#666', fontSize: '13px'}}>{index + 1}</td>
+                                            <td>{getStatusBadge(inquiry.status)}</td>
+                                            <td style={{fontWeight: '500'}}>{inquiry.title}</td>
+                                            <td>
+                                                {inquiry.position ? (
+                                                    <span style={{
+                                                        background: '#e8f4fd',
+                                                        color: '#1976d2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {inquiry.position}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                            <td style={{fontSize: '13px', color: '#666'}}>
+                                                {formatDate(inquiry.createdAt)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* 문의 작성 모달 */}
+                    {showWriteModal && (
+                        <div className="modal-overlay" onClick={() => setShowWriteModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                                <div className="modal-header">
+                                    <h3>문의 작성</h3>
+                                    <button className="modal-close" onClick={() => setShowWriteModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleSubmit}>
+                                    <div className="modal-body">
+                                        <div style={{
+                                            background: '#f07c00',
+                                            color: 'white',
+                                            padding: '10px 16px',
+                                            borderRadius: '8px',
+                                            marginBottom: '20px',
+                                            fontSize: '14px',
+                                            fontWeight: '600'
+                                        }}>
+                                            📍 {userInfo?.branchName || '지점 미설정'}
+                                            {userInfo?.team && ` / ${userInfo.team}`}
+                                        </div>
+                                        <div className="form-group">
+                                            <label>작성자 (직책) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <select
+                                                value={formData.position}
+                                                onChange={(e) => setFormData({...formData, position: e.target.value})}
+                                                required
+                                            >
+                                                <option value="">직책을 선택하세요</option>
+                                                {positionOptions.map(pos => (
+                                                    <option key={pos} value={pos}>{pos}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>제목 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <input 
+                                                type="text"
+                                                value={formData.title}
+                                                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                                placeholder="문의 제목을 입력하세요"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>내용 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <textarea 
+                                                rows="6"
+                                                value={formData.content}
+                                                onChange={(e) => setFormData({...formData, content: e.target.value})}
+                                                placeholder="문의 내용을 입력하세요"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowWriteModal(false)}
+                                            disabled={isSubmitting}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isSubmitting}
+                                        >
+                                            {isSubmitting ? '등록 중...' : '등록'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 문의 상세 모달 */}
+                    {showDetailModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
+                                <div className="modal-header">
+                                    <h3>문의 상세</h3>
+                                    <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                </div>
+                                <div className="modal-body">
+                                    <div style={{marginBottom: '20px'}}>
+                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                                {getStatusBadge(selectedInquiry.status)}
+                                                {selectedInquiry.position && (
+                                                    <span style={{
+                                                        background: '#e8f4fd',
+                                                        color: '#1976d2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {selectedInquiry.position}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span style={{fontSize: '13px', color: '#666'}}>
+                                                {formatDate(selectedInquiry.createdAt)}
+                                            </span>
+                                        </div>
+                                        <h4 style={{fontSize: '18px', fontWeight: '600', color: '#001236', marginBottom: '15px'}}>
+                                            {selectedInquiry.title}
+                                        </h4>
+                                        <div style={{
+                                            background: '#f8f9fa',
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.6',
+                                            color: '#333'
+                                        }}>
+                                            {selectedInquiry.content}
+                                        </div>
+                                    </div>
+
+                                    {/* 답변 */}
+                                    {selectedInquiry.status === 'answered' && selectedInquiry.reply && (
+                                        <div style={{
+                                            borderTop: '1px solid #eee',
+                                            paddingTop: '20px'
+                                        }}>
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                marginBottom: '12px'
+                                            }}>
+                                                <span style={{
+                                                    background: '#001236',
+                                                    color: 'white',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    본사 답변
+                                                </span>
+                                                <span style={{fontSize: '13px', color: '#666'}}>
+                                                    {formatDate(selectedInquiry.repliedAt)}
+                                                </span>
+                                            </div>
+                                            <div style={{
+                                                background: '#e3f2fd',
+                                                padding: '16px',
+                                                borderRadius: '8px',
+                                                whiteSpace: 'pre-wrap',
+                                                lineHeight: '1.6',
+                                                color: '#333'
+                                            }}>
+                                                {selectedInquiry.reply}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="modal-footer" style={{justifyContent: 'space-between'}}>
+                                    <div style={{display: 'flex', gap: '8px'}}>
+                                        <button 
+                                            className="btn btn-sm btn-secondary"
+                                            onClick={openEditModal}
+                                        >
+                                            수정
+                                        </button>
+                                        <button 
+                                            className="btn btn-sm btn-danger"
+                                            onClick={openDeleteModal}
+                                        >
+                                            삭제
+                                        </button>
+                                    </div>
+                                    <button 
+                                        className="btn btn-sm"
+                                        onClick={() => setShowDetailModal(false)}
+                                    >
+                                        닫기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 문의 수정 모달 */}
+                    {showEditModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                                <div className="modal-header">
+                                    <h3>문의 수정</h3>
+                                    <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleEdit}>
+                                    <div className="modal-body">
+                                        <div className="form-group">
+                                            <label>작성자 (직책) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <select
+                                                value={editFormData.position}
+                                                onChange={(e) => setEditFormData({...editFormData, position: e.target.value})}
+                                                required
+                                            >
+                                                <option value="">직책을 선택하세요</option>
+                                                {positionOptions.map(pos => (
+                                                    <option key={pos} value={pos}>{pos}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>제목 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <input 
+                                                type="text"
+                                                value={editFormData.title}
+                                                onChange={(e) => setEditFormData({...editFormData, title: e.target.value})}
+                                                placeholder="문의 제목을 입력하세요"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>내용 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <textarea 
+                                                rows="6"
+                                                value={editFormData.content}
+                                                onChange={(e) => setEditFormData({...editFormData, content: e.target.value})}
+                                                placeholder="문의 내용을 입력하세요"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowEditModal(false)}
+                                            disabled={isSubmitting}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isSubmitting}
+                                        >
+                                            {isSubmitting ? '수정 중...' : '수정'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 삭제 확인 모달 */}
+                    {showDeleteModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="modal-header">
+                                    <h3 style={{color: '#dc3545'}}>⚠️ 문의 삭제</h3>
+                                    <button className="modal-close" onClick={() => setShowDeleteModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleDelete}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '15px', color: '#666'}}>
+                                            이 문의를 삭제하려면 비밀번호를 입력하세요.
+                                        </p>
+                                        <p style={{
+                                            background: '#f8f9fa',
+                                            padding: '12px',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            marginBottom: '15px'
+                                        }}>
+                                            "{selectedInquiry.title}"
+                                        </p>
+                                        <div className="form-group">
+                                            <label style={{color: '#dc3545'}}>비밀번호 확인</label>
+                                            <input 
+                                                type="password"
+                                                value={deletePassword}
+                                                onChange={(e) => setDeletePassword(e.target.value)}
+                                                placeholder="비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowDeleteModal(false)}
+                                            disabled={isDeleting}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-danger btn-sm"
+                                            disabled={isDeleting}
+                                        >
+                                            {isDeleting ? '삭제 중...' : '삭제'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
         // 사이드바 컴포넌트
-        function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout }) {
+        function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout, onCostAccess }) {
             const menuItems = [
-                { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
+                { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
+                { id: 'cost', name: '마케팅 비용', icon: Icons.Cost, requiresPassword: true },
                 { id: 'settings', name: '설정', icon: Icons.Settings }
             ];
+
+            const handleMenuClick = (item) => {
+                if (item.requiresPassword) {
+                    onCostAccess();
+                } else {
+                    setCurrentPage(item.id);
+                }
+            };
 
             return (
                 <aside className="sidebar">
@@ -1979,10 +2876,16 @@
                             <div
                                 key={item.id}
                                 className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
-                                onClick={() => setCurrentPage(item.id)}
+                                onClick={() => handleMenuClick(item)}
                             >
                                 <item.icon />
                                 <span>{item.name}</span>
+                                {item.requiresPassword && (
+                                    <svg style={{width: '14px', height: '14px', marginLeft: 'auto', opacity: 0.7}} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                    </svg>
+                                )}
                             </div>
                         ))}
                     </nav>
@@ -2007,10 +2910,18 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('cost');
+            const [currentPage, setCurrentPage] = useState('inquiry');
             const [user, setUser] = useState(null);
             const [userInfo, setUserInfo] = useState(null);
             const [loading, setLoading] = useState(true);
+            
+            // 마케팅 비용 비밀번호 모달 상태
+            const [showCostPasswordModal, setShowCostPasswordModal] = useState(false);
+            const [costPasswordInput, setCostPasswordInput] = useState('');
+            const [isVerifyingCostPassword, setIsVerifyingCostPassword] = useState(false);
+            
+            // 이메일 인증 상태 (마케팅 비용 비밀번호 변경용)
+            const [isEmailVerified, setIsEmailVerified] = useState(false);
 
             // Firestore에서 사용자 정보 가져오기
             const fetchUserInfo = async (uid) => {
@@ -2023,6 +2934,34 @@
                     console.error('사용자 정보 가져오기 오류:', error);
                 }
             };
+
+            // 이메일 링크 인증 확인
+            useEffect(() => {
+                if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
+                    let email = localStorage.getItem('emailForSignIn');
+                    const isPending = localStorage.getItem('marketingPasswordPending');
+                    
+                    if (!email) {
+                        email = window.prompt('인증 이메일 주소를 입력해주세요:');
+                    }
+                    
+                    if (email && isPending) {
+                        firebase.auth().signInWithEmailLink(email, window.location.href)
+                            .then((result) => {
+                                localStorage.removeItem('emailForSignIn');
+                                setIsEmailVerified(true);
+                                setCurrentPage('settings');
+                                // URL에서 인증 파라미터 제거
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                                alert('이메일 인증이 완료되었습니다!\n설정에서 마케팅 비용 비밀번호를 설정해주세요.');
+                            })
+                            .catch((error) => {
+                                console.error('이메일 링크 인증 오류:', error);
+                                alert('이메일 인증에 실패했습니다. 다시 시도해주세요.');
+                            });
+                    }
+                }
+            }, []);
 
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -2051,6 +2990,45 @@
                 }
             };
 
+            // 마케팅 비용 접근 핸들러
+            const handleCostAccess = () => {
+                // 비밀번호가 설정되어 있지 않으면 바로 접근
+                if (!userInfo?.marketingPassword) {
+                    alert('마케팅 비용 비밀번호가 설정되어 있지 않습니다.\n설정 페이지에서 비밀번호를 먼저 설정해주세요.');
+                    setCurrentPage('settings');
+                    return;
+                }
+                setCostPasswordInput('');
+                setShowCostPasswordModal(true);
+            };
+
+            // 마케팅 비용 비밀번호 확인
+            const verifyCostPassword = async (e) => {
+                e.preventDefault();
+                
+                if (!costPasswordInput) {
+                    alert('비밀번호를 입력해주세요.');
+                    return;
+                }
+
+                setIsVerifyingCostPassword(true);
+
+                try {
+                    if (costPasswordInput === userInfo.marketingPassword) {
+                        setShowCostPasswordModal(false);
+                        setCostPasswordInput('');
+                        setCurrentPage('cost');
+                    } else {
+                        alert('비밀번호가 올바르지 않습니다.');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인에 실패했습니다.');
+                } finally {
+                    setIsVerifyingCostPassword(false);
+                }
+            };
+
             if (loading) {
                 return <div className="loading">로딩 중...</div>;
             }
@@ -2059,8 +3037,10 @@
                 switch (currentPage) {
                     case 'cost':
                         return <MarketingCostPage user={user} userInfo={userInfo} />;
+                    case 'inquiry':
+                        return <InquiryPage user={user} userInfo={userInfo} />;
                     case 'settings':
-                        return <SettingsPage user={user} userInfo={userInfo} />;
+                        return <SettingsPage user={user} userInfo={userInfo} setUserInfo={setUserInfo} isEmailVerified={isEmailVerified} setIsEmailVerified={setIsEmailVerified} />;
                     default:
                         return <MarketingCostPage user={user} userInfo={userInfo} />;
                 }
@@ -2074,10 +3054,58 @@
                         user={user}
                         userInfo={userInfo}
                         onLogout={handleLogout}
+                        onCostAccess={handleCostAccess}
                     />
                     <main className="main-content">
                         {renderPage()}
                     </main>
+
+                    {/* 마케팅 비용 비밀번호 모달 */}
+                    {showCostPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowCostPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="modal-header">
+                                    <h3>🔒 마케팅 비용 접근</h3>
+                                    <button className="modal-close" onClick={() => setShowCostPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={verifyCostPassword}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+                                            마케팅 비용 페이지에 접근하려면 비밀번호를 입력하세요.
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={costPasswordInput}
+                                                onChange={(e) => setCostPasswordInput(e.target.value)}
+                                                placeholder="마케팅 비용 비밀번호"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowCostPasswordModal(false)}
+                                            disabled={isVerifyingCostPassword}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isVerifyingCostPassword}
+                                        >
+                                            {isVerifyingCostPassword ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
