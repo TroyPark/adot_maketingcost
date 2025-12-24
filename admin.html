@@ -1956,6 +1956,59 @@
                 return Object.values(branchBudgets).reduce((sum, val) => sum + Number(val || 0), 0);
             };
 
+            // 지점별 비용 엑셀 다운로드
+            const handleExportBranchCosts = () => {
+                if (branches.length === 0) {
+                    alert('내보낼 데이터가 없습니다.');
+                    return;
+                }
+
+                const selectedRound = rounds.find(r => r.id === selectedRoundId);
+                const roundName = selectedRound ? selectedRound.name : '전체';
+
+                // CSV 데이터 생성
+                const headers = ['지점명', '배정 비용', '사용 비용', '잔여 비용', '사용률(%)'];
+                const rows = branches.map(branch => {
+                    const budget = branchBudgets[branch] || 0;
+                    const used = getBranchCosts(branch);
+                    const remaining = budget - used;
+                    const usageRate = budget > 0 ? Math.round((used / budget) * 100) : 0;
+                    return [
+                        branch,
+                        budget,
+                        used,
+                        remaining,
+                        usageRate
+                    ];
+                });
+
+                // 합계 행 추가
+                const totalBudget = getTotalBudget();
+                const totalUsed = branches.reduce((sum, b) => sum + getBranchCosts(b), 0);
+                const totalRemaining = totalBudget - totalUsed;
+                const totalRate = totalBudget > 0 ? Math.round((totalUsed / totalBudget) * 100) : 0;
+                rows.push(['합계', totalBudget, totalUsed, totalRemaining, totalRate]);
+
+                // BOM 추가 (한글 깨짐 방지)
+                const BOM = '\uFEFF';
+                const csvContent = BOM + [
+                    headers.join(','),
+                    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                ].join('\n');
+
+                // 파일 다운로드
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                const fileName = `지점별비용_${roundName}_${new Date().toLocaleDateString('ko-KR').replace(/\./g, '')}.csv`;
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
             // Round 추가
             const handleAddRound = async (e) => {
                 e.preventDefault();
@@ -2242,7 +2295,13 @@
                                                         </tbody>
                                                     </table>
                                                     
-                                                    <div style={{marginTop: '20px', textAlign: 'right'}}>
+                                                    <div style={{marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                        <button 
+                                                            className="btn btn-success"
+                                                            onClick={handleExportBranchCosts}
+                                                        >
+                                                            📥 엑셀 다운로드
+                                                        </button>
                                                         <button 
                                                             className="btn"
                                                             onClick={handleSaveBudgets}
