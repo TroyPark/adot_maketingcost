@@ -2782,41 +2782,196 @@
 
         // 설정 페이지
         function SettingsPage() {
+            const [user, setUser] = useState(null);
+            
+            // 비밀번호 변경 관련 상태
+            const [uniquePassword, setUniquePassword] = useState('');
+            const [newPassword, setNewPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
+            const [isChangingPassword, setIsChangingPassword] = useState(false);
+            const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
+            useEffect(() => {
+                const currentUser = auth.currentUser;
+                if (currentUser) {
+                    setUser(currentUser);
+                }
+            }, []);
+
+            // 비밀번호 변경 처리 (고유 비밀번호로 인증)
+            const handlePasswordChange = async (e) => {
+                e.preventDefault();
+                setPasswordMessage({ type: '', text: '' });
+
+                // 유효성 검사
+                if (!uniquePassword) {
+                    setPasswordMessage({ type: 'error', text: '고유 비밀번호를 입력해주세요.' });
+                    return;
+                }
+                if (!newPassword) {
+                    setPasswordMessage({ type: 'error', text: '새 비밀번호를 입력해주세요.' });
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    setPasswordMessage({ type: 'error', text: '새 비밀번호는 6자 이상이어야 합니다.' });
+                    return;
+                }
+                if (newPassword !== confirmPassword) {
+                    setPasswordMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' });
+                    return;
+                }
+
+                setIsChangingPassword(true);
+
+                try {
+                    // Firestore에서 고유 비밀번호 확인
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+                    
+                    if (!doc.exists) {
+                        setPasswordMessage({ type: 'error', text: '고유 비밀번호가 설정되지 않았습니다.' });
+                        setIsChangingPassword(false);
+                        return;
+                    }
+                    
+                    const storedPassword = doc.data().password;
+                    
+                    if (uniquePassword !== storedPassword) {
+                        setPasswordMessage({ type: 'error', text: '고유 비밀번호가 올바르지 않습니다.' });
+                        setIsChangingPassword(false);
+                        return;
+                    }
+
+                    // 비밀번호 변경
+                    const currentUser = auth.currentUser;
+                    await currentUser.updatePassword(newPassword);
+                    
+                    setPasswordMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' });
+                    setUniquePassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                } catch (error) {
+                    console.error('비밀번호 변경 오류:', error);
+                    if (error.code === 'auth/requires-recent-login') {
+                        setPasswordMessage({ type: 'error', text: '보안을 위해 다시 로그인 후 시도해주세요.' });
+                    } else {
+                        setPasswordMessage({ type: 'error', text: '비밀번호 변경에 실패했습니다: ' + error.message });
+                    }
+                } finally {
+                    setIsChangingPassword(false);
+                }
+            };
+
             return (
                 <div>
                     <div className="page-header">
                         <h2 className="page-title">설정</h2>
-                        <p className="page-subtitle">시스템 설정을 관리합니다</p>
+                        <p className="page-subtitle">계정 설정을 관리합니다</p>
                     </div>
 
                     <div className="content-area">
+                        {/* 계정 정보 */}
                         <div className="settings-section">
-                            <h3 className="section-title">계정 설정</h3>
-                            <div className="settings-item">
-                                <div className="settings-item-info">
-                                    <h4>이메일 알림</h4>
-                                    <p>새로운 비용 등록 시 이메일로 알림을 받습니다</p>
+                            <h3 className="section-title">계정 정보</h3>
+                            <div style={{
+                                background: '#f8f9fa',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                marginBottom: '20px'
+                            }}>
+                                <div style={{display: 'grid', gridTemplateColumns: '120px 1fr', gap: '15px', alignItems: 'center'}}>
+                                    <span style={{color: '#666', fontSize: '14px'}}>이메일</span>
+                                    <span style={{fontWeight: '600', color: '#1a1a2e'}}>{user?.email || '-'}</span>
+                                    
+                                    <span style={{color: '#666', fontSize: '14px'}}>역할</span>
+                                    <span>
+                                        <span style={{
+                                            background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
+                                            color: 'white',
+                                            padding: '4px 12px',
+                                            borderRadius: '4px',
+                                            fontSize: '12px',
+                                            fontWeight: '600'
+                                        }}>
+                                            관리자
+                                        </span>
+                                    </span>
                                 </div>
-                                <button className="btn" style={{padding: '8px 16px', fontSize: '12px'}}>설정</button>
-                            </div>
-                            <div className="settings-item">
-                                <div className="settings-item-info">
-                                    <h4>비밀번호 변경</h4>
-                                    <p>계정 비밀번호를 변경합니다</p>
-                                </div>
-                                <button className="btn" style={{padding: '8px 16px', fontSize: '12px'}}>변경</button>
                             </div>
                         </div>
 
-                        <div className="settings-section">
-                            <h3 className="section-title">시스템 설정</h3>
-                            <div className="settings-item">
-                                <div className="settings-item-info">
-                                    <h4>지점 관리</h4>
-                                    <p>지점 추가, 수정, 삭제를 관리합니다</p>
+                        {/* 비밀번호 변경 */}
+                        <div className="settings-section" style={{borderBottom: 'none', paddingBottom: 0}}>
+                            <h3 className="section-title">비밀번호 변경</h3>
+                            <p style={{color: '#666', fontSize: '14px', marginBottom: '20px'}}>
+                                비밀번호 변경을 위해 고유 비밀번호 인증이 필요합니다.
+                            </p>
+                            
+                            <form onSubmit={handlePasswordChange}>
+                                <div style={{maxWidth: '400px'}}>
+                                    <div className="form-group">
+                                        <label style={{color: '#e94560'}}>고유 비밀번호 *</label>
+                                        <input
+                                            type="password"
+                                            value={uniquePassword}
+                                            onChange={(e) => setUniquePassword(e.target.value)}
+                                            placeholder="고유 비밀번호를 입력하세요"
+                                            disabled={isChangingPassword}
+                                        />
+                                        <p style={{fontSize: '12px', color: '#999', marginTop: '4px'}}>
+                                            Round 관리에 사용되는 고유 비밀번호입니다
+                                        </p>
+                                    </div>
+                                    
+                                    <div style={{
+                                        borderTop: '1px solid #eee',
+                                        marginTop: '20px',
+                                        paddingTop: '20px'
+                                    }}>
+                                        <div className="form-group">
+                                            <label>새 비밀번호 *</label>
+                                            <input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="새 비밀번호 (6자 이상)"
+                                                disabled={isChangingPassword}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>새 비밀번호 확인 *</label>
+                                            <input
+                                                type="password"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder="새 비밀번호 다시 입력"
+                                                disabled={isChangingPassword}
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {passwordMessage.text && (
+                                        <div style={{
+                                            padding: '12px 16px',
+                                            borderRadius: '8px',
+                                            marginBottom: '15px',
+                                            background: passwordMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+                                            color: passwordMessage.type === 'success' ? '#155724' : '#721c24',
+                                            fontSize: '14px'
+                                        }}>
+                                            {passwordMessage.text}
+                                        </div>
+                                    )}
+                                    
+                                    <button 
+                                        type="submit" 
+                                        className="btn"
+                                        disabled={isChangingPassword}
+                                        style={{marginTop: '10px'}}
+                                    >
+                                        {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
+                                    </button>
                                 </div>
-                                <button className="btn" style={{padding: '8px 16px', fontSize: '12px'}}>관리</button>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 </div>
