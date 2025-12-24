@@ -606,11 +606,20 @@
             const [replyText, setReplyText] = useState('');
             const [replyAuthor, setReplyAuthor] = useState('');
             const [isReplying, setIsReplying] = useState(false);
+            
+            // 선택 및 이동 관련 상태
+            const [selectedInquiries, setSelectedInquiries] = useState([]);
+            const [showMoveModal, setShowMoveModal] = useState(false);
+            const [targetTeamForMove, setTargetTeamForMove] = useState('');
+            const [isMoving, setIsMoving] = useState(false);
 
             const team = TEAMS.find(t => t.id === teamId);
 
             // 해당 팀의 문의글 로드
             useEffect(() => {
+                // 팀 변경 시 선택 초기화
+                setSelectedInquiries([]);
+                
                 const unsubscribe = db.collection('abpInquiries')
                     .where('targetTeam', '==', teamId)
                     .onSnapshot((snapshot) => {
@@ -633,6 +642,70 @@
 
                 return () => unsubscribe();
             }, [teamId]);
+
+            // 체크박스 - 개별 선택
+            const handleSelectInquiry = (id, e) => {
+                e.stopPropagation();
+                setSelectedInquiries(prev => {
+                    if (prev.includes(id)) {
+                        return prev.filter(inquiryId => inquiryId !== id);
+                    } else {
+                        return [...prev, id];
+                    }
+                });
+            };
+
+            // 체크박스 - 전체 선택
+            const handleSelectAll = () => {
+                if (selectedInquiries.length === inquiries.length) {
+                    setSelectedInquiries([]);
+                } else {
+                    setSelectedInquiries(inquiries.map(inquiry => inquiry.id));
+                }
+            };
+
+            // 팀 이동 모달 열기
+            const openMoveModal = () => {
+                if (selectedInquiries.length === 0) {
+                    alert('이동할 문의를 선택해주세요.');
+                    return;
+                }
+                setTargetTeamForMove('');
+                setShowMoveModal(true);
+            };
+
+            // 선택된 문의들을 다른 팀으로 이동
+            const handleMoveToTeam = async () => {
+                if (!targetTeamForMove) {
+                    alert('이동할 팀을 선택해주세요.');
+                    return;
+                }
+                if (targetTeamForMove === teamId) {
+                    alert('현재 팀과 동일한 팀입니다. 다른 팀을 선택해주세요.');
+                    return;
+                }
+
+                setIsMoving(true);
+
+                try {
+                    const batch = db.batch();
+                    selectedInquiries.forEach(id => {
+                        const docRef = db.collection('abpInquiries').doc(id);
+                        batch.update(docRef, { targetTeam: targetTeamForMove });
+                    });
+                    await batch.commit();
+
+                    const targetTeamName = TEAMS.find(t => t.id === targetTeamForMove)?.name || targetTeamForMove;
+                    alert(`${selectedInquiries.length}개 문의가 ${targetTeamName}으로 이동되었습니다.`);
+                    setSelectedInquiries([]);
+                    setShowMoveModal(false);
+                } catch (error) {
+                    console.error('팀 이동 오류:', error);
+                    alert('팀 이동에 실패했습니다.');
+                } finally {
+                    setIsMoving(false);
+                }
+            };
 
             // 상세보기
             const openDetail = (inquiry) => {
@@ -714,9 +787,23 @@
 
                     <div className="content-area">
                         <div className="page-header-actions">
-                            <h3 className="section-title" style={{marginBottom: 0}}>
-                                문의 목록 ({inquiries.length}건)
-                            </h3>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                                <h3 className="section-title" style={{marginBottom: 0}}>
+                                    문의 목록 ({inquiries.length}건)
+                                </h3>
+                                {selectedInquiries.length > 0 && (
+                                    <span style={{fontSize: '14px', color: '#10b981'}}>{selectedInquiries.length}개 선택됨</span>
+                                )}
+                            </div>
+                            {selectedInquiries.length > 0 && (
+                                <button 
+                                    className="btn btn-sm" 
+                                    onClick={openMoveModal}
+                                    style={{background: '#6366f1'}}
+                                >
+                                    🔀 다른 팀으로 이동
+                                </button>
+                            )}
                         </div>
 
                         {inquiries.length === 0 ? (
@@ -727,6 +814,14 @@
                             <table className="data-table">
                                 <thead>
                                     <tr>
+                                        <th style={{width: '40px'}}>
+                                            <input 
+                                                type="checkbox"
+                                                checked={selectedInquiries.length === inquiries.length && inquiries.length > 0}
+                                                onChange={handleSelectAll}
+                                                style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                            />
+                                        </th>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
                                         <th style={{width: '100px'}}>상태</th>
                                         <th style={{width: '120px'}}>지점</th>
@@ -740,8 +835,19 @@
                                         <tr
                                             key={inquiry.id}
                                             onClick={() => openDetail(inquiry)}
-                                            style={{cursor: 'pointer'}}
+                                            style={{
+                                                cursor: 'pointer',
+                                                background: selectedInquiries.includes(inquiry.id) ? 'rgba(16, 185, 129, 0.1)' : 'transparent'
+                                            }}
                                         >
+                                            <td onClick={(e) => e.stopPropagation()}>
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={selectedInquiries.includes(inquiry.id)}
+                                                    onChange={(e) => handleSelectInquiry(inquiry.id, e)}
+                                                    style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                                                />
+                                            </td>
                                             <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
                                             <td>{getStatusBadge(inquiry.status)}</td>
                                             <td>
@@ -882,6 +988,75 @@
                                         disabled={isReplying}
                                     >
                                         {isReplying ? '저장 중...' : '답변 저장'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 팀 이동 모달 */}
+                    {showMoveModal && (
+                        <div className="modal-overlay" onClick={() => setShowMoveModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+                                <div className="modal-header">
+                                    <h3 style={{color: '#6366f1'}}>🔀 다른 팀으로 이동</h3>
+                                    <button className="modal-close" onClick={() => setShowMoveModal(false)}>×</button>
+                                </div>
+                                <div>
+                                    <p style={{marginBottom: '20px', color: '#666'}}>
+                                        선택한 <strong style={{color: '#10b981'}}>{selectedInquiries.length}개</strong> 문의를 다른 팀으로 이동합니다.
+                                    </p>
+                                    
+                                    <div className="form-group">
+                                        <label>이동할 팀 선택 *</label>
+                                        <select
+                                            value={targetTeamForMove}
+                                            onChange={(e) => setTargetTeamForMove(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                border: '2px solid #e0e0e0',
+                                                fontSize: '14px',
+                                                background: 'white'
+                                            }}
+                                        >
+                                            <option value="">-- 팀을 선택하세요 --</option>
+                                            {TEAMS.filter(t => t.id !== teamId).map(t => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {targetTeamForMove && (
+                                        <div style={{
+                                            background: '#f0f9ff',
+                                            border: '1px solid #bae6fd',
+                                            borderRadius: '8px',
+                                            padding: '12px 16px',
+                                            marginTop: '15px'
+                                        }}>
+                                            <p style={{fontSize: '14px', color: '#0369a1'}}>
+                                                📋 선택한 문의가 <strong>{TEAMS.find(t => t.id === targetTeamForMove)?.name}</strong>으로 이동됩니다.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="modal-actions" style={{padding: '20px 0 0', borderTop: '1px solid #eee', marginTop: '20px'}}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setShowMoveModal(false)}
+                                        disabled={isMoving}
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={handleMoveToTeam}
+                                        disabled={isMoving || !targetTeamForMove}
+                                        style={{background: '#6366f1'}}
+                                    >
+                                        {isMoving ? '이동 중...' : '이동 확인'}
                                     </button>
                                 </div>
                             </div>
