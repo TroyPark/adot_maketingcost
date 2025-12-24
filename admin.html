@@ -807,6 +807,11 @@
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                 </svg>
             ),
+            Inquiry: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            ),
             Round: () => (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10"/>
@@ -2341,8 +2346,12 @@
                 email: '',
                 password: '',
                 displayName: '',
-                branchName: ''
+                branchName: '',
+                team: ''
             });
+            
+            // 팀 옵션
+            const teamOptions = ['1팀', '2팀', '3팀', '4팀'];
             const [selectedUsers, setSelectedUsers] = useState([]);
             
             // 삭제 확인 모달 상태
@@ -2474,6 +2483,7 @@
                     password: '',
                     displayName: '',
                     branchName: '',
+                    team: '',
                     adminPassword: ''
                 });
                 setShowModal(true);
@@ -2487,6 +2497,7 @@
                     password: '',
                     displayName: user.displayName || '',
                     branchName: user.branchName || '',
+                    team: user.team || '',
                     adminPassword: ''
                 });
                 setShowModal(true);
@@ -2500,7 +2511,8 @@
                     // 수정
                     const result = await updateUser(editingUser.uid, {
                         displayName: formData.displayName,
-                        branchName: formData.branchName
+                        branchName: formData.branchName,
+                        team: formData.team
                     });
                     if (result.success) {
                         alert('사용자 정보가 수정되었습니다.');
@@ -2530,7 +2542,8 @@
                         ADMIN_EMAIL,
                         formData.adminPassword,
                         formData.displayName,
-                        formData.branchName
+                        formData.branchName,
+                        formData.team
                     );
                     
                     // 플래그 해제
@@ -2629,6 +2642,7 @@
                                         <th>이메일</th>
                                         <th>이름</th>
                                         <th>지점명</th>
+                                        <th>팀</th>
                                         <th>역할</th>
                                         <th>상태</th>
                                         <th>가입일</th>
@@ -2654,6 +2668,20 @@
                                             <td>{user.email}</td>
                                             <td>{user.displayName || '-'}</td>
                                             <td>{user.branchName || '-'}</td>
+                                            <td>
+                                                {user.team ? (
+                                                    <span style={{
+                                                        background: '#e3f2fd',
+                                                        color: '#1976d2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {user.team}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
                                             <td>
                                                 <span className={`status-badge ${user.role === 'admin' ? 'admin' : ''}`}>
                                                     {user.role === 'admin' ? '관리자' : '사용자'}
@@ -2739,6 +2767,26 @@
                                             onChange={(e) => setFormData({...formData, branchName: e.target.value})}
                                             placeholder="소속 지점명"
                                         />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>팀</label>
+                                        <select
+                                            value={formData.team}
+                                            onChange={(e) => setFormData({...formData, team: e.target.value})}
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 16px',
+                                                borderRadius: '8px',
+                                                border: '2px solid #e0e0e0',
+                                                fontSize: '14px',
+                                                background: 'white'
+                                            }}
+                                        >
+                                            <option value="">팀 선택</option>
+                                            {teamOptions.map(team => (
+                                                <option key={team} value={team}>{team}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     {!editingUser && (
                                         <div className="form-group" style={{marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee'}}>
@@ -3037,9 +3085,464 @@
             );
         }
 
+        // 지점 문의 창구 페이지 (관리자용)
+        function InquiryPage() {
+            const [inquiries, setInquiries] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [branches, setBranches] = useState([]);
+            const [teams, setTeams] = useState([]);
+            const [selectedBranch, setSelectedBranch] = useState('all');
+            const [selectedTeam, setSelectedTeam] = useState('all');
+            const [showDetailModal, setShowDetailModal] = useState(false);
+            const [selectedInquiry, setSelectedInquiry] = useState(null);
+            const [replyText, setReplyText] = useState('');
+            const [isReplying, setIsReplying] = useState(false);
+
+            // 모든 문의글 로드
+            useEffect(() => {
+                const unsubscribe = db.collection('inquiries')
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        // 최신순 정렬
+                        data.sort((a, b) => {
+                            const dateA = a.createdAt?.toDate?.() || new Date(0);
+                            const dateB = b.createdAt?.toDate?.() || new Date(0);
+                            return dateB - dateA;
+                        });
+                        setInquiries(data);
+
+                        // 지점 목록 추출
+                        const branchSet = new Set();
+                        const teamSet = new Set();
+                        data.forEach(inquiry => {
+                            if (inquiry.branchName) branchSet.add(inquiry.branchName);
+                            if (inquiry.team) teamSet.add(inquiry.team);
+                        });
+                        setBranches([...branchSet].sort());
+                        setTeams([...teamSet].sort());
+
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('문의글 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, []);
+
+            // 필터링된 목록
+            const filteredInquiries = inquiries.filter(inquiry => {
+                if (selectedBranch !== 'all' && inquiry.branchName !== selectedBranch) return false;
+                if (selectedTeam !== 'all' && inquiry.team !== selectedTeam) return false;
+                return true;
+            });
+
+            // 날짜 포맷
+            const formatDateLocal = (timestamp) => {
+                if (!timestamp) return '-';
+                const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                return date.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            // 상세보기
+            const openDetail = (inquiry) => {
+                setSelectedInquiry(inquiry);
+                setReplyText(inquiry.reply || '');
+                setShowDetailModal(true);
+            };
+
+            // 답변 저장
+            const handleReply = async () => {
+                if (!replyText.trim()) {
+                    alert('답변 내용을 입력해주세요.');
+                    return;
+                }
+
+                setIsReplying(true);
+
+                try {
+                    await db.collection('inquiries').doc(selectedInquiry.id).update({
+                        reply: replyText.trim(),
+                        status: 'answered',
+                        repliedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('답변이 저장되었습니다.');
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('답변 저장 오류:', error);
+                    alert('답변 저장에 실패했습니다.');
+                } finally {
+                    setIsReplying(false);
+                }
+            };
+
+            // 상태 배지
+            const getStatusBadge = (status) => {
+                const styles = {
+                    pending: { bg: '#fff3e0', color: '#f57c00', text: '대기중' },
+                    answered: { bg: '#e8f5e9', color: '#388e3c', text: '답변완료' }
+                };
+                const style = styles[status] || styles.pending;
+                return (
+                    <span style={{
+                        background: style.bg,
+                        color: style.color,
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-block'
+                    }}>
+                        {style.text}
+                    </span>
+                );
+            };
+
+            // 필터 초기화
+            const handleResetFilters = () => {
+                setSelectedBranch('all');
+                setSelectedTeam('all');
+            };
+
+            if (loading) {
+                return (
+                    <div className="loading-spinner">
+                        <p>문의 목록을 불러오는 중...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">지점 문의 창구</h2>
+                        <p className="page-subtitle">전 지점의 문의사항을 확인하고 답변합니다</p>
+                    </div>
+
+                    {/* 통계 카드 */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <h3>전체 문의</h3>
+                            <div className="value">{inquiries.length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>대기중</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'pending').length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>답변완료</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'answered').length}</div>
+                        </div>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="page-header-actions">
+                            <h3 className="section-title" style={{marginBottom: 0}}>
+                                문의 목록 ({filteredInquiries.length}건)
+                            </h3>
+                        </div>
+
+                        {/* 필터 영역 */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '20px',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            padding: '15px 20px',
+                            background: '#f8f9fa',
+                            borderRadius: '10px',
+                            marginBottom: '20px'
+                        }}>
+                            {/* 지점 필터 */}
+                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>지점:</label>
+                                <select
+                                    value={selectedBranch}
+                                    onChange={(e) => setSelectedBranch(e.target.value)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '2px solid #e0e0e0',
+                                        fontSize: '14px',
+                                        minWidth: '150px'
+                                    }}
+                                >
+                                    <option value="all">전체 지점</option>
+                                    {branches.map(branch => (
+                                        <option key={branch} value={branch}>{branch}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 팀 필터 */}
+                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>팀:</label>
+                                <select
+                                    value={selectedTeam}
+                                    onChange={(e) => setSelectedTeam(e.target.value)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '2px solid #e0e0e0',
+                                        fontSize: '14px',
+                                        minWidth: '120px'
+                                    }}
+                                >
+                                    <option value="all">전체 팀</option>
+                                    {teams.map(team => (
+                                        <option key={team} value={team}>{team}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 필터 초기화 */}
+                            {(selectedBranch !== 'all' || selectedTeam !== 'all') && (
+                                <button
+                                    onClick={handleResetFilters}
+                                    style={{
+                                        padding: '8px 16px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        background: '#6c757d',
+                                        color: 'white',
+                                        fontSize: '13px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    필터 초기화
+                                </button>
+                            )}
+                        </div>
+
+                        {filteredInquiries.length === 0 ? (
+                            <div className="empty-state">
+                                <p>등록된 문의가 없습니다.</p>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
+                                        <th style={{width: '100px', whiteSpace: 'nowrap'}}>상태</th>
+                                        <th style={{width: '110px'}}>지점</th>
+                                        <th style={{width: '70px'}}>팀</th>
+                                        <th style={{width: '30%'}}>제목</th>
+                                        <th style={{width: '90px'}}>작성자</th>
+                                        <th style={{width: '160px'}}>작성일</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredInquiries.map((inquiry, index) => (
+                                        <tr
+                                            key={inquiry.id}
+                                            onClick={() => openDetail(inquiry)}
+                                            style={{cursor: 'pointer'}}
+                                        >
+                                            <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
+                                            <td>{getStatusBadge(inquiry.status)}</td>
+                                            <td>
+                                                <span style={{
+                                                    background: '#f07c00',
+                                                    color: 'white',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {inquiry.branchName || '-'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {inquiry.team ? (
+                                                    <span style={{
+                                                        background: '#e3f2fd',
+                                                        color: '#1976d2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {inquiry.team}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                            <td style={{fontWeight: '500'}}>{inquiry.title}</td>
+                                            <td>
+                                                {inquiry.position ? (
+                                                    <span style={{
+                                                        background: '#f3e5f5',
+                                                        color: '#7b1fa2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {inquiry.position}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{fontSize: '13px', color: '#666'}}>{inquiry.userName || '-'}</span>
+                                                )}
+                                            </td>
+                                            <td style={{fontSize: '13px', color: '#666'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* 문의 상세/답변 모달 */}
+                    {showDetailModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '700px'}}>
+                                <div className="modal-header">
+                                    <h3>문의 상세</h3>
+                                    <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                </div>
+                                <div style={{padding: '20px', maxHeight: '70vh', overflowY: 'auto'}}>
+                                    {/* 문의 정보 */}
+                                    <div style={{marginBottom: '20px'}}>
+                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
+                                            {getStatusBadge(selectedInquiry.status)}
+                                            <span style={{
+                                                background: '#f07c00',
+                                                color: 'white',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                            }}>
+                                                {selectedInquiry.branchName}
+                                            </span>
+                                            {selectedInquiry.team && (
+                                                <span style={{
+                                                    background: '#e3f2fd',
+                                                    color: '#1976d2',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedInquiry.team}
+                                                </span>
+                                            )}
+                                            {selectedInquiry.position && (
+                                                <span style={{
+                                                    background: '#f3e5f5',
+                                                    color: '#7b1fa2',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {selectedInquiry.position}
+                                                </span>
+                                            )}
+                                            <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
+                                                {formatDateLocal(selectedInquiry.createdAt)}
+                                            </span>
+                                        </div>
+                                        <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
+                                            작성자: {selectedInquiry.position || selectedInquiry.userName || '-'} ({selectedInquiry.userEmail})
+                                        </div>
+                                        <h4 style={{fontSize: '18px', fontWeight: '600', color: '#1a1a2e', marginBottom: '15px'}}>
+                                            {selectedInquiry.title}
+                                        </h4>
+                                        <div style={{
+                                            background: '#f8f9fa',
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.6',
+                                            color: '#333'
+                                        }}>
+                                            {selectedInquiry.content}
+                                        </div>
+                                    </div>
+
+                                    {/* 답변 작성 영역 */}
+                                    <div style={{
+                                        borderTop: '1px solid #eee',
+                                        paddingTop: '20px'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            marginBottom: '12px'
+                                        }}>
+                                            <span style={{
+                                                background: '#e94560',
+                                                color: 'white',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                            }}>
+                                                관리자 답변
+                                            </span>
+                                            {selectedInquiry.repliedAt && (
+                                                <span style={{fontSize: '13px', color: '#666'}}>
+                                                    {formatDateLocal(selectedInquiry.repliedAt)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="form-group">
+                                            <textarea
+                                                rows="5"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                placeholder="답변 내용을 입력하세요"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px 16px',
+                                                    borderRadius: '8px',
+                                                    border: '2px solid #e0e0e0',
+                                                    fontSize: '14px',
+                                                    resize: 'vertical'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee'}}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setShowDetailModal(false)}
+                                        disabled={isReplying}
+                                    >
+                                        닫기
+                                    </button>
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={handleReply}
+                                        disabled={isReplying}
+                                    >
+                                        {isReplying ? '저장 중...' : '답변 저장'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // 사이드바 컴포넌트
         function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess }) {
             const menuItems = [
+                { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
                 { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
                 { id: 'round', name: 'Round 관리', icon: Icons.Round },
                 { id: 'users', name: '사용자 관리', icon: Icons.Users },
@@ -3096,7 +3599,7 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('cost');
+            const [currentPage, setCurrentPage] = useState('inquiry');
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             
@@ -3200,6 +3703,8 @@
                 switch (currentPage) {
                     case 'cost':
                         return <MarketingCostPage />;
+                    case 'inquiry':
+                        return <InquiryPage />;
                     case 'round':
                         return <RoundManagementPage />;
                     case 'users':
