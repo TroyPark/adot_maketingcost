@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기획본부 - Marketing Cost Compilater</title>
+    <link rel="icon" type="image/png" href="image/symbol_white.png">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <!-- React CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f4f3;
+            color: #333;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 사이드바 - 기획본부용 그린/틸 테마 */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #0d3b36 0%, #1a5c54 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .abp-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header p {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 20px 0;
+        }
+
+        .nav-section-title {
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            gap: 12px;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border-left-color: #10b981;
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .nav-item span {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-item .badge {
+            margin-left: auto;
+            background: #10b981;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .user-info-sidebar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .user-details .name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-details .role {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .logout-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #10b981;
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 30px;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            color: #0d3b36;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .content-area {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #0d3b36 0%, #1a5c54 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(13, 59, 54, 0.3);
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .section-title {
+            color: #0d3b36;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        /* 테이블 스타일 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0d3b36;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.pending {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status-badge.answered {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: #0d3b36;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .page-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* 팀 배지 색상 */
+        .team-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .team-badge.planning {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .team-badge.marketing {
+            background: #fce7f3;
+            color: #be185d;
+        }
+
+        .team-badge.hrd {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .team-badge.production {
+            background: #d1fae5;
+            color: #047857;
+        }
+
+        .team-badge.rnd {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        /* 로딩 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        /* 원본 문의 박스 */
+        .original-inquiry-box {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .original-inquiry-box h5 {
+            color: #0369a1;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .original-inquiry-box p {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+            }
+
+            .sidebar-header h1,
+            .sidebar-header p,
+            .nav-item span,
+            .user-details,
+            .logout-btn span,
+            .nav-section-title {
+                display: none;
+            }
+
+            .nav-item {
+                justify-content: center;
+                padding: 14px;
+            }
+
+            .main-content {
+                margin-left: 70px;
+                padding: 20px;
+            }
+
+            .user-info-sidebar {
+                justify-content: center;
+            }
+
+            .data-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">로딩 중...</div>
+    </div>
+
+    <!-- Firebase 설정 -->
+    <script src="firebase.js"></script>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const ADMIN_EMAIL = 'admin@dshare.co.kr';
+        const ABP_EMAIL = 'abp@dshare.co.kr';
+        
+        // 팀 목록
+        const TEAMS = [
+            { id: 'planning', name: '학원사업기획팀', className: 'planning' },
+            { id: 'marketing', name: '학원사업마케팅팀', className: 'marketing' },
+            { id: 'hrd', name: '학원사업HRD팀', className: 'hrd' },
+            { id: 'production', name: '콘텐츠제작팀', className: 'production' },
+            { id: 'rnd', name: '콘텐츠R&D팀', className: 'rnd' }
+        ];
+
+        // 아이콘 컴포넌트
+        const Icons = {
+            Team: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+            ),
+            Settings: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            )
+        };
+
+        // 날짜 포맷
+        function formatDate(timestamp) {
+            if (!timestamp) return '-';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 팀별 문의 페이지
+        function TeamInquiryPage({ teamId }) {
+            const [inquiries, setInquiries] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showDetailModal, setShowDetailModal] = useState(false);
+            const [selectedInquiry, setSelectedInquiry] = useState(null);
+            const [replyText, setReplyText] = useState('');
+            const [replyAuthor, setReplyAuthor] = useState('');
+            const [isReplying, setIsReplying] = useState(false);
+
+            const team = TEAMS.find(t => t.id === teamId);
+
+            // 해당 팀의 문의글 로드
+            useEffect(() => {
+                const unsubscribe = db.collection('abpInquiries')
+                    .where('targetTeam', '==', teamId)
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        // 최신순 정렬
+                        data.sort((a, b) => {
+                            const dateA = a.createdAt?.toDate?.() || new Date(0);
+                            const dateB = b.createdAt?.toDate?.() || new Date(0);
+                            return dateB - dateA;
+                        });
+                        setInquiries(data);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('문의글 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, [teamId]);
+
+            // 상세보기
+            const openDetail = (inquiry) => {
+                setSelectedInquiry(inquiry);
+                setReplyText(inquiry.reply || '');
+                setReplyAuthor(inquiry.replyAuthor || '');
+                setShowDetailModal(true);
+            };
+
+            // 답변 저장
+            const handleReply = async () => {
+                if (!replyText.trim()) {
+                    alert('답변 내용을 입력해주세요.');
+                    return;
+                }
+                if (!replyAuthor.trim()) {
+                    alert('작성자 이름을 입력해주세요.');
+                    return;
+                }
+
+                setIsReplying(true);
+
+                try {
+                    await db.collection('abpInquiries').doc(selectedInquiry.id).update({
+                        reply: replyText.trim(),
+                        replyAuthor: replyAuthor.trim(),
+                        status: 'answered',
+                        repliedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('답변이 저장되었습니다.');
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('답변 저장 오류:', error);
+                    alert('답변 저장에 실패했습니다.');
+                } finally {
+                    setIsReplying(false);
+                }
+            };
+
+            // 상태 배지
+            const getStatusBadge = (status) => {
+                if (status === 'answered') {
+                    return <span className="status-badge answered">답변완료</span>;
+                }
+                return <span className="status-badge pending">대기중</span>;
+            };
+
+            if (loading) {
+                return (
+                    <div className="loading-spinner">
+                        <p>문의 목록을 불러오는 중...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">{team?.name}</h2>
+                        <p className="page-subtitle">지점에서 접수된 문의사항에 답변합니다</p>
+                    </div>
+
+                    {/* 통계 카드 */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <h3>전체 문의</h3>
+                            <div className="value">{inquiries.length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>대기중</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'pending').length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>답변완료</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'answered').length}</div>
+                        </div>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="page-header-actions">
+                            <h3 className="section-title" style={{marginBottom: 0}}>
+                                문의 목록 ({inquiries.length}건)
+                            </h3>
+                        </div>
+
+                        {inquiries.length === 0 ? (
+                            <div className="empty-state">
+                                <p>접수된 문의가 없습니다.</p>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
+                                        <th style={{width: '100px'}}>상태</th>
+                                        <th style={{width: '120px'}}>지점</th>
+                                        <th>문의 내용</th>
+                                        <th style={{width: '100px'}}>작성자</th>
+                                        <th style={{width: '160px'}}>작성일</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {inquiries.map((inquiry, index) => (
+                                        <tr
+                                            key={inquiry.id}
+                                            onClick={() => openDetail(inquiry)}
+                                            style={{cursor: 'pointer'}}
+                                        >
+                                            <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
+                                            <td>{getStatusBadge(inquiry.status)}</td>
+                                            <td>
+                                                <span style={{
+                                                    background: '#f07c00',
+                                                    color: 'white',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {inquiry.branchName || '-'}
+                                                </span>
+                                            </td>
+                                            <td style={{
+                                                maxWidth: '300px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {inquiry.content}
+                                            </td>
+                                            <td style={{fontSize: '13px'}}>{inquiry.authorName || '-'}</td>
+                                            <td style={{fontSize: '13px', color: '#666'}}>{formatDate(inquiry.createdAt)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* 문의 상세/답변 모달 */}
+                    {showDetailModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>문의 상세</h3>
+                                    <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                </div>
+                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                    {/* 문의 정보 */}
+                                    <div style={{marginBottom: '20px'}}>
+                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
+                                            {getStatusBadge(selectedInquiry.status)}
+                                            <span style={{
+                                                background: '#f07c00',
+                                                color: 'white',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                            }}>
+                                                {selectedInquiry.branchName}
+                                            </span>
+                                            <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
+                                                {formatDate(selectedInquiry.createdAt)}
+                                            </span>
+                                        </div>
+                                        
+                                        {/* 원본 지점 문의 내용 */}
+                                        {selectedInquiry.originalInquiry && (
+                                            <div className="original-inquiry-box">
+                                                <h5>📋 원본 지점 문의</h5>
+                                                <p><strong>{selectedInquiry.originalInquiry.title}</strong></p>
+                                                <p style={{marginTop: '8px', color: '#555'}}>{selectedInquiry.originalInquiry.content}</p>
+                                            </div>
+                                        )}
+                                        
+                                        <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
+                                            작성자: {selectedInquiry.authorName || '-'}
+                                        </div>
+                                        <div style={{
+                                            background: '#f8f9fa',
+                                            padding: '16px',
+                                            borderRadius: '8px',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.6',
+                                            color: '#333'
+                                        }}>
+                                            {selectedInquiry.content}
+                                        </div>
+                                    </div>
+
+                                    {/* 답변 작성 영역 */}
+                                    <div style={{
+                                        borderTop: '1px solid #eee',
+                                        paddingTop: '20px'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            marginBottom: '12px'
+                                        }}>
+                                            <span className={`team-badge ${team?.className}`}>
+                                                {team?.name} 답변
+                                            </span>
+                                            {selectedInquiry.repliedAt && (
+                                                <span style={{fontSize: '13px', color: '#666'}}>
+                                                    {formatDate(selectedInquiry.repliedAt)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="form-group">
+                                            <label>작성자 이름 *</label>
+                                            <input
+                                                type="text"
+                                                value={replyAuthor}
+                                                onChange={(e) => setReplyAuthor(e.target.value)}
+                                                placeholder="답변 작성자 이름을 입력하세요"
+                                            />
+                                        </div>
+                                        
+                                        <div className="form-group">
+                                            <label>답변 내용 *</label>
+                                            <textarea
+                                                rows="5"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                placeholder="답변 내용을 입력하세요"
+                                                style={{resize: 'vertical'}}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee'}}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setShowDetailModal(false)}
+                                        disabled={isReplying}
+                                    >
+                                        닫기
+                                    </button>
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={handleReply}
+                                        disabled={isReplying}
+                                    >
+                                        {isReplying ? '저장 중...' : '답변 저장'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 설정 페이지
+        function SettingsPage() {
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">설정</h2>
+                        <p className="page-subtitle">기획본부 시스템 설정</p>
+                    </div>
+
+                    <div className="content-area">
+                        <div style={{
+                            background: '#f8f9fa',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            textAlign: 'center',
+                            color: '#666'
+                        }}>
+                            <p>설정 기능은 준비 중입니다.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // 사이드바 컴포넌트
+        function Sidebar({ currentPage, setCurrentPage, user, onLogout }) {
+            // 각 팀의 대기중 문의 수 계산
+            const [pendingCounts, setPendingCounts] = useState({});
+
+            useEffect(() => {
+                const unsubscribe = db.collection('abpInquiries')
+                    .where('status', '==', 'pending')
+                    .onSnapshot((snapshot) => {
+                        const counts = {};
+                        snapshot.docs.forEach(doc => {
+                            const data = doc.data();
+                            counts[data.targetTeam] = (counts[data.targetTeam] || 0) + 1;
+                        });
+                        setPendingCounts(counts);
+                    });
+
+                return () => unsubscribe();
+            }, []);
+
+            return (
+                <aside className="sidebar">
+                    <div className="sidebar-header">
+                        <div className="abp-badge">ABP</div>
+                        <h1>기획본부</h1>
+                        <p>지점 문의 관리 시스템</p>
+                    </div>
+
+                    <nav className="sidebar-nav">
+                        <div className="nav-section-title">팀별 문의함</div>
+                        {TEAMS.map(team => (
+                            <div
+                                key={team.id}
+                                className={`nav-item ${currentPage === team.id ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(team.id)}
+                            >
+                                <Icons.Team />
+                                <span>{team.name}</span>
+                                {pendingCounts[team.id] > 0 && (
+                                    <span className="badge">{pendingCounts[team.id]}</span>
+                                )}
+                            </div>
+                        ))}
+                        
+                        <div className="nav-section-title" style={{marginTop: '20px'}}>시스템</div>
+                        <div
+                            className={`nav-item ${currentPage === 'settings' ? 'active' : ''}`}
+                            onClick={() => setCurrentPage('settings')}
+                        >
+                            <Icons.Settings />
+                            <span>설정</span>
+                        </div>
+                    </nav>
+
+                    <div className="sidebar-footer">
+                        <div className="user-info-sidebar">
+                            <div className="user-avatar">
+                                {user?.email?.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="user-details">
+                                <div className="name">{user?.email}</div>
+                                <div className="role">기획본부</div>
+                            </div>
+                        </div>
+                        <button className="logout-btn" onClick={onLogout}>
+                            로그아웃
+                        </button>
+                    </div>
+                </aside>
+            );
+        }
+
+        // 메인 앱 컴포넌트
+        function App() {
+            const [currentPage, setCurrentPage] = useState('planning');
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+                    if (!currentUser) {
+                        window.location.href = 'index.html';
+                    } else if (currentUser.email !== ABP_EMAIL) {
+                        // ABP 계정만 접근 가능
+                        if (currentUser.email === ADMIN_EMAIL) {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'user.html';
+                        }
+                    } else {
+                        setUser(currentUser);
+                        setLoading(false);
+                    }
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            const handleLogout = async () => {
+                if (confirm('로그아웃 하시겠습니까?')) {
+                    const result = await logout();
+                    if (result.success) {
+                        window.location.href = 'index.html';
+                    } else {
+                        alert('로그아웃 실패: ' + result.message);
+                    }
+                }
+            };
+
+            if (loading) {
+                return <div className="loading">로딩 중...</div>;
+            }
+
+            const renderPage = () => {
+                if (currentPage === 'settings') {
+                    return <SettingsPage />;
+                }
+                // 팀 페이지
+                const team = TEAMS.find(t => t.id === currentPage);
+                if (team) {
+                    return <TeamInquiryPage teamId={currentPage} />;
+                }
+                return <TeamInquiryPage teamId="planning" />;
+            };
+
+            return (
+                <div className="app-container">
+                    <Sidebar
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        user={user}
+                        onLogout={handleLogout}
+                    />
+                    <main className="main-content">
+                        {renderPage()}
+                    </main>
+                </div>
+            );
+        }
+
+        // React 렌더링
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
