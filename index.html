@@ -191,8 +191,7 @@
     <div class="login-container">
         <div class="login-header">
             <h1>로그인</h1>
-            <h2>지점 마케팅 비용 관리 시스템</h2> 
-            <p>Marketing Cost Compilater에 오신 것을 환영합니다</p>
+            <h2>지점 소통 및 마케팅 비용 관리 시스템</h2> 
         </div>
 
         <form id="loginForm">
@@ -310,9 +309,11 @@
             if (result.success) {
                 console.log('로그인 성공:', result.user.email);
                 
-                // 관리자 이메일 확인 후 페이지 분기
+                // 이메일 확인 후 페이지 분기
                 if (result.user.email === 'admin@dshare.co.kr') {
                     window.location.href = 'admin.html';
+                } else if (result.user.email === 'abp@dshare.co.kr') {
+                    window.location.href = 'abp.html';
                 } else {
                     window.location.href = 'user.html';
                 }
@@ -329,9 +330,11 @@
             if (user) {
                 console.log('이미 로그인됨:', user.email);
                 
-                // 관리자 이메일 확인 후 페이지 분기
+                // 이메일 확인 후 페이지 분기
                 if (user.email === 'admin@dshare.co.kr') {
                     window.location.href = 'admin.html';
+                } else if (user.email === 'abp@dshare.co.kr') {
+                    window.location.href = 'abp.html';
                 } else {
                     window.location.href = 'user.html';
                 }
