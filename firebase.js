@@ -129,7 +129,7 @@ async function createUser(email, password, displayName = '', branchName = '') {
 }
 
 // 관리자용 사용자 생성 (생성 후 관리자로 다시 로그인)
-async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, adminPassword, displayName = '', branchName = '') {
+async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, adminPassword, displayName = '', branchName = '', team = '') {
     try {
         // 1. 먼저 관리자 비밀번호가 맞는지 확인 (현재 관리자 세션 유지하면서)
         const adminUser = auth.currentUser;
@@ -156,6 +156,7 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, admi
             email: newUserEmail,
             displayName: displayName || newUserEmail.split('@')[0],
             branchName: branchName,
+            team: team,
             role: 'user',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastLoginAt: null,
