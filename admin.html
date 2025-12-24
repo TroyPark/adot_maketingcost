@@ -1214,10 +1214,12 @@
                         <p className="page-subtitle">전체 지점의 마케팅 비용을 관리합니다</p>
                     </div>
 
-                    {/* 현재 Round 정보 카드 */}
+                    {/* 현재 Round 정보 카드 - 전체 또는 선택된 지점 */}
                     {currentRound && totalBudget > 0 && (
                         <div style={{
-                            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                            background: selectedBranch !== 'all' 
+                                ? 'linear-gradient(135deg, #0d4f3c 0%, #1a6b4f 100%)' 
+                                : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
                             borderRadius: '12px',
                             padding: '24px',
                             marginBottom: '20px',
@@ -1230,16 +1232,29 @@
                                 marginBottom: '16px'
                             }}>
                                 <div>
-                                    <div style={{
-                                        display: 'inline-block',
-                                        background: '#e94560',
-                                        padding: '4px 10px',
-                                        borderRadius: '4px',
-                                        fontSize: '11px',
-                                        fontWeight: '700',
-                                        marginBottom: '8px'
-                                    }}>
-                                        현재 진행중
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px'}}>
+                                        <div style={{
+                                            display: 'inline-block',
+                                            background: '#e94560',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: '700'
+                                        }}>
+                                            현재 진행중
+                                        </div>
+                                        {selectedBranch !== 'all' && (
+                                            <div style={{
+                                                display: 'inline-block',
+                                                background: '#f07c00',
+                                                padding: '4px 12px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '700'
+                                            }}>
+                                                📍 {selectedBranch}
+                                            </div>
+                                        )}
                                     </div>
                                     <h3 style={{fontSize: '18px', fontWeight: '700', marginBottom: '4px'}}>
                                         {currentRound.name}
@@ -1248,113 +1263,188 @@
                                         {currentRound.startDate} ~ {currentRound.endDate}
                                     </p>
                                 </div>
-                                <div style={{
-                                    background: getRoundUsedAmount() > totalBudget ? '#dc3545' : '#e94560',
-                                    padding: '8px 16px',
-                                    borderRadius: '20px',
-                                    fontSize: '14px',
-                                    fontWeight: '700'
-                                }}>
-                                    {totalBudget > 0 ? Math.round((getRoundUsedAmount() / totalBudget) * 100) : 0}% 소진
-                                </div>
+                                {(() => {
+                                    const displayBudget = selectedBranch !== 'all' 
+                                        ? (branchBudgets[selectedBranch] || 0)
+                                        : totalBudget;
+                                    const displayUsed = selectedBranch !== 'all'
+                                        ? getRoundUsedByBranch(selectedBranch)
+                                        : getRoundUsedAmount();
+                                    const rate = displayBudget > 0 ? Math.round((displayUsed / displayBudget) * 100) : 0;
+                                    return (
+                                        <div style={{
+                                            background: rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#e94560',
+                                            padding: '8px 16px',
+                                            borderRadius: '20px',
+                                            fontSize: '14px',
+                                            fontWeight: '700'
+                                        }}>
+                                            {rate}% 소진
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             
                             {/* 프로그레스 바 */}
-                            <div style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                borderRadius: '10px',
-                                height: '14px',
-                                marginBottom: '20px',
-                                overflow: 'hidden'
-                            }}>
-                                <div style={{
-                                    width: `${Math.min((getRoundUsedAmount() / totalBudget) * 100, 100)}%`,
-                                    height: '100%',
-                                    background: getRoundUsedAmount() > totalBudget 
-                                        ? 'linear-gradient(90deg, #dc3545, #ff6b6b)' 
-                                        : 'linear-gradient(90deg, #e94560, #ff6b6b)',
-                                    transition: 'width 0.5s ease'
-                                }} />
-                            </div>
-                            
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px'}}>
-                                <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>총 배정 예산</div>
-                                    <div style={{fontSize: '22px', fontWeight: '700'}}>{formatAmount(totalBudget)}</div>
-                                </div>
-                                <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>총 사용 비용</div>
-                                    <div style={{fontSize: '22px', fontWeight: '700'}}>{formatAmount(getRoundUsedAmount())}</div>
-                                </div>
-                                <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 예산</div>
+                            {(() => {
+                                const displayBudget = selectedBranch !== 'all' 
+                                    ? (branchBudgets[selectedBranch] || 0)
+                                    : totalBudget;
+                                const displayUsed = selectedBranch !== 'all'
+                                    ? getRoundUsedByBranch(selectedBranch)
+                                    : getRoundUsedAmount();
+                                const rate = displayBudget > 0 ? (displayUsed / displayBudget) * 100 : 0;
+                                return (
                                     <div style={{
-                                        fontSize: '22px', 
-                                        fontWeight: '700',
-                                        color: totalBudget - getRoundUsedAmount() < 0 ? '#ff6b6b' : '#4ade80'
+                                        background: 'rgba(255,255,255,0.2)',
+                                        borderRadius: '10px',
+                                        height: '14px',
+                                        marginBottom: '20px',
+                                        overflow: 'hidden'
                                     }}>
-                                        {formatAmount(totalBudget - getRoundUsedAmount())}
+                                        <div style={{
+                                            width: `${Math.min(rate, 100)}%`,
+                                            height: '100%',
+                                            background: rate > 100 
+                                                ? 'linear-gradient(90deg, #dc3545, #ff6b6b)' 
+                                                : rate > 80
+                                                ? 'linear-gradient(90deg, #fbbf24, #fcd34d)'
+                                                : 'linear-gradient(90deg, #e94560, #ff6b6b)',
+                                            transition: 'width 0.5s ease'
+                                        }} />
+                                    </div>
+                                );
+                            })()}
+                            
+                            {/* 지점 선택 시 해당 지점 정보 표시 */}
+                            {selectedBranch !== 'all' ? (
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px'}}>
+                                    <div>
+                                        <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 예산</div>
+                                        <div style={{fontSize: '22px', fontWeight: '700'}}>
+                                            {formatAmount(branchBudgets[selectedBranch] || 0)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>사용 비용</div>
+                                        <div style={{fontSize: '22px', fontWeight: '700'}}>
+                                            {formatAmount(getRoundUsedByBranch(selectedBranch))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 예산</div>
+                                        <div style={{
+                                            fontSize: '22px', 
+                                            fontWeight: '700',
+                                            color: (branchBudgets[selectedBranch] || 0) - getRoundUsedByBranch(selectedBranch) < 0 ? '#ff6b6b' : '#4ade80'
+                                        }}>
+                                            {formatAmount((branchBudgets[selectedBranch] || 0) - getRoundUsedByBranch(selectedBranch))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>Round 등록 건수</div>
+                                        <div style={{fontSize: '22px', fontWeight: '700'}}>
+                                            {costs.filter(cost => {
+                                                if (cost.branchName !== selectedBranch) return false;
+                                                const costDate = cost.date;
+                                                return costDate >= currentRound.startDate && costDate <= currentRound.endDate;
+                                            }).length}건
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 지점 수</div>
-                                    <div style={{fontSize: '22px', fontWeight: '700'}}>
-                                        {Object.keys(branchBudgets).filter(k => branchBudgets[k] > 0).length}개
+                            ) : (
+                                <>
+                                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px'}}>
+                                        <div>
+                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>총 배정 예산</div>
+                                            <div style={{fontSize: '22px', fontWeight: '700'}}>{formatAmount(totalBudget)}</div>
+                                        </div>
+                                        <div>
+                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>총 사용 비용</div>
+                                            <div style={{fontSize: '22px', fontWeight: '700'}}>{formatAmount(getRoundUsedAmount())}</div>
+                                        </div>
+                                        <div>
+                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 예산</div>
+                                            <div style={{
+                                                fontSize: '22px', 
+                                                fontWeight: '700',
+                                                color: totalBudget - getRoundUsedAmount() < 0 ? '#ff6b6b' : '#4ade80'
+                                            }}>
+                                                {formatAmount(totalBudget - getRoundUsedAmount())}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 지점 수</div>
+                                            <div style={{fontSize: '22px', fontWeight: '700'}}>
+                                                {Object.keys(branchBudgets).filter(k => branchBudgets[k] > 0).length}개
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* 지점별 소진율 미니 테이블 */}
-                            {Object.keys(branchBudgets).length > 0 && (
-                                <div style={{
-                                    marginTop: '20px',
-                                    paddingTop: '20px',
-                                    borderTop: '1px solid rgba(255,255,255,0.1)'
-                                }}>
-                                    <div style={{fontSize: '13px', fontWeight: '600', marginBottom: '12px', opacity: 0.9}}>
-                                        지점별 소진율
-                                    </div>
-                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px'}}>
-                                        {Object.entries(branchBudgets)
-                                            .filter(([_, budget]) => budget > 0)
-                                            .map(([branch, budget]) => {
-                                                const used = getRoundUsedByBranch(branch);
-                                                const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
-                                                return (
-                                                    <div key={branch} style={{
-                                                        background: 'rgba(255,255,255,0.1)',
-                                                        borderRadius: '8px',
-                                                        padding: '10px 12px'
-                                                    }}>
-                                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px'}}>
-                                                            <span style={{fontSize: '13px', fontWeight: '600'}}>{branch}</span>
-                                                            <span style={{
-                                                                fontSize: '12px',
-                                                                fontWeight: '700',
-                                                                color: rate > 100 ? '#ff6b6b' : rate > 80 ? '#fbbf24' : '#4ade80'
-                                                            }}>{rate}%</span>
-                                                        </div>
-                                                        <div style={{
-                                                            background: 'rgba(255,255,255,0.2)',
-                                                            borderRadius: '4px',
-                                                            height: '6px',
-                                                            overflow: 'hidden'
-                                                        }}>
-                                                            <div style={{
-                                                                width: `${Math.min(rate, 100)}%`,
-                                                                height: '100%',
-                                                                background: rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80',
-                                                                transition: 'width 0.3s'
-                                                            }} />
-                                                        </div>
-                                                        <div style={{fontSize: '11px', opacity: 0.7, marginTop: '4px'}}>
-                                                            {formatAmount(used)} / {formatAmount(budget)}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                    </div>
-                                </div>
+                                    {/* 지점별 소진율 미니 테이블 (전체 선택 시에만 표시) */}
+                                    {Object.keys(branchBudgets).length > 0 && (
+                                        <div style={{
+                                            marginTop: '20px',
+                                            paddingTop: '20px',
+                                            borderTop: '1px solid rgba(255,255,255,0.1)'
+                                        }}>
+                                            <div style={{fontSize: '13px', fontWeight: '600', marginBottom: '12px', opacity: 0.9}}>
+                                                지점별 소진율
+                                            </div>
+                                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px'}}>
+                                                {Object.entries(branchBudgets)
+                                                    .filter(([_, budget]) => budget > 0)
+                                                    .map(([branch, budget]) => {
+                                                        const used = getRoundUsedByBranch(branch);
+                                                        const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
+                                                        return (
+                                                            <div 
+                                                                key={branch} 
+                                                                style={{
+                                                                    background: 'rgba(255,255,255,0.1)',
+                                                                    borderRadius: '8px',
+                                                                    padding: '10px 12px',
+                                                                    cursor: 'pointer',
+                                                                    transition: 'all 0.2s ease'
+                                                                }}
+                                                                onClick={() => {
+                                                                    setSelectedBranch(branch);
+                                                                    setSelectedCosts([]);
+                                                                }}
+                                                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                                            >
+                                                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px'}}>
+                                                                    <span style={{fontSize: '13px', fontWeight: '600'}}>{branch}</span>
+                                                                    <span style={{
+                                                                        fontSize: '12px',
+                                                                        fontWeight: '700',
+                                                                        color: rate > 100 ? '#ff6b6b' : rate > 80 ? '#fbbf24' : '#4ade80'
+                                                                    }}>{rate}%</span>
+                                                                </div>
+                                                                <div style={{
+                                                                    background: 'rgba(255,255,255,0.2)',
+                                                                    borderRadius: '4px',
+                                                                    height: '6px',
+                                                                    overflow: 'hidden'
+                                                                }}>
+                                                                    <div style={{
+                                                                        width: `${Math.min(rate, 100)}%`,
+                                                                        height: '100%',
+                                                                        background: rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80',
+                                                                        transition: 'width 0.3s'
+                                                                    }} />
+                                                                </div>
+                                                                <div style={{fontSize: '11px', opacity: 0.7, marginTop: '4px'}}>
+                                                                    {formatAmount(used)} / {formatAmount(budget)}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
