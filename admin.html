@@ -873,6 +873,10 @@
             const [branches, setBranches] = useState([]);
             const [selectedBranch, setSelectedBranch] = useState('all');
             
+            // 팀 필터 상태
+            const [teams, setTeams] = useState([]);
+            const [selectedTeam, setSelectedTeam] = useState('all');
+            
             // 날짜 필터 상태
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
@@ -937,12 +941,18 @@
                         
                         // 지점 목록 추출
                         const branchSet = new Set();
+                        // 팀 목록 추출
+                        const teamSet = new Set();
                         costsData.forEach(cost => {
                             if (cost.branchName) {
                                 branchSet.add(cost.branchName);
                             }
+                            if (cost.team) {
+                                teamSet.add(cost.team);
+                            }
                         });
                         setBranches([...branchSet].sort());
+                        setTeams([...teamSet].sort());
                         setLoading(false);
                     }, (error) => {
                         console.error('비용 목록 로드 오류:', error);
@@ -1023,6 +1033,11 @@
                     return false;
                 }
                 
+                // 팀 필터
+                if (selectedTeam !== 'all' && cost.team !== selectedTeam) {
+                    return false;
+                }
+                
                 // 날짜 필터 (cost.date 기준)
                 if (startDate || endDate) {
                     const costDate = new Date(cost.date);
@@ -1046,6 +1061,7 @@
             // 필터 초기화
             const handleResetFilters = () => {
                 setSelectedBranch('all');
+                setSelectedTeam('all');
                 setStartDate('');
                 setEndDate('');
             };
@@ -1164,9 +1180,10 @@
                 }
 
                 // CSV 데이터 생성
-                const headers = ['지점', '날짜', '항목', '금액', '설명', '등록자', '등록일시'];
+                const headers = ['지점', '팀', '날짜', '항목', '금액', '설명', '등록자', '등록일시'];
                 const rows = dataToExport.map(cost => [
                     cost.branchName || '미설정',
+                    cost.team || '-',
                     formatDateForExcel(cost.date),
                     categories[cost.category]?.label || cost.category,
                     formatAmountForExcel(cost.amount),
@@ -1519,6 +1536,30 @@
                                 </select>
                             </div>
                             
+                            {/* 팀 필터 */}
+                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>팀:</label>
+                                <select 
+                                    value={selectedTeam}
+                                    onChange={(e) => {
+                                        setSelectedTeam(e.target.value);
+                                        setSelectedCosts([]);
+                                    }}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '2px solid #e0e0e0',
+                                        fontSize: '14px',
+                                        minWidth: '100px'
+                                    }}
+                                >
+                                    <option value="all">전체 팀</option>
+                                    {teams.map(team => (
+                                        <option key={team} value={team}>{team}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
                             {/* 날짜 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                 <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>등록 일시:</label>
@@ -1554,7 +1595,7 @@
                             </div>
                             
                             {/* 필터 초기화 버튼 */}
-                            {(selectedBranch !== 'all' || startDate || endDate) && (
+                            {(selectedBranch !== 'all' || selectedTeam !== 'all' || startDate || endDate) && (
                                 <button
                                     onClick={handleResetFilters}
                                     style={{
@@ -1618,6 +1659,7 @@
                                                 />
                                             </th>
                                             <th>지점</th>
+                                            <th>팀</th>
                                             <th>날짜</th>
                                             <th>항목</th>
                                             <th>금액</th>
@@ -1650,6 +1692,7 @@
                                                         {cost.branchName || '미설정'}
                                                     </span>
                                                 </td>
+                                                <td style={{fontSize: '13px', color: '#666'}}>{cost.team || '-'}</td>
                                                 <td>{formatCostDate(cost.date)}</td>
                                                 <td>
                                                     <span className={`status-badge ${categories[cost.category]?.className || ''}`} style={{
