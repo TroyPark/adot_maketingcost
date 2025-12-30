@@ -2196,10 +2196,10 @@
                                             />
                                         </div>
                                     </div>
-                                    <div className="modal-actions">
+                                    <div className="modal-footer">
                                         <button
                                             type="button"
-                                            className="btn btn-secondary"
+                                            className="btn btn-secondary btn-sm"
                                             onClick={handleCancelReauth}
                                             disabled={isReauthenticating}
                                         >
@@ -2207,7 +2207,7 @@
                                         </button>
                                         <button
                                             type="submit"
-                                            className="btn"
+                                            className="btn btn-sm"
                                             disabled={isReauthenticating || !reauthPassword}
                                         >
                                             {isReauthenticating ? '확인 중...' : '확인'}
