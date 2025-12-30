@@ -3973,12 +3973,8 @@
             
             // 새 문의 작성 모달 상태
             const [showNewInquiryModal, setShowNewInquiryModal] = useState(false);
-            const [branches, setBranches] = useState([]);
-            const [teams, setTeams] = useState(['1팀', '2팀', '3팀', '4팀']);
             const [newInquiry, setNewInquiry] = useState({
                 targetTeam: '',
-                branchName: '',
-                team: '',
                 authorName: '',
                 content: ''
             });
@@ -4222,8 +4218,6 @@
             const openNewInquiryModal = () => {
                 setNewInquiry({
                     targetTeam: '',
-                    branchName: '',
-                    team: '',
                     authorName: '',
                     content: ''
                 });
@@ -4234,10 +4228,6 @@
             const handleNewInquirySubmit = async () => {
                 if (!newInquiry.targetTeam) {
                     alert('문의할 부서를 선택해주세요.');
-                    return;
-                }
-                if (!newInquiry.branchName) {
-                    alert('지점을 선택해주세요.');
                     return;
                 }
                 if (!newInquiry.content.trim()) {
@@ -4256,8 +4246,8 @@
                         // 원본 지점 문의 없이 직접 작성
                         originalInquiryId: null,
                         originalInquiry: null,
-                        branchName: newInquiry.branchName,
-                        team: newInquiry.team || '',
+                        branchName: '',
+                        team: '',
                         
                         // 기획본부 문의 정보
                         targetTeam: newInquiry.targetTeam,
@@ -4874,50 +4864,6 @@
                                             <option value="">-- 부서를 선택하세요 --</option>
                                             {ABP_TEAMS.map(team => (
                                                 <option key={team.id} value={team.id}>{team.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* 지점 선택 */}
-                                    <div className="form-group">
-                                        <label>지점 *</label>
-                                        <select
-                                            value={newInquiry.branchName}
-                                            onChange={(e) => setNewInquiry({...newInquiry, branchName: e.target.value})}
-                                            style={{
-                                                width: '100%',
-                                                padding: '12px 16px',
-                                                borderRadius: '8px',
-                                                border: '2px solid #e0e0e0',
-                                                fontSize: '14px',
-                                                background: 'white'
-                                            }}
-                                        >
-                                            <option value="">-- 지점을 선택하세요 --</option>
-                                            {branches.map(branch => (
-                                                <option key={branch} value={branch}>{branch}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* 팀 선택 */}
-                                    <div className="form-group">
-                                        <label>팀 (선택)</label>
-                                        <select
-                                            value={newInquiry.team}
-                                            onChange={(e) => setNewInquiry({...newInquiry, team: e.target.value})}
-                                            style={{
-                                                width: '100%',
-                                                padding: '12px 16px',
-                                                borderRadius: '8px',
-                                                border: '2px solid #e0e0e0',
-                                                fontSize: '14px',
-                                                background: 'white'
-                                            }}
-                                        >
-                                            <option value="">-- 팀 선택 --</option>
-                                            {teams.map(team => (
-                                                <option key={team} value={team}>{team}</option>
                                             ))}
                                         </select>
                                     </div>
