@@ -824,7 +824,6 @@
                                         </th>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
                                         <th style={{width: '100px'}}>상태</th>
-                                        <th style={{width: '120px'}}>지점</th>
                                         <th>문의 내용</th>
                                         <th style={{width: '100px'}}>작성자</th>
                                         <th style={{width: '160px'}}>작성일</th>
@@ -850,18 +849,6 @@
                                             </td>
                                             <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
                                             <td>{getStatusBadge(inquiry.status)}</td>
-                                            <td>
-                                                <span style={{
-                                                    background: '#f07c00',
-                                                    color: 'white',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {inquiry.branchName || '-'}
-                                                </span>
-                                            </td>
                                             <td style={{
                                                 maxWidth: '300px',
                                                 overflow: 'hidden',
@@ -892,16 +879,6 @@
                                     <div style={{marginBottom: '20px'}}>
                                         <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
                                             {getStatusBadge(selectedInquiry.status)}
-                                            <span style={{
-                                                background: '#f07c00',
-                                                color: 'white',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
-                                                {selectedInquiry.branchName}
-                                            </span>
                                             <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
                                                 {formatDate(selectedInquiry.createdAt)}
                                             </span>
