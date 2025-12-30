@@ -1825,9 +1825,8 @@
                 try {
                     const email = localStorage.getItem('reauthEmail') || user.email;
                     
-                    // 비밀번호로 재인증
-                    const credential = firebase.auth.EmailAuthProvider.credential(email, reauthPassword);
-                    await user.reauthenticateWithCredential(credential);
+                    // 이메일/비밀번호로 다시 로그인하여 인증 방식 복원
+                    await firebase.auth().signInWithEmailAndPassword(email, reauthPassword);
                     
                     // 재인증 성공 - 이메일/비밀번호 인증 방식 복원됨
                     localStorage.removeItem('emailForSignIn');
