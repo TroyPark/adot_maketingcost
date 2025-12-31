@@ -554,9 +554,22 @@
 
             resetEmailError.classList.remove('show');
             sendResetEmailBtn.disabled = true;
-            sendResetEmailBtn.textContent = '발송 중...';
+            sendResetEmailBtn.textContent = '확인 중...';
 
             try {
+                // Firestore에서 해당 이메일이 등록되어 있는지 확인
+                const usersSnapshot = await db.collection('users').where('email', '==', email).get();
+                
+                if (usersSnapshot.empty) {
+                    resetEmailError.textContent = '등록되지 않은 이메일입니다.';
+                    resetEmailError.classList.add('show');
+                    sendResetEmailBtn.disabled = false;
+                    sendResetEmailBtn.textContent = '이메일 발송';
+                    return;
+                }
+
+                sendResetEmailBtn.textContent = '발송 중...';
+
                 // Firebase 이메일 언어 설정
                 firebase.auth().languageCode = 'ko';
                 
@@ -573,9 +586,7 @@
             } catch (error) {
                 console.error('비밀번호 재설정 이메일 발송 오류:', error);
                 
-                if (error.code === 'auth/user-not-found') {
-                    resetEmailError.textContent = '등록되지 않은 이메일입니다.';
-                } else if (error.code === 'auth/invalid-email') {
+                if (error.code === 'auth/invalid-email') {
                     resetEmailError.textContent = '올바른 이메일 형식을 입력해주세요.';
                 } else {
                     resetEmailError.textContent = '이메일 발송에 실패했습니다. 다시 시도해주세요.';
