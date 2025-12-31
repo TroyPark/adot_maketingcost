@@ -1784,12 +1784,15 @@
         }
 
         // 설정 페이지
-        function SettingsPage({ user, userInfo, setUserInfo, isEmailVerified, setIsEmailVerified, needsReauth, setNeedsReauth }) {
+        function SettingsPage({ user, userInfo, setUserInfo, isEmailVerified, setIsEmailVerified }) {
             const [showPasswordModal, setShowPasswordModal] = useState(false);
             const [showMarketingPasswordModal, setShowMarketingPasswordModal] = useState(false);
-            const [showReauthModal, setShowReauthModal] = useState(false);
-            const [reauthPassword, setReauthPassword] = useState('');
-            const [isReauthenticating, setIsReauthenticating] = useState(false);
+            const [showPreAuthModal, setShowPreAuthModal] = useState(false); // 이메일 발송 전 비밀번호 확인 모달
+            const [showRestoreAuthModal, setShowRestoreAuthModal] = useState(false); // 마케팅 비밀번호 설정 후 인증 복원 모달
+            const [preAuthPassword, setPreAuthPassword] = useState('');
+            const [restoreAuthPassword, setRestoreAuthPassword] = useState('');
+            const [isPreAuthenticating, setIsPreAuthenticating] = useState(false);
+            const [isRestoringAuth, setIsRestoringAuth] = useState(false);
             const [passwordForm, setPasswordForm] = useState({
                 currentPassword: '',
                 newPassword: '',
@@ -1804,63 +1807,80 @@
             const [isSendingEmail, setIsSendingEmail] = useState(false);
             const [emailSent, setEmailSent] = useState(false);
             
-            // 재인증 필요 시 모달 자동 표시
-            useEffect(() => {
-                if (needsReauth) {
-                    setShowReauthModal(true);
-                }
-            }, [needsReauth]);
-            
-            // 계정 비밀번호로 재인증 (이메일 링크 인증 후)
-            const handleReauthenticate = async (e) => {
+            // 이메일 발송 전 비밀번호 확인
+            const handlePreAuthenticate = async (e) => {
                 e.preventDefault();
                 
-                if (!reauthPassword) {
+                if (!preAuthPassword) {
                     alert('비밀번호를 입력해주세요.');
                     return;
                 }
                 
-                setIsReauthenticating(true);
+                setIsPreAuthenticating(true);
                 
                 try {
-                    const email = localStorage.getItem('reauthEmail') || user.email;
+                    // 현재 비밀번호로 재인증
+                    const credential = firebase.auth.EmailAuthProvider.credential(user.email, preAuthPassword);
+                    await user.reauthenticateWithCredential(credential);
                     
-                    // 이메일/비밀번호로 다시 로그인하여 인증 방식 복원
-                    await firebase.auth().signInWithEmailAndPassword(email, reauthPassword);
+                    // 비밀번호 확인 성공 - 이메일 발송 진행
+                    setShowPreAuthModal(false);
+                    setPreAuthPassword('');
                     
-                    // 재인증 성공 - 이메일/비밀번호 인증 방식 복원됨
-                    localStorage.removeItem('emailForSignIn');
-                    localStorage.removeItem('marketingPasswordPending');
-                    localStorage.removeItem('needsReauth');
-                    localStorage.removeItem('reauthEmail');
-                    
-                    setIsEmailVerified(true);
-                    setNeedsReauth(false);
-                    setShowReauthModal(false);
-                    setReauthPassword('');
-                    
-                    alert('인증이 완료되었습니다!\n이제 마케팅 비용 비밀번호를 설정할 수 있습니다.');
+                    // 이메일 발송
+                    await sendVerificationEmailAfterAuth();
                 } catch (error) {
-                    console.error('재인증 오류:', error);
+                    console.error('비밀번호 확인 오류:', error);
                     if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                         alert('비밀번호가 올바르지 않습니다.');
                     } else {
                         alert('인증에 실패했습니다: ' + error.message);
                     }
                 } finally {
-                    setIsReauthenticating(false);
+                    setIsPreAuthenticating(false);
                 }
             };
             
-            // 재인증 취소
-            const handleCancelReauth = () => {
-                localStorage.removeItem('emailForSignIn');
-                localStorage.removeItem('marketingPasswordPending');
-                localStorage.removeItem('needsReauth');
-                localStorage.removeItem('reauthEmail');
-                setNeedsReauth(false);
-                setShowReauthModal(false);
-                setReauthPassword('');
+            // 마케팅 비밀번호 설정 후 인증 방식 복원
+            const handleRestoreAuth = async (e) => {
+                e.preventDefault();
+                
+                if (!restoreAuthPassword) {
+                    alert('비밀번호를 입력해주세요.');
+                    return;
+                }
+                
+                setIsRestoringAuth(true);
+                
+                try {
+                    const email = localStorage.getItem('reauthEmail') || user.email;
+                    
+                    // 이메일/비밀번호로 다시 로그인하여 인증 방식 복원
+                    await firebase.auth().signInWithEmailAndPassword(email, restoreAuthPassword);
+                    
+                    // 인증 방식 복원 성공
+                    localStorage.removeItem('emailForSignIn');
+                    localStorage.removeItem('marketingPasswordPending');
+                    localStorage.removeItem('needsReauth');
+                    localStorage.removeItem('reauthEmail');
+                    localStorage.removeItem('passwordVerified');
+                    
+                    setShowRestoreAuthModal(false);
+                    setRestoreAuthPassword('');
+                    setIsEmailVerified(false);
+                    setNeedsReauth(false);
+                    
+                    alert('설정이 완료되었습니다!');
+                } catch (error) {
+                    console.error('인증 복원 오류:', error);
+                    if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                        alert('비밀번호가 올바르지 않습니다.');
+                    } else {
+                        alert('인증에 실패했습니다: ' + error.message);
+                    }
+                } finally {
+                    setIsRestoringAuth(false);
+                }
             };
 
             // 계정 비밀번호 변경
@@ -1916,8 +1936,13 @@
                 }
             };
 
-            // 이메일 인증 링크 전송
-            const sendVerificationEmail = async () => {
+            // 인증 이메일 보내기 버튼 클릭 - 먼저 비밀번호 확인 모달 표시
+            const handleSendEmailClick = () => {
+                setShowPreAuthModal(true);
+            };
+            
+            // 이메일 인증 링크 전송 (비밀번호 확인 후)
+            const sendVerificationEmailAfterAuth = async () => {
                 setIsSendingEmail(true);
 
                 try {
@@ -1934,6 +1959,8 @@
                     // 이메일 저장 (링크 확인용)
                     localStorage.setItem('emailForSignIn', user.email);
                     localStorage.setItem('marketingPasswordPending', 'true');
+                    localStorage.setItem('passwordVerified', 'true'); // 비밀번호 확인 완료 표시
+                    localStorage.setItem('reauthEmail', user.email);
                     
                     setEmailSent(true);
                     alert(`인증 이메일이 ${user.email}로 전송되었습니다.\n이메일의 링크를 클릭하여 인증을 완료해주세요.`);
@@ -1978,16 +2005,15 @@
                         marketingPassword: marketingPasswordForm.newMarketingPassword
                     });
 
-                    // 이메일 인증 상태 초기화
-                    setIsEmailVerified(false);
-                    localStorage.removeItem('marketingPasswordPending');
-
-                    alert('마케팅 비용 비밀번호가 설정되었습니다.');
                     setShowMarketingPasswordModal(false);
                     setMarketingPasswordForm({
                         newMarketingPassword: '',
                         confirmMarketingPassword: ''
                     });
+                    
+                    // 마케팅 비밀번호 설정 완료 - 인증 방식 복원 모달 표시
+                    alert('마케팅 비용 비밀번호가 설정되었습니다.\n계정 보안을 위해 비밀번호를 다시 입력해주세요.');
+                    setShowRestoreAuthModal(true);
                 } catch (error) {
                     console.error('마케팅 비용 비밀번호 설정 오류:', error);
                     alert('비밀번호 설정에 실패했습니다: ' + error.message);
@@ -2152,14 +2178,68 @@
                         </div>
                     )}
 
-                    {/* 계정 비밀번호 재인증 모달 (이메일 링크 인증 후) */}
-                    {showReauthModal && (
+                    {/* 이메일 발송 전 계정 비밀번호 확인 모달 */}
+                    {showPreAuthModal && (
                         <div className="modal-overlay">
                             <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
                                 <div className="modal-header">
                                     <h3>🔐 계정 비밀번호 확인</h3>
                                 </div>
-                                <form onSubmit={handleReauthenticate}>
+                                <form onSubmit={handlePreAuthenticate}>
+                                    <div className="modal-body">
+                                        <div style={{
+                                            background: '#e3f2fd',
+                                            padding: '14px',
+                                            borderRadius: '8px',
+                                            marginBottom: '20px'
+                                        }}>
+                                            <p style={{fontSize: '13px', color: '#1565c0', lineHeight: '1.5'}}>
+                                                📧 인증 이메일을 보내기 전에<br/>
+                                                <strong>현재 계정 비밀번호</strong>를 확인합니다.
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="form-group">
+                                            <label>계정 비밀번호</label>
+                                            <input
+                                                type="password"
+                                                value={preAuthPassword}
+                                                onChange={(e) => setPreAuthPassword(e.target.value)}
+                                                placeholder="현재 계정 비밀번호 입력"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => { setShowPreAuthModal(false); setPreAuthPassword(''); }}
+                                            disabled={isPreAuthenticating}
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-sm"
+                                            disabled={isPreAuthenticating || !preAuthPassword}
+                                        >
+                                            {isPreAuthenticating ? '확인 중...' : '확인 후 이메일 발송'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 마케팅 비밀번호 설정 후 인증 방식 복원 모달 */}
+                    {showRestoreAuthModal && (
+                        <div className="modal-overlay">
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="modal-header">
+                                    <h3>🔐 계정 보안 복원</h3>
+                                </div>
+                                <form onSubmit={handleRestoreAuth}>
                                     <div className="modal-body">
                                         <div style={{
                                             background: '#e8f5e9',
@@ -2170,7 +2250,7 @@
                                         }}>
                                             <div style={{fontSize: '32px', marginBottom: '8px'}}>✅</div>
                                             <p style={{fontSize: '14px', color: '#388e3c', fontWeight: '600'}}>
-                                                이메일 인증이 완료되었습니다!
+                                                마케팅 비용 비밀번호가 설정되었습니다!
                                             </p>
                                         </div>
                                         
@@ -2181,7 +2261,7 @@
                                             marginBottom: '20px'
                                         }}>
                                             <p style={{fontSize: '13px', color: '#e65100', lineHeight: '1.5'}}>
-                                                ⚠️ 보안을 위해 <strong>현재 계정 비밀번호</strong>를 한 번 더 입력해주세요.
+                                                ⚠️ 계정 보안을 위해 <strong>계정 비밀번호</strong>를 입력하여 인증을 완료해주세요.
                                             </p>
                                         </div>
                                         
@@ -2189,8 +2269,8 @@
                                             <label>계정 비밀번호</label>
                                             <input
                                                 type="password"
-                                                value={reauthPassword}
-                                                onChange={(e) => setReauthPassword(e.target.value)}
+                                                value={restoreAuthPassword}
+                                                onChange={(e) => setRestoreAuthPassword(e.target.value)}
                                                 placeholder="현재 계정 비밀번호 입력"
                                                 autoFocus
                                             />
@@ -2198,19 +2278,12 @@
                                     </div>
                                     <div className="modal-footer">
                                         <button
-                                            type="button"
-                                            className="btn btn-secondary btn-sm"
-                                            onClick={handleCancelReauth}
-                                            disabled={isReauthenticating}
-                                        >
-                                            취소
-                                        </button>
-                                        <button
                                             type="submit"
                                             className="btn btn-sm"
-                                            disabled={isReauthenticating || !reauthPassword}
+                                            disabled={isRestoringAuth || !restoreAuthPassword}
+                                            style={{width: '100%'}}
                                         >
-                                            {isReauthenticating ? '확인 중...' : '확인'}
+                                            {isRestoringAuth ? '확인 중...' : '확인'}
                                         </button>
                                     </div>
                                 </form>
@@ -2279,7 +2352,7 @@
                                             <button 
                                                 type="button" 
                                                 className="btn btn-sm"
-                                                onClick={sendVerificationEmail}
+                                                onClick={handleSendEmailClick}
                                                 disabled={isSendingEmail}
                                             >
                                                 {isSendingEmail ? '전송 중...' : (emailSent ? '다시 전송' : '인증 이메일 보내기')}
@@ -3054,8 +3127,6 @@
             
             // 이메일 인증 상태 (마케팅 비용 비밀번호 변경용)
             const [isEmailVerified, setIsEmailVerified] = useState(false);
-            // 재인증 필요 상태 (이메일 링크 인증 후 계정 비밀번호 확인용)
-            const [needsReauth, setNeedsReauth] = useState(false);
 
             // Firestore에서 사용자 정보 가져오기
             const fetchUserInfo = async (uid) => {
@@ -3074,6 +3145,7 @@
                 if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
                     let email = localStorage.getItem('emailForSignIn');
                     const isPending = localStorage.getItem('marketingPasswordPending');
+                    const passwordVerified = localStorage.getItem('passwordVerified');
                     
                     if (!email) {
                         email = window.prompt('인증 이메일 주소를 입력해주세요:');
@@ -3085,19 +3157,24 @@
                                 // URL에서 인증 파라미터 제거
                                 window.history.replaceState({}, document.title, window.location.pathname);
                                 
-                                // 이메일 링크 인증 후 계정 비밀번호로 재인증 필요
-                                // needsReauth 플래그 설정
-                                localStorage.setItem('needsReauth', 'true');
-                                localStorage.setItem('reauthEmail', email);
-                                
-                                setCurrentPage('settings');
-                                setNeedsReauth(true);
+                                // 비밀번호가 이미 확인된 경우 바로 마케팅 비밀번호 설정 허용
+                                if (passwordVerified === 'true') {
+                                    setIsEmailVerified(true);
+                                    setCurrentPage('settings');
+                                    alert('이메일 인증이 완료되었습니다!\n이제 마케팅 비용 비밀번호를 설정할 수 있습니다.');
+                                } else {
+                                    // 비밀번호 확인이 안 된 경우 (비정상 케이스)
+                                    localStorage.removeItem('emailForSignIn');
+                                    localStorage.removeItem('marketingPasswordPending');
+                                    alert('인증 절차가 올바르지 않습니다. 다시 시도해주세요.');
+                                }
                             })
                             .catch((error) => {
                                 console.error('이메일 링크 인증 오류:', error);
                                 alert('이메일 인증에 실패했습니다. 다시 시도해주세요.');
                                 localStorage.removeItem('emailForSignIn');
                                 localStorage.removeItem('marketingPasswordPending');
+                                localStorage.removeItem('passwordVerified');
                             });
                     }
                 }
@@ -3114,9 +3191,11 @@
                         fetchUserInfo(currentUser.uid);
                         setLoading(false);
                         
-                        // localStorage에서 재인증 필요 상태 복원
-                        if (localStorage.getItem('needsReauth') === 'true') {
-                            setNeedsReauth(true);
+                        // localStorage에서 이메일 인증 완료 상태 복원
+                        const passwordVerified = localStorage.getItem('passwordVerified');
+                        const isPending = localStorage.getItem('marketingPasswordPending');
+                        if (passwordVerified === 'true' && isPending === 'true') {
+                            setIsEmailVerified(true);
                             setCurrentPage('settings');
                         }
                     }
@@ -3186,7 +3265,7 @@
                     case 'inquiry':
                         return <InquiryPage user={user} userInfo={userInfo} />;
                     case 'settings':
-                        return <SettingsPage user={user} userInfo={userInfo} setUserInfo={setUserInfo} isEmailVerified={isEmailVerified} setIsEmailVerified={setIsEmailVerified} needsReauth={needsReauth} setNeedsReauth={setNeedsReauth} />;
+                        return <SettingsPage user={user} userInfo={userInfo} setUserInfo={setUserInfo} isEmailVerified={isEmailVerified} setIsEmailVerified={setIsEmailVerified} />;
                     default:
                         return <MarketingCostPage user={user} userInfo={userInfo} />;
                 }
