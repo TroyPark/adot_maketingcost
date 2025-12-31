@@ -1905,12 +1905,11 @@
                 setIsReauthenticating(true);
                 
                 try {
-                    const email = localStorage.getItem('emailForSignIn') || user.email;
+                    // 현재 로그인된 사용자로 재인증 (reauthenticateWithCredential 사용)
+                    const credential = firebase.auth.EmailAuthProvider.credential(user.email, reauthPassword);
+                    await user.reauthenticateWithCredential(credential);
                     
-                    // 이메일/비밀번호로 다시 로그인하여 인증 방식 복원
-                    await firebase.auth().signInWithEmailAndPassword(email, reauthPassword);
-                    
-                    // 재인증 성공 - 이메일/비밀번호 인증 방식 복원됨
+                    // 재인증 성공
                     localStorage.removeItem('emailForSignIn');
                     localStorage.removeItem('marketingPasswordPending');
                     localStorage.removeItem('needsReauth');
@@ -1938,13 +1937,12 @@
             
             // 재인증 취소
             const handleCancelReauth = () => {
-                // 인증 취소 시 로그아웃하여 이메일 링크 세션 정리
-                firebase.auth().signOut().then(() => {
-                    localStorage.removeItem('emailForSignIn');
-                    localStorage.removeItem('marketingPasswordPending');
-                    localStorage.removeItem('needsReauth');
-                    window.location.href = 'index.html';
-                });
+                localStorage.removeItem('emailForSignIn');
+                localStorage.removeItem('marketingPasswordPending');
+                localStorage.removeItem('needsReauth');
+                setNeedsReauth(false);
+                setShowReauthModal(false);
+                setReauthPassword('');
             };
 
             // 마케팅 비용 비밀번호 설정/변경 (이메일 인증 완료 후)
@@ -3070,35 +3068,23 @@
                 }
             };
 
-            // 이메일 링크 인증 확인
+            // 이메일 링크 인증 확인 (signInWithEmailLink 호출하지 않음 - 현재 세션 유지)
             useEffect(() => {
-                if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
-                    let email = localStorage.getItem('emailForSignIn');
-                    const isPending = localStorage.getItem('marketingPasswordPending');
+                // URL에 marketingPasswordChange 파라미터가 있고, 이메일 링크인 경우
+                const urlParams = new URLSearchParams(window.location.search);
+                const isMarketingPasswordChange = urlParams.get('marketingPasswordChange') === 'true';
+                const isPending = localStorage.getItem('marketingPasswordPending');
+                
+                if (isMarketingPasswordChange && isPending && firebase.auth().isSignInWithEmailLink(window.location.href)) {
+                    // URL에서 인증 파라미터 제거
+                    window.history.replaceState({}, document.title, window.location.pathname);
                     
-                    if (!email) {
-                        email = window.prompt('인증 이메일 주소를 입력해주세요:');
-                    }
+                    // 이메일 링크 인증 완료 - 계정 비밀번호로 재인증 필요
+                    // signInWithEmailLink를 호출하지 않으므로 현재 세션이 유지됨
+                    localStorage.setItem('needsReauth', 'true');
                     
-                    if (email && isPending) {
-                        firebase.auth().signInWithEmailLink(email, window.location.href)
-                            .then(async (result) => {
-                                // URL에서 인증 파라미터 제거
-                                window.history.replaceState({}, document.title, window.location.pathname);
-                                
-                                // 이메일 링크 인증 완료 - 계정 비밀번호로 재인증 필요
-                                localStorage.setItem('needsReauth', 'true');
-                                
-                                setCurrentPage('settings');
-                                setNeedsReauth(true);
-                            })
-                            .catch((error) => {
-                                console.error('이메일 링크 인증 오류:', error);
-                                alert('이메일 인증에 실패했습니다. 다시 시도해주세요.');
-                                localStorage.removeItem('emailForSignIn');
-                                localStorage.removeItem('marketingPasswordPending');
-                            });
-                    }
+                    setCurrentPage('settings');
+                    setNeedsReauth(true);
                 }
             }, []);
 
