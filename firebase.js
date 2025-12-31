@@ -160,7 +160,8 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, admi
             role: 'user',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastLoginAt: null,
-            isActive: true
+            isActive: true,
+            marketingPassword: '0000'  // 마케팅 비용 초기 비밀번호
         });
         
         // 5. 관리자 계정으로 다시 로그인
