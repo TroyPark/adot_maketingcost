@@ -1868,7 +1868,6 @@
                     setShowRestoreAuthModal(false);
                     setRestoreAuthPassword('');
                     setIsEmailVerified(false);
-                    setNeedsReauth(false);
                     
                     alert('설정이 완료되었습니다!');
                 } catch (error) {
@@ -2180,7 +2179,7 @@
 
                     {/* 이메일 발송 전 계정 비밀번호 확인 모달 */}
                     {showPreAuthModal && (
-                        <div className="modal-overlay">
+                        <div className="modal-overlay" style={{zIndex: 1100}}>
                             <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
                                 <div className="modal-header">
                                     <h3>🔐 계정 비밀번호 확인</h3>
@@ -2234,7 +2233,7 @@
                     
                     {/* 마케팅 비밀번호 설정 후 인증 방식 복원 모달 */}
                     {showRestoreAuthModal && (
-                        <div className="modal-overlay">
+                        <div className="modal-overlay" style={{zIndex: 1100}}>
                             <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
                                 <div className="modal-header">
                                     <h3>🔐 계정 보안 복원</h3>
