@@ -1920,7 +1920,10 @@
                     setShowReauthModal(false);
                     setReauthPassword('');
                     
-                    alert('인증이 완료되었습니다!\n이제 마케팅 비용 비밀번호를 설정할 수 있습니다.');
+                    alert('인증이 완료되었습니다!\n이제 마케팅 비용 비밀번호를 설정해주세요.');
+                    
+                    // 인증 완료 후 마케팅 비밀번호 모달 자동 열기
+                    setShowMarketingPasswordModal(true);
                 } catch (error) {
                     console.error('재인증 오류:', error);
                     if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
