@@ -38,23 +38,34 @@ function getFirebaseErrorMessage(errorCode) {
 // 이메일/비밀번호 로그인
 async function loginWithEmail(email, password) {
     try {
+        console.log('🔐 로그인 시도:', email);
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
+        console.log('✅ Firebase Auth 로그인 성공:', user.email);
         
-        // ===== 보안: 승인된 계정만 로그인 허용 =====
-        const validationResult = await validateUserAccount(user);
-        if (!validationResult.success) {
-            await auth.signOut(); // 즉시 로그아웃
-            return validationResult;
+        // ===== 보안: 승인된 계정만 로그인 허용 (관리자/ABP 계정 제외) =====
+        // 관리자 및 ABP 계정은 자동 승인
+        if (user.email !== 'admin@dshare.co.kr' && user.email !== 'abp@dshare.co.kr') {
+            console.log('🔍 일반 사용자 계정 검증 시작...');
+            const validationResult = await validateUserAccount(user);
+            if (!validationResult.success) {
+                console.error('❌ 계정 검증 실패');
+                await auth.signOut(); // 즉시 로그아웃
+                return validationResult;
+            }
+            console.log('✅ 계정 검증 통과');
+        } else {
+            console.log('✅ 관리자/ABP 계정 - 자동 승인');
         }
         // ===== 보안 확인 끝 =====
         
         // 마지막 로그인 시간 업데이트
         await updateLastLogin(user.uid);
         
+        console.log('🎉 로그인 완료:', user.email);
         return { success: true, user: user };
     } catch (error) {
-        console.error('로그인 오류:', error);
+        console.error('❌ 로그인 오류:', error);
         return { success: false, error: error.code, message: getFirebaseErrorMessage(error.code) };
     }
 }
@@ -167,10 +178,15 @@ function onAuthStateChange(callback) {
 // ===== 보안: 이메일 변조 실시간 감시 =====
 // 페이지에서 호출하여 이메일 변경을 실시간으로 감지하고 차단
 async function monitorEmailChanges() {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) return true;
     
     const currentUser = auth.currentUser;
     const uid = currentUser.uid;
+    
+    // 관리자 및 ABP 계정은 감시 제외
+    if (currentUser.email === 'admin@dshare.co.kr' || currentUser.email === 'abp@dshare.co.kr') {
+        return true;
+    }
     
     try {
         const doc = await db.collection('users').doc(uid).get();
