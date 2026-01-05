@@ -81,7 +81,7 @@ async function validateUserAccount(user) {
             console.error('🚨 미승인 계정 로그인 차단:', user.email);
             return { 
                 success: false, 
-                message: '관리자가 승인하지 않은 계정입니다.\n계정 생성은 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928' 
+                message: '관리자가 승인하지 않은 계정입니다.\n계정 생성은 관리자에게 문의하세요.\n담당자: 학원사업마케팅팀 / 박영주' 
             };
         }
         
