@@ -158,7 +158,7 @@ function onAuthStateChange(callback) {
 // 이 함수는 외부에서 호출되지 않도록 합니다
 async function createUser(email, password, displayName = '', branchName = '') {
     console.error('🚨 보안: createUser 함수는 비활성화되었습니다. 관리자를 통해 계정을 생성하세요.');
-    console.error('담당자: 박영주 / 010-4037-0928');
+    console.error('담당자: 학원사업마케팅팀 박영주');
     return { 
         success: false, 
         message: '보안상 일반 회원가입은 차단되었습니다.\n관리자에게 계정 생성을 요청하세요.\n담당자: 박영주 / 010-4037-0928' 
