@@ -149,10 +149,14 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, admi
         // 3. 새 사용자 생성 (이때 새 사용자로 자동 로그인됨)
         const userCredential = await auth.createUserWithEmailAndPassword(newUserEmail, newUserPassword);
         const newUser = userCredential.user;
+        const newUserId = newUser.uid;
         
-        // 4. Firestore에 사용자 정보 저장
-        await db.collection('users').doc(newUser.uid).set({
-            uid: newUser.uid,
+        // 4. 관리자 계정으로 다시 로그인 (Firestore 쓰기 전에!)
+        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+        
+        // 5. Firestore에 사용자 정보 저장 (이제 관리자 권한으로!)
+        await db.collection('users').doc(newUserId).set({
+            uid: newUserId,
             email: newUserEmail,
             displayName: displayName || newUserEmail.split('@')[0],
             branchName: branchName,
@@ -163,9 +167,6 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, admi
             isActive: true,
             marketingPassword: '0000'  // 마케팅 비용 초기 비밀번호
         });
-        
-        // 5. 관리자 계정으로 다시 로그인
-        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
         
         console.log('새 사용자 생성 완료:', newUserEmail);
         return { success: true, user: newUser };
