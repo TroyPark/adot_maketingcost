@@ -268,6 +268,8 @@ async function createUser(email, password, displayName = '', branchName = '') {
 
 // 관리자용 사용자 생성 (고유 비밀번호로 확인)
 async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniquePassword, displayName = '', branchName = '', team = '') {
+    let secondaryApp = null;
+    
     try {
         // 1. 관리자로 로그인되어 있는지 확인
         const adminUser = auth.currentUser;
@@ -288,11 +290,15 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
             return { success: false, message: '고유 비밀번호가 올바르지 않습니다.' };
         }
 
-        // 3. 새 사용자 생성 (이때 새 사용자로 자동 로그인됨)
-        const userCredential = await auth.createUserWithEmailAndPassword(newUserEmail, newUserPassword);
+        // 3. 별도의 Firebase 앱 인스턴스로 새 사용자 생성 (관리자 세션 유지)
+        const firebaseConfig = firebase.app().options;
+        secondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
+        const secondaryAuth = secondaryApp.auth();
+        
+        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(newUserEmail, newUserPassword);
         const newUser = userCredential.user;
         
-        // 4. Firestore에 사용자 정보 저장
+        // 4. Firestore에 사용자 정보 저장 (관리자 세션으로 저장)
         await db.collection('users').doc(newUser.uid).set({
             uid: newUser.uid,
             email: newUserEmail,
@@ -306,13 +312,24 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
             marketingPassword: '0000'  // 마케팅 비용 초기 비밀번호
         });
         
-        // 5. 로그아웃 (관리자는 다시 로그인 필요)
-        await auth.signOut();
+        // 5. 별도 앱 인스턴스 삭제
+        await secondaryApp.delete();
         
-        console.log('새 사용자 생성 완료:', newUserEmail);
-        return { success: true, user: newUser, needsRelogin: true };
+        console.log('✅ 새 사용자 생성 완료:', newUserEmail);
+        console.log('✅ 관리자 세션 유지됨');
+        return { success: true, user: newUser };
     } catch (error) {
-        console.error('관리자 사용자 생성 오류:', error);
+        console.error('❌ 관리자 사용자 생성 오류:', error);
+        
+        // 별도 앱 인스턴스가 있으면 삭제
+        if (secondaryApp) {
+            try {
+                await secondaryApp.delete();
+            } catch (deleteError) {
+                console.error('Secondary app 삭제 오류:', deleteError);
+            }
+        }
+        
         return { success: false, error: error.code, message: getFirebaseErrorMessage(error.code) };
     }
 }
