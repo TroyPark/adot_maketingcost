@@ -3077,7 +3077,7 @@
             // 재인증 필요 상태 (이메일 링크 인증 후 계정 비밀번호 확인용)
             const [needsReauth, setNeedsReauth] = useState(false);
 
-            // Firestore에서 사용자 정보 가져오기 (없으면 생성)
+            // Firestore에서 사용자 정보 가져오기
             const fetchUserInfo = async (uid) => {
                 try {
                     const docRef = db.collection('users').doc(uid);
@@ -3086,30 +3086,17 @@
                     if (doc.exists) {
                         setUserInfo(doc.data());
                     } else {
-                        // 문서가 없으면 자동 생성 (Firebase Authentication에만 있는 경우)
-                        console.log('사용자 문서가 없습니다. 자동 생성합니다...');
-                        const currentUser = firebase.auth().currentUser;
-                        
-                        const newUserData = {
-                            uid: uid,
-                            email: currentUser.email,
-                            displayName: currentUser.displayName || currentUser.email.split('@')[0],
-                            branchName: '',
-                            team: '',
-                            role: 'user',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            isActive: true,
-                            marketingPassword: '0000'  // 초기 비밀번호
-                        };
-                        
-                        await docRef.set(newUserData);
-                        setUserInfo(newUserData);
-                        console.log('사용자 문서가 생성되었습니다.');
+                        // 🚨 문서가 없으면 무단 계정 차단
+                        console.error('🚨 Firestore에 등록되지 않은 계정입니다!');
+                        alert('⚠️ 관리자가 승인하지 않은 계정입니다.\n\n계정 생성은 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928');
+                        await auth.signOut();
+                        window.location.href = 'index.html';
                     }
                 } catch (error) {
-                    console.error('사용자 정보 가져오기/생성 오류:', error);
-                    alert('사용자 정보를 불러오는데 실패했습니다. 페이지를 새로고침해주세요.');
+                    console.error('사용자 정보 가져오기 오류:', error);
+                    alert('사용자 정보를 불러오는데 실패했습니다.\n관리자에게 문의하세요.');
+                    await auth.signOut();
+                    window.location.href = 'index.html';
                 }
             };
 
