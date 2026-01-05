@@ -3007,14 +3007,17 @@
                     isCreatingUser = false;
                     
                     if (result.success) {
-                        if (result.needsRelogin) {
-                            alert('사용자가 등록되었습니다. 관리자 계정으로 다시 로그인해주세요.');
-                            window.location.href = 'index.html';
-                        } else {
-                            alert('사용자가 등록되었습니다.');
-                            setShowModal(false);
-                            loadUsers();
-                        }
+                        alert('✅ 사용자가 등록되었습니다.');
+                        setShowModal(false);
+                        setFormData({
+                            email: '',
+                            password: '',
+                            displayName: '',
+                            branchName: '',
+                            team: '',
+                            adminPassword: ''
+                        });
+                        loadUsers();
                     } else {
                         alert(result.message);
                     }
