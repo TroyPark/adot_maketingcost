@@ -290,6 +290,67 @@ async function updateLastLogin(uid) {
     }
 }
 
+// ===== 자동 로그아웃 기능 =====
+
+// 자동 로그아웃 시간 (밀리초) - 6시간
+const AUTO_LOGOUT_TIME = 6 * 60 * 60 * 1000; // 6시간
+
+// 마지막 활동 시간 업데이트
+function updateLastActivity() {
+    if (auth.currentUser) {
+        localStorage.setItem('lastActivityTime', Date.now().toString());
+    }
+}
+
+// 자동 로그아웃 체크
+function checkAutoLogout() {
+    if (!auth.currentUser) return true;
+    
+    const lastActivity = localStorage.getItem('lastActivityTime');
+    
+    if (lastActivity) {
+        const timePassed = Date.now() - parseInt(lastActivity);
+        
+        // 1일이 지났으면 자동 로그아웃
+        if (timePassed > AUTO_LOGOUT_TIME) {
+            console.log('자동 로그아웃: 24시간 동안 활동 없음');
+            auth.signOut().then(() => {
+                localStorage.removeItem('lastActivityTime');
+                alert('보안을 위해 자동 로그아웃되었습니다.\n(24시간 동안 활동 없음)\n\n다시 로그인해주세요.');
+                window.location.href = 'index.html';
+            });
+            return false;
+        }
+    } else {
+        // 첫 로그인 또는 활동 시간 없음
+        updateLastActivity();
+    }
+    
+    return true;
+}
+
+// 인증 상태 변경 시 체크
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        // 로그인 상태면 체크
+        checkAutoLogout();
+    } else {
+        // 로그아웃 시 활동 시간 삭제
+        localStorage.removeItem('lastActivityTime');
+    }
+});
+
+// 사용자 활동 감지 시 시간 업데이트
+if (typeof document !== 'undefined') {
+    document.addEventListener('click', updateLastActivity);
+    document.addEventListener('keydown', updateLastActivity);
+    document.addEventListener('scroll', updateLastActivity);
+    document.addEventListener('mousemove', updateLastActivity);
+}
+
+// 1분마다 자동 로그아웃 체크
+setInterval(checkAutoLogout, 60000); // 1분
+
 // ===== Firebase Storage 이미지 관리 함수 =====
 
 // 이미지 크기 제한 상수
