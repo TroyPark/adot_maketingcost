@@ -1967,10 +1967,31 @@
                 setIsChangingMarketing(true);
 
                 try {
-                    // Firestore에 마케팅 비용 비밀번호 저장
-                    await db.collection('users').doc(user.uid).update({
-                        marketingPassword: marketingPasswordForm.newMarketingPassword
-                    });
+                    const userDocRef = db.collection('users').doc(user.uid);
+                    
+                    // 문서 존재 여부 확인
+                    const doc = await userDocRef.get();
+                    
+                    if (!doc.exists) {
+                        // 문서가 없으면 생성
+                        await userDocRef.set({
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: user.displayName || user.email.split('@')[0],
+                            branchName: userInfo?.branchName || '',
+                            team: userInfo?.team || '',
+                            role: 'user',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            isActive: true,
+                            marketingPassword: marketingPasswordForm.newMarketingPassword
+                        });
+                    } else {
+                        // 문서가 있으면 업데이트
+                        await userDocRef.update({
+                            marketingPassword: marketingPasswordForm.newMarketingPassword
+                        });
+                    }
 
                     // 로컬 상태 업데이트
                     setUserInfo({
@@ -3056,15 +3077,39 @@
             // 재인증 필요 상태 (이메일 링크 인증 후 계정 비밀번호 확인용)
             const [needsReauth, setNeedsReauth] = useState(false);
 
-            // Firestore에서 사용자 정보 가져오기
+            // Firestore에서 사용자 정보 가져오기 (없으면 생성)
             const fetchUserInfo = async (uid) => {
                 try {
-                    const doc = await db.collection('users').doc(uid).get();
+                    const docRef = db.collection('users').doc(uid);
+                    const doc = await docRef.get();
+                    
                     if (doc.exists) {
                         setUserInfo(doc.data());
+                    } else {
+                        // 문서가 없으면 자동 생성 (Firebase Authentication에만 있는 경우)
+                        console.log('사용자 문서가 없습니다. 자동 생성합니다...');
+                        const currentUser = firebase.auth().currentUser;
+                        
+                        const newUserData = {
+                            uid: uid,
+                            email: currentUser.email,
+                            displayName: currentUser.displayName || currentUser.email.split('@')[0],
+                            branchName: '',
+                            team: '',
+                            role: 'user',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            isActive: true,
+                            marketingPassword: '0000'  // 초기 비밀번호
+                        };
+                        
+                        await docRef.set(newUserData);
+                        setUserInfo(newUserData);
+                        console.log('사용자 문서가 생성되었습니다.');
                     }
                 } catch (error) {
-                    console.error('사용자 정보 가져오기 오류:', error);
+                    console.error('사용자 정보 가져오기/생성 오류:', error);
+                    alert('사용자 정보를 불러오는데 실패했습니다. 페이지를 새로고침해주세요.');
                 }
             };
 
