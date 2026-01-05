@@ -1236,6 +1236,20 @@
                 setShowImageModal(true);
             };
 
+            // 이미지 다운로드
+            const handleDownloadImage = () => {
+                if (previewImages.length === 0) return;
+                
+                const currentImage = previewImages[currentImageIndex];
+                const link = document.createElement('a');
+                link.href = currentImage.url;
+                link.download = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
             // 이전/다음 이미지
             const handlePrevImage = () => {
                 setCurrentImageIndex(prev => prev > 0 ? prev - 1 : previewImages.length - 1);
@@ -2045,9 +2059,26 @@
                             <div className="image-modal" onClick={(e) => e.stopPropagation()}>
                                 <div className="image-modal-header">
                                     <h3>증빙 이미지 ({currentImageIndex + 1} / {previewImages.length})</h3>
-                                    <button className="image-modal-close" onClick={() => setShowImageModal(false)}>
-                                        ×
-                                    </button>
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                        <button 
+                                            className="btn btn-sm"
+                                            style={{
+                                                background: '#4CAF50',
+                                                color: 'white',
+                                                padding: '6px 12px',
+                                                fontSize: '13px',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={handleDownloadImage}
+                                        >
+                                            ⬇ 다운로드
+                                        </button>
+                                        <button className="image-modal-close" onClick={() => setShowImageModal(false)}>
+                                            ×
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="image-modal-body">
                                     {previewImages.length > 1 && (
