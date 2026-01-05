@@ -3152,7 +3152,16 @@
                     }
                 });
 
-                return () => unsubscribe();
+                // ===== 보안: 이메일 변조 실시간 감시 시작 =====
+                const emailMonitorInterval = startEmailMonitoring();
+
+                return () => {
+                    unsubscribe();
+                    // 감시 중지
+                    if (emailMonitorInterval) {
+                        clearInterval(emailMonitorInterval);
+                    }
+                };
             }, []);
 
             const handleLogout = async () => {
