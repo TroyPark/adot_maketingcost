@@ -41,8 +41,16 @@ async function loginWithEmail(email, password) {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
-        // Firestore에 사용자 정보가 없으면 생성, 있으면 마지막 로그인 시간 업데이트
-        await ensureUserInFirestore(user);
+        // ===== 보안: 승인된 계정만 로그인 허용 =====
+        const validationResult = await validateUserAccount(user);
+        if (!validationResult.success) {
+            await auth.signOut(); // 즉시 로그아웃
+            return validationResult;
+        }
+        // ===== 보안 확인 끝 =====
+        
+        // 마지막 로그인 시간 업데이트
+        await updateLastLogin(user.uid);
         
         return { success: true, user: user };
     } catch (error) {
@@ -51,24 +59,67 @@ async function loginWithEmail(email, password) {
     }
 }
 
-// Firestore에 사용자 정보가 없으면 생성
+// ===== 보안: 계정 검증 함수 =====
+// Firestore에 등록된 승인된 계정인지 확인 (자동 생성하지 않음!)
+async function validateUserAccount(user) {
+    try {
+        const doc = await db.collection('users').doc(user.uid).get();
+        
+        if (!doc.exists) {
+            // ⚠️ 보안: Firestore에 사용자 정보가 없으면 미승인 계정
+            console.error('🚨 미승인 계정 로그인 차단:', user.email);
+            return { 
+                success: false, 
+                message: '관리자가 승인하지 않은 계정입니다.\n계정 생성은 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928' 
+            };
+        }
+        
+        const userData = doc.data();
+        
+        // 비활성화된 계정 확인
+        if (userData.isActive === false) {
+            console.error('🚨 비활성화된 계정 로그인 차단:', user.email);
+            return { 
+                success: false, 
+                message: '비활성화된 계정입니다.\n관리자에게 문의하세요.' 
+            };
+        }
+        
+        console.log('✅ 승인된 계정 로그인:', user.email);
+        return { success: true };
+    } catch (error) {
+        console.error('사용자 정보 확인 오류:', error);
+        return { 
+            success: false, 
+            message: '사용자 정보를 확인할 수 없습니다.\n관리자에게 문의하세요.' 
+        };
+    }
+}
+
+// Firestore에 사용자 정보가 없으면 생성 (관리자만 사용, 일반 로그인에서는 호출하지 않음)
 async function ensureUserInFirestore(user) {
     try {
         const doc = await db.collection('users').doc(user.uid).get();
         
         if (!doc.exists) {
-            // 사용자 정보가 없으면 새로 생성
-            await db.collection('users').doc(user.uid).set({
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || user.email.split('@')[0],
-                branchName: '',
-                role: user.email === 'admin@dshare.co.kr' ? 'admin' : 'user',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-                isActive: true
-            });
-            console.log('새 사용자 정보가 Firestore에 생성되었습니다.');
+            // 관리자 계정만 자동 생성 허용
+            if (user.email === 'admin@dshare.co.kr' || user.email === 'abp@dshare.co.kr') {
+                await db.collection('users').doc(user.uid).set({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || user.email.split('@')[0],
+                    branchName: '',
+                    role: user.email === 'admin@dshare.co.kr' ? 'admin' : 'abp',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    isActive: true,
+                    marketingPassword: '0000'
+                });
+                console.log('관리자 계정 정보가 Firestore에 생성되었습니다.');
+            } else {
+                console.error('일반 계정은 자동 생성할 수 없습니다:', user.email);
+                return { success: false };
+            }
         } else {
             // 사용자 정보가 있으면 마지막 로그인 시간만 업데이트
             await db.collection('users').doc(user.uid).update({
@@ -103,8 +154,18 @@ function onAuthStateChange(callback) {
     return auth.onAuthStateChanged(callback);
 }
 
-// 사용자 생성 (회원가입) - Firestore에도 저장
+// ⚠️ 사용자 생성 함수 - 보안상 비활성화 (관리자만 admin.html에서 createUserByAdmin 사용)
+// 이 함수는 외부에서 호출되지 않도록 합니다
 async function createUser(email, password, displayName = '', branchName = '') {
+    console.error('🚨 보안: createUser 함수는 비활성화되었습니다. 관리자를 통해 계정을 생성하세요.');
+    console.error('담당자: 박영주 / 010-4037-0928');
+    return { 
+        success: false, 
+        message: '보안상 일반 회원가입은 차단되었습니다.\n관리자에게 계정 생성을 요청하세요.\n담당자: 박영주 / 010-4037-0928' 
+    };
+    
+    // 아래 코드는 실행되지 않음 (보안상 주석 처리하지 않고 막음)
+    /*
     try {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -126,6 +187,7 @@ async function createUser(email, password, displayName = '', branchName = '') {
         console.error('회원가입 오류:', error);
         return { success: false, error: error.code, message: getFirebaseErrorMessage(error.code) };
     }
+    */
 }
 
 // 관리자용 사용자 생성 (고유 비밀번호로 확인)
