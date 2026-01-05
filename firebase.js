@@ -641,3 +641,6 @@ async function deleteCostImages(userId, costId) {
     }
 }
 
+// ===== 보안: 전역 함수로 노출 (HTML에서 사용) =====
+window.startEmailMonitoring = startEmailMonitoring;
+window.monitorEmailChanges = monitorEmailChanges;
