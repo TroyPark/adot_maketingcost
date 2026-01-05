@@ -85,6 +85,16 @@ async function validateUserAccount(user) {
             };
         }
         
+        // ===== 보안: 이메일 불일치 감지 (이메일 변조 차단) =====
+        if (userData.email !== user.email) {
+            console.error('🚨 이메일 불일치 감지! Auth:', user.email, '/ Firestore:', userData.email);
+            console.error('🚨 계정 변조 시도 차단 - uid:', user.uid);
+            return { 
+                success: false, 
+                message: '계정 정보가 변조되었습니다.\n보안을 위해 로그인이 차단되었습니다.\n관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928' 
+            };
+        }
+        
         console.log('✅ 승인된 계정 로그인:', user.email);
         return { success: true };
     } catch (error) {
@@ -152,6 +162,56 @@ function getCurrentUser() {
 // 인증 상태 변경 리스너
 function onAuthStateChange(callback) {
     return auth.onAuthStateChanged(callback);
+}
+
+// ===== 보안: 이메일 변조 실시간 감시 =====
+// 페이지에서 호출하여 이메일 변경을 실시간으로 감지하고 차단
+async function monitorEmailChanges() {
+    if (!auth.currentUser) return;
+    
+    const currentUser = auth.currentUser;
+    const uid = currentUser.uid;
+    
+    try {
+        const doc = await db.collection('users').doc(uid).get();
+        
+        if (doc.exists) {
+            const userData = doc.data();
+            const authEmail = currentUser.email;
+            const firestoreEmail = userData.email;
+            
+            // 이메일 불일치 감지
+            if (authEmail !== firestoreEmail) {
+                console.error('🚨🚨🚨 실시간 이메일 변조 감지!');
+                console.error('Auth Email:', authEmail);
+                console.error('Firestore Email:', firestoreEmail);
+                console.error('계정을 강제 로그아웃합니다.');
+                
+                alert('⚠️ 계정 정보 변조가 감지되었습니다.\n보안을 위해 로그아웃됩니다.\n\n정상적인 접근을 원하시면 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928');
+                
+                await auth.signOut();
+                window.location.href = 'index.html';
+                return false;
+            }
+            
+            return true;
+        }
+    } catch (error) {
+        console.error('이메일 검증 오류:', error);
+    }
+    
+    return true;
+}
+
+// 페이지에서 주기적으로 이메일 검증 (30초마다)
+function startEmailMonitoring() {
+    // 즉시 한 번 체크
+    monitorEmailChanges();
+    
+    // 30초마다 체크
+    return setInterval(() => {
+        monitorEmailChanges();
+    }, 30000); // 30초
 }
 
 // ⚠️ 사용자 생성 함수 - 보안상 비활성화 (관리자만 admin.html에서 createUserByAdmin 사용)
