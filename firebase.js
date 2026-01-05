@@ -153,21 +153,10 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
         // 3. 새 사용자 생성 (이때 새 사용자로 자동 로그인됨)
         const userCredential = await auth.createUserWithEmailAndPassword(newUserEmail, newUserPassword);
         const newUser = userCredential.user;
-        const newUserId = newUser.uid;
         
-        // 4. 관리자 계정으로 다시 로그인 (Firestore 쓰기 전에!)
-        // 고유 비밀번호는 Firebase Auth 비밀번호가 아니므로 현재 관리자의 이메일로만 로그인 시도
-        // 주의: 이 부분은 관리자가 로그아웃되지 않도록 원래 세션을 복원해야 함
-        // Firebase는 새 사용자 생성 시 자동으로 그 사용자로 로그인되므로, 
-        // 관리자 세션을 복원하기 위해 페이지 새로고침이 필요할 수 있음
-        
-        // 임시 해결책: 새 사용자 생성 후 로그아웃하고 관리자에게 다시 로그인 요청
-        await auth.signOut();
-        
-        // 5. Firestore에 사용자 정보 저장은 관리자가 다시 로그인한 후 자동으로 처리
-        // 일단 사용자 정보를 localStorage에 저장
-        const newUserData = {
-            uid: newUserId,
+        // 4. Firestore에 사용자 정보 저장
+        await db.collection('users').doc(newUser.uid).set({
+            uid: newUser.uid,
             email: newUserEmail,
             displayName: displayName || newUserEmail.split('@')[0],
             branchName: branchName,
@@ -176,16 +165,11 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastLoginAt: null,
             isActive: true,
-            marketingPassword: '0000'
-        };
+            marketingPassword: '0000'  // 마케팅 비용 초기 비밀번호
+        });
         
-        // Firestore에 저장 시도 (실패할 수 있음)
-        try {
-            await db.collection('users').doc(newUserId).set(newUserData);
-        } catch (firestoreError) {
-            console.error('Firestore 저장 실패:', firestoreError);
-            // 무시하고 계속 진행 - 다음 로그인 시 자동 생성될 것임
-        }
+        // 5. 로그아웃 (관리자는 다시 로그인 필요)
+        await auth.signOut();
         
         console.log('새 사용자 생성 완료:', newUserEmail);
         return { success: true, user: newUser, needsRelogin: true };
