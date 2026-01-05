@@ -2762,6 +2762,12 @@
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
+            
+            // 활성화/비활성화 모달 상태
+            const [showToggleModal, setShowToggleModal] = useState(false);
+            const [toggleUser, setToggleUser] = useState(null);
+            const [togglePassword, setTogglePassword] = useState('');
+            const [isToggling, setIsToggling] = useState(false);
 
             // 사용자 목록 실시간 리스너
             useEffect(() => {
@@ -2964,14 +2970,57 @@
                 }
             };
 
-            // 사용자 활성화/비활성화
-            const handleToggleActive = async (user) => {
-                const newStatus = !user.isActive;
-                const result = await toggleUserActive(user.uid, newStatus);
-                if (result.success) {
-                    loadUsers();
-                } else {
-                    alert(result.message);
+            // 사용자 활성화/비활성화 모달 열기
+            const handleToggleActive = (user) => {
+                setToggleUser(user);
+                setTogglePassword('');
+                setShowToggleModal(true);
+            };
+            
+            // 고유 비밀번호 확인 후 활성화/비활성화 실행
+            const confirmToggleActive = async () => {
+                if (!togglePassword) {
+                    alert('고유 비밀번호를 입력해주세요.');
+                    return;
+                }
+
+                setIsToggling(true);
+
+                try {
+                    // Firestore에서 고유 비밀번호 확인
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+                    
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Firebase Console에서 설정해주세요.');
+                        setIsToggling(false);
+                        return;
+                    }
+                    
+                    const storedPassword = doc.data().password;
+                    
+                    if (togglePassword !== storedPassword) {
+                        alert('비밀번호가 올바르지 않습니다.');
+                        setIsToggling(false);
+                        return;
+                    }
+
+                    // 활성화/비활성화 실행
+                    const newStatus = !toggleUser.isActive;
+                    const result = await toggleUserActive(toggleUser.uid, newStatus);
+                    
+                    if (result.success) {
+                        setShowToggleModal(false);
+                        setToggleUser(null);
+                        setTogglePassword('');
+                        loadUsers();
+                    } else {
+                        alert(result.message);
+                    }
+                } catch (error) {
+                    console.error('활성화/비활성화 오류:', error);
+                    alert('처리 중 오류가 발생했습니다.');
+                } finally {
+                    setIsToggling(false);
                 }
             };
 
@@ -3289,6 +3338,72 @@
                                         disabled={isDeleting || !deletePassword}
                                     >
                                         {isDeleting ? '삭제 중...' : '삭제 확인'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 활성화/비활성화 확인 모달 */}
+                    {showToggleModal && toggleUser && (
+                        <div className="modal-overlay" onClick={() => !isToggling && setShowToggleModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="modal-header">
+                                    <h3 style={{color: toggleUser.isActive ? '#dc3545' : '#28a745'}}>
+                                        {toggleUser.isActive ? '⚠️ 사용자 비활성화' : '✓ 사용자 활성화'}
+                                    </h3>
+                                    <button 
+                                        className="modal-close" 
+                                        onClick={() => setShowToggleModal(false)}
+                                        disabled={isToggling}
+                                    >×</button>
+                                </div>
+                                <div style={{marginBottom: '20px'}}>
+                                    <p style={{color: '#666', marginBottom: '15px'}}>
+                                        <strong>{toggleUser.email}</strong> 사용자를 
+                                        <strong style={{color: toggleUser.isActive ? '#dc3545' : '#28a745'}}>
+                                            {toggleUser.isActive ? ' 비활성화' : ' 활성화'}
+                                        </strong>합니다.
+                                    </p>
+                                    {toggleUser.isActive && (
+                                        <p style={{fontSize: '13px', color: '#666'}}>
+                                            비활성화된 사용자는 로그인이 제한될 수 있습니다.
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="form-group">
+                                    <label style={{color: toggleUser.isActive ? '#dc3545' : '#28a745'}}>
+                                        고유 비밀번호 확인
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={togglePassword}
+                                        onChange={(e) => setTogglePassword(e.target.value)}
+                                        placeholder="고유 비밀번호를 입력하세요"
+                                        disabled={isToggling}
+                                        onKeyPress={(e) => e.key === 'Enter' && confirmToggleActive()}
+                                        autoFocus
+                                    />
+                                    <p style={{fontSize: '11px', color: '#999', marginTop: '5px'}}>
+                                        담당자 : 박영주 / 010-4037-0928
+                                    </p>
+                                </div>
+                                <div className="modal-actions">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary" 
+                                        onClick={() => setShowToggleModal(false)}
+                                        disabled={isToggling}
+                                    >
+                                        취소
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className={`btn ${toggleUser.isActive ? 'btn-danger' : 'btn-success'}`}
+                                        onClick={confirmToggleActive}
+                                        disabled={isToggling || !togglePassword}
+                                    >
+                                        {isToggling ? '처리 중...' : (toggleUser.isActive ? '비활성화' : '활성화')}
                                     </button>
                                 </div>
                             </div>
