@@ -2939,14 +2939,14 @@
                         return;
                     }
                     if (!formData.adminPassword) {
-                        alert('관리자 비밀번호를 입력해주세요.');
+                        alert('고유 비밀번호를 입력해주세요.');
                         return;
                     }
                     
                     // 사용자 생성 중 플래그 설정 (리다이렉트 방지)
                     isCreatingUser = true;
                     
-                    // 관리자용 사용자 생성 (생성 후 관리자로 재로그인)
+                    // 관리자용 사용자 생성 (고유 비밀번호로 확인)
                     const result = await createUserByAdmin(
                         formData.email,
                         formData.password,
@@ -2961,9 +2961,14 @@
                     isCreatingUser = false;
                     
                     if (result.success) {
-                        alert('사용자가 등록되었습니다.');
-                        setShowModal(false);
-                        loadUsers();
+                        if (result.needsRelogin) {
+                            alert('사용자가 등록되었습니다. 관리자 계정으로 다시 로그인해주세요.');
+                            window.location.href = 'index.html';
+                        } else {
+                            alert('사용자가 등록되었습니다.');
+                            setShowModal(false);
+                            loadUsers();
+                        }
                     } else {
                         alert(result.message);
                     }
@@ -3250,16 +3255,16 @@
                                     </div>
                                     {!editingUser && (
                                         <div className="form-group" style={{marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #eee'}}>
-                                            <label style={{color: '#f07c00'}}>관리자 비밀번호 확인</label>
+                                            <label style={{color: '#f07c00'}}>고유 비밀번호 확인</label>
                                             <input
                                                 type="password"
                                                 value={formData.adminPassword}
                                                 onChange={(e) => setFormData({...formData, adminPassword: e.target.value})}
-                                                placeholder="관리자 비밀번호를 입력하세요"
+                                                placeholder="고유 비밀번호를 입력하세요"
                                                 required
                                             />
                                             <p style={{fontSize: '12px', color: '#666', marginTop: '5px'}}>
-                                                사용자 추가 후 관리자 계정 유지를 위해 필요합니다
+                                                담당자: 박영주 / 010-4037-0928
                                             </p>
                                         </div>
                                     )}
