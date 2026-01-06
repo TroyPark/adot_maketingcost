@@ -266,10 +266,9 @@ async function createUser(email, password, displayName = '', branchName = '') {
     */
 }
 
-// 관리자용 사용자 생성 (고유 비밀번호로 확인)
+// 관리자용 사용자 생성 (Firebase Functions 사용 - 보안 강화)
+// ⚠️ Functions 설정이 완료되어야 정상 작동합니다. 설정 방법은 FIREBASE_FUNCTIONS_SETUP.md 참조
 async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniquePassword, displayName = '', branchName = '', team = '') {
-    let secondaryApp = null;
-    
     try {
         // 1. 관리자로 로그인되어 있는지 확인
         const adminUser = auth.currentUser;
@@ -277,60 +276,62 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
             return { success: false, message: '관리자로 로그인되어 있지 않습니다.' };
         }
 
-        // 2. Firestore에서 고유 비밀번호 확인
-        const doc = await db.collection('settings').doc('roundPassword').get();
+        // 2. Firebase Functions 호출 (Admin SDK로 사용자 생성)
+        // Functions가 배포되어 있지 않으면 오류 발생
+        const createUserFunction = firebase.functions().httpsCallable('createUser');
         
-        if (!doc.exists) {
-            return { success: false, message: '고유 비밀번호가 설정되지 않았습니다.' };
-        }
-        
-        const storedPassword = doc.data().password;
-        
-        if (uniquePassword !== storedPassword) {
-            return { success: false, message: '고유 비밀번호가 올바르지 않습니다.' };
-        }
-
-        // 3. 별도의 Firebase 앱 인스턴스로 새 사용자 생성 (관리자 세션 유지)
-        const firebaseConfig = firebase.app().options;
-        secondaryApp = firebase.initializeApp(firebaseConfig, 'Secondary');
-        const secondaryAuth = secondaryApp.auth();
-        
-        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(newUserEmail, newUserPassword);
-        const newUser = userCredential.user;
-        
-        // 4. Firestore에 사용자 정보 저장 (관리자 세션으로 저장)
-        await db.collection('users').doc(newUser.uid).set({
-            uid: newUser.uid,
+        const result = await createUserFunction({
             email: newUserEmail,
-            displayName: displayName || newUserEmail.split('@')[0],
+            password: newUserPassword,
+            displayName: displayName,
             branchName: branchName,
             team: team,
-            role: 'user',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastLoginAt: null,
-            isActive: true,
-            marketingPassword: '0000'  // 마케팅 비용 초기 비밀번호
+            uniquePassword: uniquePassword
         });
-        
-        // 5. 별도 앱 인스턴스 삭제
-        await secondaryApp.delete();
-        
-        console.log('✅ 새 사용자 생성 완료:', newUserEmail);
-        console.log('✅ 관리자 세션 유지됨');
-        return { success: true, user: newUser };
+
+        if (result.data && result.data.success) {
+            console.log('✅ 새 사용자 생성 완료 (Functions):', newUserEmail);
+            return { 
+                success: true, 
+                user: { 
+                    uid: result.data.uid, 
+                    email: result.data.email 
+                } 
+            };
+        } else {
+            return { 
+                success: false, 
+                message: result.data?.message || '사용자 생성에 실패했습니다.' 
+            };
+        }
     } catch (error) {
         console.error('❌ 관리자 사용자 생성 오류:', error);
         
-        // 별도 앱 인스턴스가 있으면 삭제
-        if (secondaryApp) {
-            try {
-                await secondaryApp.delete();
-            } catch (deleteError) {
-                console.error('Secondary app 삭제 오류:', deleteError);
-            }
+        // Functions 오류 메시지 추출 및 변환
+        let errorMessage = '사용자 생성에 실패했습니다.';
+        
+        if (error.code === 'functions/not-found') {
+            errorMessage = 'Firebase Functions가 배포되지 않았습니다.\nFIREBASE_FUNCTIONS_SETUP.md 파일을 참조하여 Functions를 설정해주세요.';
+        } else if (error.code === 'functions/unauthenticated') {
+            errorMessage = '로그인이 필요합니다.';
+        } else if (error.code === 'functions/permission-denied') {
+            errorMessage = error.message || '권한이 없습니다. 관리자로 로그인되어 있는지 확인하세요.';
+        } else if (error.code === 'functions/invalid-argument') {
+            errorMessage = error.message || '입력 정보가 올바르지 않습니다.';
+        } else if (error.code === 'functions/failed-precondition') {
+            errorMessage = error.message || '고유 비밀번호가 설정되지 않았습니다.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        } else {
+            // 기존 Firebase 오류 메시지 변환
+            errorMessage = getFirebaseErrorMessage(error.code);
         }
         
-        return { success: false, error: error.code, message: getFirebaseErrorMessage(error.code) };
+        return { 
+            success: false, 
+            error: error.code, 
+            message: errorMessage 
+        };
     }
 }
 
