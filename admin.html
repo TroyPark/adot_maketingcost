@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
     <!-- React CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -4986,10 +4987,10 @@
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
                                         <th style={{width: '100px'}}>상태</th>
                                         <th style={{width: '150px'}}>문의 부서</th>
-                                        <th style={{width: '110px'}}>지점</th>
-                                        <th>문의 내용</th>
+                                        <th style={{width: '150px'}}>지점</th>
+                                        <th style={{width: '180px'}}>문의 내용</th>
                                         <th style={{width: '100px'}}>작성자</th>
-                                        <th style={{width: '160px'}}>작성일</th>
+                                        <th style={{width: '180px'}}>작성일</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -5036,7 +5037,7 @@
                                                 </span>
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} style={{
-                                                maxWidth: '250px',
+                                                maxWidth: '180px',
                                                 overflow: 'hidden',
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap'
