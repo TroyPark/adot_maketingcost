@@ -1797,7 +1797,17 @@
                                         <div className="action-bar-left">
                                             <span>{selectedCosts.length}개 선택됨</span>
                                         </div>
-                                        <div className="action-bar-right">
+                                        <div className="action-bar-right" style={{display: 'flex', gap: '10px'}}>
+                                            <button 
+                                                className="btn btn-sm"
+                                                style={{
+                                                    background: '#4CAF50',
+                                                    color: 'white'
+                                                }}
+                                                onClick={() => alert('현재 개발중 입니다')}
+                                            >
+                                                📄 결제요청서 작성
+                                            </button>
                                             <button className="btn btn-sm btn-danger" onClick={openDeleteModal}>
                                                 선택 삭제
                                             </button>
