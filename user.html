@@ -969,8 +969,8 @@
             const MIN_IMAGES = 3;
             const MAX_IMAGES = 5;
             
-            // 본사 증빙 가능 체크박스 상태
-            const [canVerifyAtHQ, setCanVerifyAtHQ] = useState(false);
+            // 증빙 방식 선택 상태 ('branch' 또는 'hq')
+            const [verifyType, setVerifyType] = useState('branch');
             
             // 선택 및 삭제 관련 상태
             const [selectedCosts, setSelectedCosts] = useState([]);
@@ -1161,6 +1161,14 @@
                 setImageFiles(prev => prev.filter((_, i) => i !== index));
                 setImagePreviews(prev => prev.filter((_, i) => i !== index));
             };
+            
+            // 증빙 방식 변경 시 이미지 초기화 (본사 증빙 선택 시)
+            useEffect(() => {
+                if (verifyType === 'hq') {
+                    setImageFiles([]);
+                    setImagePreviews([]);
+                }
+            }, [verifyType]);
 
             // 모든 이미지 제거
             const handleImageRemoveAll = () => {
@@ -1210,9 +1218,9 @@
                     return;
                 }
 
-                // 이미지 개수 검증 (본사 증빙 가능 체크 시 제외)
-                if (!canVerifyAtHQ && imageFiles.length < MIN_IMAGES) {
-                    alert(`증빙 이미지는 최소 ${MIN_IMAGES}개 이상 업로드해주세요. (현재 ${imageFiles.length}개)\n\n※ 본사에서 증빙 가능한 경우 체크박스를 선택하세요.`);
+                // 이미지 개수 검증 (지점 증빙 선택 시에만 필수)
+                if (verifyType === 'branch' && imageFiles.length < MIN_IMAGES) {
+                    alert(`증빙 이미지는 최소 ${MIN_IMAGES}개 이상 업로드해주세요. (현재 ${imageFiles.length}개)`);
                     return;
                 }
 
@@ -1231,7 +1239,7 @@
                         description: formData.description,
                         imageCount: imageFiles.length,
                         images: [],
-                        canVerifyAtHQ: canVerifyAtHQ,  // 본사 증빙 가능 여부
+                        canVerifyAtHQ: verifyType === 'hq',  // 본사 증빙 여부
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
@@ -1258,7 +1266,7 @@
                     });
                     setImageFiles([]);
                     setImagePreviews([]);
-                    setCanVerifyAtHQ(false);  // 본사 증빙 체크박스 초기화
+                    setVerifyType('branch');  // 증빙 방식 초기화
                     setIsDrawerOpen(false);
                     alert('비용이 등록되었습니다.');
                 } catch (error) {
@@ -1732,100 +1740,179 @@
                                         />
                                     </div>
                                     
-                                    {/* 증빙 이미지 업로드 (필수, 최소 3개 ~ 최대 5개) */}
+                                    {/* 증빙 방식 선택 */}
                                     <div className="form-group">
-                                        <label>증빙 이미지 <span className="required">*</span></label>
+                                        <label>증빙 방식 선택 <span className="required">*</span></label>
                                         
-                                        {/* 이미지 미리보기 그리드 */}
-                                        {imagePreviews.length > 0 && (
-                                            <div className="image-preview-grid">
-                                                {imagePreviews.map((preview, index) => (
-                                                    <div key={index} className="image-preview-item">
-                                                        <img src={preview} alt={`증빙 이미지 ${index + 1}`} />
-                                                        <button 
-                                                            type="button"
-                                                            className="image-remove-btn"
-                                                            onClick={() => handleImageRemove(index)}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* 이미지 추가 영역 */}
-                                        {imageFiles.length < MAX_IMAGES && (
-                                            <label className="image-upload-area">
-                                                <input 
-                                                    type="file"
-                                                    accept="image/jpeg, image/png"
-                                                    onChange={handleImageChange}
-                                                    multiple
-                                                    style={{display: 'none'}}
-                                                />
-                                                <svg className="image-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                                                    <polyline points="21 15 16 10 5 21"/>
-                                                </svg>
-                                                <div className="image-upload-text">클릭하여 이미지 추가</div>
-                                                <div className="image-upload-hint">JPG, PNG 파일만 가능 (여러 장 선택 가능)</div>
-                                            </label>
-                                        )}
-
-                                        {/* 이미지 개수 안내 */}
-                                        <div className={`image-count-info ${imageFiles.length >= MIN_IMAGES || canVerifyAtHQ ? 'success' : 'warning'}`}>
-                                            {imageFiles.length} / {MAX_IMAGES}장 {!canVerifyAtHQ && `(최소 ${MIN_IMAGES}장 필수)`}
-                                        </div>
-                                        
-                                        {/* 본사 증빙 가능 체크박스 */}
+                                        {/* 증빙 방식 체크박스 */}
                                         <div style={{
-                                            marginTop: '15px',
-                                            padding: '12px 16px',
-                                            background: canVerifyAtHQ ? '#fff3e0' : '#f8f9fa',
-                                            border: canVerifyAtHQ ? '2px solid #f07c00' : '2px solid #e0e0e0',
-                                            borderRadius: '8px',
-                                            transition: 'all 0.3s ease'
+                                            display: 'grid',
+                                            gridTemplateColumns: '1fr 1fr',
+                                            gap: '12px',
+                                            marginBottom: '20px'
                                         }}>
-                                            <label style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '10px',
-                                                cursor: 'pointer',
-                                                margin: 0
-                                            }}>
-                                                <input 
-                                                    type="checkbox"
-                                                    checked={canVerifyAtHQ}
-                                                    onChange={(e) => setCanVerifyAtHQ(e.target.checked)}
-                                                    style={{
-                                                        width: '18px',
-                                                        height: '18px',
-                                                        cursor: 'pointer',
-                                                        accentColor: '#f07c00'
-                                                    }}
-                                                />
-                                                <span style={{
-                                                    fontSize: '14px',
-                                                    fontWeight: '600',
-                                                    color: canVerifyAtHQ ? '#f07c00' : '#666'
-                                                }}>
-                                                    📋 본사 증빙 가능
-                                                </span>
-                                            </label>
-                                            {canVerifyAtHQ && (
+                                            {/* 지점 증빙 */}
+                                            <div 
+                                                onClick={() => setVerifyType('branch')}
+                                                style={{
+                                                    padding: '16px',
+                                                    background: verifyType === 'branch' ? '#e8f4fd' : '#f8f9fa',
+                                                    border: verifyType === 'branch' ? '2px solid #1976d2' : '2px solid #e0e0e0',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease',
+                                                    textAlign: 'center'
+                                                }}
+                                            >
                                                 <div style={{
-                                                    marginTop: '8px',
-                                                    paddingLeft: '28px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={verifyType === 'branch'}
+                                                        onChange={() => setVerifyType('branch')}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            width: '20px',
+                                                            height: '20px',
+                                                            cursor: 'pointer',
+                                                            accentColor: '#1976d2'
+                                                        }}
+                                                    />
+                                                    <span style={{
+                                                        fontSize: '16px',
+                                                        fontWeight: '700',
+                                                        color: verifyType === 'branch' ? '#1976d2' : '#666'
+                                                    }}>
+                                                        📷 지점 증빙
+                                                    </span>
+                                                </div>
+                                                <div style={{
                                                     fontSize: '12px',
-                                                    color: '#e65100',
+                                                    color: verifyType === 'branch' ? '#1565c0' : '#999',
                                                     lineHeight: '1.4'
                                                 }}>
-                                                    ✓ 본사에서 증빙 가능한 경우 이미지 없이 등록 가능합니다.
+                                                    이미지 3~5장 업로드
                                                 </div>
-                                            )}
+                                            </div>
+                                            
+                                            {/* 본사 증빙 */}
+                                            <div 
+                                                onClick={() => setVerifyType('hq')}
+                                                style={{
+                                                    padding: '16px',
+                                                    background: verifyType === 'hq' ? '#fff3e0' : '#f8f9fa',
+                                                    border: verifyType === 'hq' ? '2px solid #f07c00' : '2px solid #e0e0e0',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease',
+                                                    textAlign: 'center'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={verifyType === 'hq'}
+                                                        onChange={() => setVerifyType('hq')}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            width: '20px',
+                                                            height: '20px',
+                                                            cursor: 'pointer',
+                                                            accentColor: '#f07c00'
+                                                        }}
+                                                    />
+                                                    <span style={{
+                                                        fontSize: '16px',
+                                                        fontWeight: '700',
+                                                        color: verifyType === 'hq' ? '#f07c00' : '#666'
+                                                    }}>
+                                                        📋 본사 증빙
+                                                    </span>
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    color: verifyType === 'hq' ? '#e65100' : '#999',
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    이미지 없이 등록
+                                                </div>
+                                            </div>
                                         </div>
+                                        
+                                        {/* 지점 증빙 선택 시 이미지 업로드 영역 표시 */}
+                                        {verifyType === 'branch' && (
+                                            <>
+                                                {/* 이미지 미리보기 그리드 */}
+                                                {imagePreviews.length > 0 && (
+                                                    <div className="image-preview-grid">
+                                                        {imagePreviews.map((preview, index) => (
+                                                            <div key={index} className="image-preview-item">
+                                                                <img src={preview} alt={`증빙 이미지 ${index + 1}`} />
+                                                                <button 
+                                                                    type="button"
+                                                                    className="image-remove-btn"
+                                                                    onClick={() => handleImageRemove(index)}
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* 이미지 추가 영역 */}
+                                                {imageFiles.length < MAX_IMAGES && (
+                                                    <label className="image-upload-area">
+                                                        <input 
+                                                            type="file"
+                                                            accept="image/jpeg, image/png"
+                                                            onChange={handleImageChange}
+                                                            multiple
+                                                            style={{display: 'none'}}
+                                                        />
+                                                        <svg className="image-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                            <polyline points="21 15 16 10 5 21"/>
+                                                        </svg>
+                                                        <div className="image-upload-text">클릭하여 이미지 추가</div>
+                                                        <div className="image-upload-hint">JPG, PNG 파일만 가능 (여러 장 선택 가능)</div>
+                                                    </label>
+                                                )}
+
+                                                {/* 이미지 개수 안내 */}
+                                                <div className={`image-count-info ${imageFiles.length >= MIN_IMAGES ? 'success' : 'warning'}`}>
+                                                    {imageFiles.length} / {MAX_IMAGES}장 (최소 {MIN_IMAGES}장 필수)
+                                                </div>
+                                            </>
+                                        )}
+                                        
+                                        {/* 본사 증빙 선택 시 안내 메시지 */}
+                                        {verifyType === 'hq' && (
+                                            <div style={{
+                                                padding: '16px',
+                                                background: '#fff3e0',
+                                                border: '1px solid #ffb74d',
+                                                borderRadius: '8px',
+                                                fontSize: '14px',
+                                                color: '#e65100',
+                                                lineHeight: '1.6'
+                                            }}>
+                                                ✓ 본사에서 증빙 가능한 비용입니다.<br/>
+                                                이미지 없이 등록됩니다.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
