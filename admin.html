@@ -1389,15 +1389,23 @@
                 const branches = [...new Set(selectedData.map(cost => cost.branchName || '미설정'))];
                 const branchName = branches.length === 1 ? branches[0] : '다수 지점';
 
+                // HTML 형식으로 생성
+                let html = `<div style="font-family: 'Malgun Gothic', sans-serif; line-height: 1.8;">`;
+
                 // 1. 목적
-                let text = `1. 목적\n`;
-                text += ` - '${branchName}'의 지점 마케팅 진행 비용 결제 요청\n\n`;
+                html += `<p style="margin-bottom: 10px;"><strong>1. 목적</strong></p>`;
+                html += `<p style="margin-left: 20px; margin-bottom: 20px;"> - '${branchName}'의 지점 마케팅 진행 비용 결제 요청</p>`;
 
                 // 2. 내용 (테이블)
-                text += `2. 내용\n\n`;
-
-                // 테이블 헤더
-                text += `구분\t지점\t내용\t금액\t비고\n`;
+                html += `<p style="margin-bottom: 10px;"><strong>2. 내용</strong></p>`;
+                html += `<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 20px; margin-left: 20px;">`;
+                html += `<thead><tr style="background-color: #f0f0f0;">`;
+                html += `<th style="border: 1px solid #ccc; text-align: center;">구분</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center;">지점</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center;">내용</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center;">금액</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center;">비고</th>`;
+                html += `</tr></thead><tbody>`;
 
                 // 테이블 데이터
                 selectedData.forEach((cost, index) => {
@@ -1405,31 +1413,55 @@
                     const branch = cost.branchName || '미설정';
                     const description = cost.description || '-';
                     const amount = Number(cost.amount || 0).toLocaleString('ko-KR') + '원';
-                    const remark = formatCostDate(cost.date); // 비고에 날짜 표시
+                    const remark = formatCostDate(cost.date);
 
-                    text += `${category}\t${branch}\t${description}\t${amount}\t${remark}\n`;
+                    html += `<tr>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center;">${category}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center;">${branch}</td>`;
+                    html += `<td style="border: 1px solid #ccc; padding-left: 10px;">${description}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px;">${amount}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center;">${remark}</td>`;
+                    html += `</tr>`;
                 });
 
                 // 총액 추가
                 const totalAmount = selectedData.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
-                text += `\n총액:\t\t\t${totalAmount.toLocaleString('ko-KR')}원\t\n`;
+                html += `<tr style="background-color: #f8f8f8; font-weight: bold;">`;
+                html += `<td colspan="3" style="border: 1px solid #ccc; text-align: center;">총액</td>`;
+                html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px;">${totalAmount.toLocaleString('ko-KR')}원</td>`;
+                html += `<td style="border: 1px solid #ccc;"></td>`;
+                html += `</tr>`;
+                html += `</tbody></table>`;
 
                 // 3. 첨부파일
-                text += `\n3. 첨부파일\n`;
-                text += ` - 증빙 이미지 참조\n`;
+                html += `<p style="margin-bottom: 10px;"><strong>3. 첨부파일</strong></p>`;
+                html += `<p style="margin-left: 20px;"> - 증빙 이미지 참조</p>`;
+                html += `</div>`;
 
-                setPaymentRequestText(text);
+                setPaymentRequestText(html);
                 setShowPaymentRequestModal(true);
             };
 
-            // 결제요청서 복사
-            const copyPaymentRequest = () => {
-                navigator.clipboard.writeText(paymentRequestText).then(() => {
-                    alert('결제요청서가 클립보드에 복사되었습니다.');
-                }).catch(err => {
+            // 결제요청서 복사 (HTML 형식)
+            const copyPaymentRequest = async () => {
+                try {
+                    // HTML과 텍스트 모두 클립보드에 복사
+                    const blob = new Blob([paymentRequestText], { type: 'text/html' });
+                    const clipboardItem = new ClipboardItem({
+                        'text/html': blob
+                    });
+                    await navigator.clipboard.write([clipboardItem]);
+                    alert('결제요청서가 클립보드에 복사되었습니다.\n다우오피스에 붙여넣기(Ctrl+V) 하세요.');
+                } catch (err) {
                     console.error('복사 실패:', err);
-                    alert('복사에 실패했습니다. 텍스트를 직접 선택하여 복사해주세요.');
-                });
+                    // 폴백: 텍스트로 복사 시도
+                    try {
+                        await navigator.clipboard.writeText(paymentRequestText);
+                        alert('텍스트 형식으로 복사되었습니다.');
+                    } catch (err2) {
+                        alert('복사에 실패했습니다. 아래 내용을 직접 선택하여 복사해주세요.');
+                    }
+                }
             };
 
             // 이번 달 비용 계산
@@ -2227,24 +2259,22 @@
                                         fontSize: '13px',
                                         color: '#666'
                                     }}>
-                                        💡 아래 내용을 복사하여 다우오피스 결제요청서에 붙여넣기 하세요.
+                                        💡 아래 "클립보드에 복사" 버튼을 클릭하여 복사한 후, 다우오피스 결제요청서에 붙여넣기(Ctrl+V) 하세요.
                                     </div>
-                                    <textarea
-                                        readOnly
-                                        value={paymentRequestText}
+                                    <div
+                                        id="payment-request-content"
                                         style={{
                                             width: '100%',
                                             minHeight: '400px',
+                                            maxHeight: '600px',
+                                            overflow: 'auto',
                                             padding: '15px',
                                             border: '2px solid #e0e0e0',
                                             borderRadius: '8px',
-                                            fontSize: '14px',
-                                            fontFamily: 'monospace',
-                                            lineHeight: '1.6',
-                                            resize: 'vertical',
-                                            whiteSpace: 'pre'
+                                            background: 'white',
+                                            cursor: 'text'
                                         }}
-                                        onClick={(e) => e.target.select()}
+                                        dangerouslySetInnerHTML={{ __html: paymentRequestText }}
                                     />
                                 </div>
                                 <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
