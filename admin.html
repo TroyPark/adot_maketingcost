@@ -1000,7 +1000,11 @@
             
             // 상세보기 모달 상태
             const [detailCost, setDetailCost] = useState(null);
-            
+
+            // 결제요청서 모달 상태
+            const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false);
+            const [paymentRequestText, setPaymentRequestText] = useState('');
+
             // 페이지네이션 상태
             const [currentPage, setCurrentPage] = useState(1);
             const ITEMS_PER_PAGE = 20;
@@ -1369,6 +1373,63 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            };
+
+            // 결제요청서 생성
+            const generatePaymentRequest = () => {
+                if (selectedCosts.length === 0) {
+                    alert('선택된 항목이 없습니다.');
+                    return;
+                }
+
+                // 선택된 비용 데이터 가져오기
+                const selectedData = costs.filter(cost => selectedCosts.includes(cost.id));
+
+                // 지점명 추출 (중복 제거)
+                const branches = [...new Set(selectedData.map(cost => cost.branchName || '미설정'))];
+                const branchName = branches.length === 1 ? branches[0] : '다수 지점';
+
+                // 1. 목적
+                let text = `1. 목적\n`;
+                text += ` - '${branchName}'의 지점 마케팅 진행 비용 결제 요청\n\n`;
+
+                // 2. 내용 (테이블)
+                text += `2. 내용\n\n`;
+
+                // 테이블 헤더
+                text += `구분\t지점\t내용\t금액\t비고\n`;
+
+                // 테이블 데이터
+                selectedData.forEach((cost, index) => {
+                    const category = categories[cost.category]?.label || cost.category;
+                    const branch = cost.branchName || '미설정';
+                    const description = cost.description || '-';
+                    const amount = Number(cost.amount || 0).toLocaleString('ko-KR') + '원';
+                    const remark = formatCostDate(cost.date); // 비고에 날짜 표시
+
+                    text += `${category}\t${branch}\t${description}\t${amount}\t${remark}\n`;
+                });
+
+                // 총액 추가
+                const totalAmount = selectedData.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+                text += `\n총액:\t\t\t${totalAmount.toLocaleString('ko-KR')}원\t\n`;
+
+                // 3. 첨부파일
+                text += `\n3. 첨부파일\n`;
+                text += ` - 증빙 이미지 참조\n`;
+
+                setPaymentRequestText(text);
+                setShowPaymentRequestModal(true);
+            };
+
+            // 결제요청서 복사
+            const copyPaymentRequest = () => {
+                navigator.clipboard.writeText(paymentRequestText).then(() => {
+                    alert('결제요청서가 클립보드에 복사되었습니다.');
+                }).catch(err => {
+                    console.error('복사 실패:', err);
+                    alert('복사에 실패했습니다. 텍스트를 직접 선택하여 복사해주세요.');
+                });
             };
 
             // 이번 달 비용 계산
@@ -1799,13 +1860,13 @@
                                             <span>{selectedCosts.length}개 선택됨</span>
                                         </div>
                                         <div className="action-bar-right" style={{display: 'flex', gap: '10px'}}>
-                                            <button 
+                                            <button
                                                 className="btn btn-sm"
                                                 style={{
                                                     background: '#4CAF50',
                                                     color: 'white'
                                                 }}
-                                                onClick={() => alert('현재 개발중 입니다')}
+                                                onClick={generatePaymentRequest}
                                             >
                                                 📄 결제요청서 작성
                                             </button>
@@ -2145,6 +2206,67 @@
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 결제요청서 모달 */}
+                    {showPaymentRequestModal && (
+                        <div className="modal-overlay" onClick={() => setShowPaymentRequestModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '800px', width: '90%'}}>
+                                <div className="modal-header">
+                                    <h3>📄 결제요청서</h3>
+                                    <button className="modal-close" onClick={() => setShowPaymentRequestModal(false)}>×</button>
+                                </div>
+                                <div className="modal-body" style={{padding: '20px'}}>
+                                    <div style={{
+                                        background: '#f8f9fa',
+                                        padding: '15px',
+                                        borderRadius: '8px',
+                                        marginBottom: '15px',
+                                        fontSize: '13px',
+                                        color: '#666'
+                                    }}>
+                                        💡 아래 내용을 복사하여 다우오피스 결제요청서에 붙여넣기 하세요.
+                                    </div>
+                                    <textarea
+                                        readOnly
+                                        value={paymentRequestText}
+                                        style={{
+                                            width: '100%',
+                                            minHeight: '400px',
+                                            padding: '15px',
+                                            border: '2px solid #e0e0e0',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            fontFamily: 'monospace',
+                                            lineHeight: '1.6',
+                                            resize: 'vertical',
+                                            whiteSpace: 'pre'
+                                        }}
+                                        onClick={(e) => e.target.select()}
+                                    />
+                                </div>
+                                <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setShowPaymentRequestModal(false)}
+                                    >
+                                        닫기
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm"
+                                        style={{
+                                            background: '#4CAF50',
+                                            color: 'white'
+                                        }}
+                                        onClick={copyPaymentRequest}
+                                    >
+                                        📋 클립보드에 복사
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
