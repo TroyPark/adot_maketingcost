@@ -1400,11 +1400,11 @@
                 html += `<p style="margin-bottom: 10px;"><strong>2. 내용</strong></p>`;
                 html += `<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 20px; margin-left: 20px;">`;
                 html += `<thead><tr style="background-color: #f0f0f0;">`;
-                html += `<th style="border: 1px solid #ccc; text-align: center;">구분</th>`;
-                html += `<th style="border: 1px solid #ccc; text-align: center;">지점</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center; width: 100px; white-space: nowrap;">구분</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center; width: 120px; white-space: nowrap;">지점</th>`;
                 html += `<th style="border: 1px solid #ccc; text-align: center;">내용</th>`;
-                html += `<th style="border: 1px solid #ccc; text-align: center;">금액</th>`;
-                html += `<th style="border: 1px solid #ccc; text-align: center;">비고</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center; width: 120px; white-space: nowrap;">금액</th>`;
+                html += `<th style="border: 1px solid #ccc; text-align: center; width: 100px; white-space: nowrap;">비고</th>`;
                 html += `</tr></thead><tbody>`;
 
                 // 테이블 데이터
@@ -1416,20 +1416,20 @@
                     const remark = formatCostDate(cost.date);
 
                     html += `<tr>`;
-                    html += `<td style="border: 1px solid #ccc; text-align: center;">${category}</td>`;
-                    html += `<td style="border: 1px solid #ccc; text-align: center;">${branch}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center; white-space: nowrap;">${category}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center; white-space: nowrap;">${branch}</td>`;
                     html += `<td style="border: 1px solid #ccc; padding-left: 10px;">${description}</td>`;
-                    html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px;">${amount}</td>`;
-                    html += `<td style="border: 1px solid #ccc; text-align: center;">${remark}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px; white-space: nowrap;">${amount}</td>`;
+                    html += `<td style="border: 1px solid #ccc; text-align: center; white-space: nowrap;">${remark}</td>`;
                     html += `</tr>`;
                 });
 
                 // 총액 추가
                 const totalAmount = selectedData.reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
                 html += `<tr style="background-color: #f8f8f8; font-weight: bold;">`;
-                html += `<td colspan="3" style="border: 1px solid #ccc; text-align: center;">총액</td>`;
-                html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px;">${totalAmount.toLocaleString('ko-KR')}원</td>`;
-                html += `<td style="border: 1px solid #ccc;"></td>`;
+                html += `<td colspan="3" style="border: 1px solid #ccc; text-align: center; white-space: nowrap;">총액</td>`;
+                html += `<td style="border: 1px solid #ccc; text-align: right; padding-right: 10px; white-space: nowrap;">${totalAmount.toLocaleString('ko-KR')}원</td>`;
+                html += `<td style="border: 1px solid #ccc; white-space: nowrap;"></td>`;
                 html += `</tr>`;
                 html += `</tbody></table>`;
 
