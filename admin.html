@@ -3934,6 +3934,27 @@
                 return true;
             });
 
+            // 팀별 통계 계산
+            const getTeamStats = () => {
+                return ABP_TEAMS.map(team => {
+                    const teamInquiries = inquiries.filter(i => i.team === team.name);
+                    const total = teamInquiries.length;
+                    const pending = teamInquiries.filter(i => i.status === 'pending').length;
+                    const answered = teamInquiries.filter(i => i.status === 'answered').length;
+                    const completionRate = total > 0 ? ((answered / total) * 100).toFixed(1) : 0;
+
+                    return {
+                        name: team.name,
+                        total,
+                        pending,
+                        answered,
+                        completionRate
+                    };
+                });
+            };
+
+            const teamStats = getTeamStats();
+
             // 날짜 포맷
             const formatDateLocal = (timestamp) => {
                 if (!timestamp) return '-';
@@ -4160,20 +4181,42 @@
                         <p className="page-subtitle">전 지점의 문의사항을 확인하고 답변합니다</p>
                     </div>
 
-                    {/* 통계 카드 */}
-                    <div className="stats-grid">
-                        <div className="stat-card">
-                            <h3>전체 문의</h3>
-                            <div className="value">{inquiries.length}</div>
-                        </div>
-                        <div className="stat-card">
-                            <h3>대기중</h3>
-                            <div className="value">{inquiries.filter(i => i.status === 'pending').length}</div>
-                        </div>
-                        <div className="stat-card">
-                            <h3>답변완료</h3>
-                            <div className="value">{inquiries.filter(i => i.status === 'answered').length}</div>
-                        </div>
+                    {/* 팀별 통계 대시보드 */}
+                    <div className="stats-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))'}}>
+                        {teamStats.map((team, index) => (
+                            <div key={team.name} className="stat-card" style={{
+                                background: `linear-gradient(135deg, ${['#1a1a2e', '#16213e', '#0f3460', '#1a5f7a', '#159895'][index % 5]} 0%, ${['#16213e', '#0f3460', '#1a5f7a', '#159895', '#1a1a2e'][index % 5]} 100%)`
+                            }}>
+                                <h3 style={{fontSize: '13px', marginBottom: '15px', opacity: 1, fontWeight: '600'}}>
+                                    {team.name}
+                                </h3>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <span style={{fontSize: '12px', opacity: 0.85}}>전체 문의</span>
+                                        <span style={{fontSize: '18px', fontWeight: '700'}}>{team.total}</span>
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <span style={{fontSize: '12px', opacity: 0.85}}>대기중</span>
+                                        <span style={{fontSize: '16px', fontWeight: '600', color: '#ffd93d'}}>{team.pending}</span>
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                        <span style={{fontSize: '12px', opacity: 0.85}}>답변완료</span>
+                                        <span style={{fontSize: '16px', fontWeight: '600', color: '#6bcf7f'}}>{team.answered}</span>
+                                    </div>
+                                    <div style={{
+                                        marginTop: '10px',
+                                        paddingTop: '10px',
+                                        borderTop: '1px solid rgba(255,255,255,0.2)',
+                                        textAlign: 'center'
+                                    }}>
+                                        <span style={{fontSize: '11px', opacity: 0.75}}>답변 완료율</span>
+                                        <div style={{fontSize: '24px', fontWeight: '700', marginTop: '5px', color: '#4ecca3'}}>
+                                            {team.completionRate}%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     <div className="content-area">
