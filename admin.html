@@ -4816,7 +4816,7 @@
             // 팀별 통계 계산
             const getAbpTeamStats = () => {
                 return ABP_TEAMS.map(team => {
-                    const teamInquiries = inquiries.filter(i => i.targetTeam === team.name);
+                    const teamInquiries = inquiries.filter(i => i.targetTeam === team.id);
                     const total = teamInquiries.length;
                     const pending = teamInquiries.filter(i => i.status === 'pending').length;
                     const answered = teamInquiries.filter(i => i.status === 'answered').length;
