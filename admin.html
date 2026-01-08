@@ -3934,17 +3934,19 @@
                 return true;
             });
 
-            // 팀별 통계 계산
+            // 팀별 통계 계산 (지점 팀: 1팀, 2팀, 3팀, 4팀)
+            const BRANCH_TEAMS = ['1팀', '2팀', '3팀', '4팀'];
+
             const getTeamStats = () => {
-                return ABP_TEAMS.map(team => {
-                    const teamInquiries = inquiries.filter(i => i.team === team.name);
+                return BRANCH_TEAMS.map(teamName => {
+                    const teamInquiries = inquiries.filter(i => i.team === teamName);
                     const total = teamInquiries.length;
                     const pending = teamInquiries.filter(i => i.status === 'pending').length;
                     const answered = teamInquiries.filter(i => i.status === 'answered').length;
                     const completionRate = total > 0 ? ((answered / total) * 100).toFixed(1) : 0;
 
                     return {
-                        name: team.name,
+                        name: teamName,
                         total,
                         pending,
                         answered,
@@ -4182,10 +4184,10 @@
                     </div>
 
                     {/* 팀별 통계 대시보드 */}
-                    <div className="stats-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))'}}>
+                    <div className="stats-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
                         {teamStats.map((team, index) => (
                             <div key={team.name} className="stat-card" style={{
-                                background: `linear-gradient(135deg, ${['#1a1a2e', '#16213e', '#0f3460', '#1a5f7a', '#159895'][index % 5]} 0%, ${['#16213e', '#0f3460', '#1a5f7a', '#159895', '#1a1a2e'][index % 5]} 100%)`
+                                background: `linear-gradient(135deg, ${['#1a1a2e', '#0f3460', '#1a5f7a', '#159895'][index]} 0%, ${['#16213e', '#1a5f7a', '#159895', '#0d3b36'][index]} 100%)`
                             }}>
                                 <h3 style={{fontSize: '13px', marginBottom: '15px', opacity: 1, fontWeight: '600'}}>
                                     {team.name}
