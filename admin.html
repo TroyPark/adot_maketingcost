@@ -3957,6 +3957,12 @@
 
             const teamStats = getTeamStats();
 
+            // 전체 통계 계산
+            const totalInquiries = inquiries.length;
+            const totalPending = inquiries.filter(i => i.status === 'pending').length;
+            const totalAnswered = inquiries.filter(i => i.status === 'answered').length;
+            const totalCompletionRate = totalInquiries > 0 ? ((totalAnswered / totalInquiries) * 100).toFixed(1) : 0;
+
             // 날짜 포맷
             const formatDateLocal = (timestamp) => {
                 if (!timestamp) return '-';
@@ -4181,6 +4187,34 @@
                     <div className="page-header">
                         <h2 className="page-title">지점 문의 창구</h2>
                         <p className="page-subtitle">전 지점의 문의사항을 확인하고 답변합니다</p>
+                    </div>
+
+                    {/* 전체 통계 대시보드 */}
+                    <div className="stats-grid" style={{marginBottom: '20px'}}>
+                        <div className="stat-card" style={{
+                            background: 'linear-gradient(135deg, #e94560 0%, #d63850 100%)'
+                        }}>
+                            <h3>전체 문의</h3>
+                            <div className="value">{totalInquiries}</div>
+                        </div>
+                        <div className="stat-card" style={{
+                            background: 'linear-gradient(135deg, #f07c00 0%, #e06c00 100%)'
+                        }}>
+                            <h3>대기중</h3>
+                            <div className="value">{totalPending}</div>
+                        </div>
+                        <div className="stat-card" style={{
+                            background: 'linear-gradient(135deg, #28a745 0%, #218838 100%)'
+                        }}>
+                            <h3>답변완료</h3>
+                            <div className="value">{totalAnswered}</div>
+                        </div>
+                        <div className="stat-card" style={{
+                            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+                        }}>
+                            <h3>답변 완료율</h3>
+                            <div className="value">{totalCompletionRate}%</div>
+                        </div>
                     </div>
 
                     {/* 팀별 통계 대시보드 */}
