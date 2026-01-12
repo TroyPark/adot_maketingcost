@@ -1242,32 +1242,14 @@
             };
 
             // 이미지 다운로드
-            const handleDownloadImage = async () => {
+            const handleDownloadImage = () => {
                 if (previewImages.length === 0) return;
                 
-                try {
-                    const currentImage = previewImages[currentImageIndex];
-                    const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
-                    
-                    // Firebase Storage URL에서 path 추출
-                    const imageRef = storage.refFromURL(currentImage.url);
-                    
-                    // 다운로드 URL에 강제 다운로드 헤더 추가
-                    const url = new URL(currentImage.url);
-                    url.searchParams.set('response-content-disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-                    
-                    // 강제 다운로드
-                    const link = document.createElement('a');
-                    link.href = url.toString();
-                    link.download = fileName;
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } catch (error) {
-                    console.error('이미지 다운로드 오류:', error);
-                    alert('이미지 다운로드에 실패했습니다.');
-                }
+                const currentImage = previewImages[currentImageIndex];
+                const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
+                
+                // 안내 메시지 표시
+                alert('💾 이미지 다운로드 방법:\n\n1. 이미지에서 우클릭\n2. "다른 이름으로 이미지 저장" 선택\n3. 저장 위치를 선택하고 저장\n\n또는\n\n아래 이미지를 드래그해서 폴더로 이동하세요.');
             };
 
             // 이전/다음 이미지
