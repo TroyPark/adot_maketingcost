@@ -1249,15 +1249,21 @@
                     const currentImage = previewImages[currentImageIndex];
                     const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
                     
-                    // Firebase Storage URL을 직접 다운로드 (CORS 문제 해결)
+                    // Firebase Storage에서 직접 Blob 가져오기
+                    const imageRef = storage.refFromURL(currentImage.url);
+                    const blob = await imageRef.getBlob();
+                    
+                    // Blob URL 생성 후 다운로드
+                    const blobUrl = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
-                    link.href = currentImage.url;
+                    link.href = blobUrl;
                     link.download = fileName;
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
+                    
+                    // Blob URL 메모리 해제
+                    window.URL.revokeObjectURL(blobUrl);
                 } catch (error) {
                     console.error('이미지 다운로드 오류:', error);
                     alert('이미지 다운로드에 실패했습니다.');
