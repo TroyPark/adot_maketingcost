@@ -1242,32 +1242,37 @@
             };
 
             // 이미지 다운로드
-            const handleDownloadImage = async () => {
+            const handleDownloadImage = () => {
                 if (previewImages.length === 0) return;
                 
-                try {
-                    const currentImage = previewImages[currentImageIndex];
-                    const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
-                    
-                    // Firebase Storage에서 직접 Blob 가져오기
-                    const imageRef = storage.refFromURL(currentImage.url);
-                    const blob = await imageRef.getBlob();
-                    
-                    // Blob URL 생성 후 다운로드
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = fileName;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    // Blob URL 메모리 해제
-                    window.URL.revokeObjectURL(blobUrl);
-                } catch (error) {
-                    console.error('이미지 다운로드 오류:', error);
+                const currentImage = previewImages[currentImageIndex];
+                const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
+                
+                // XMLHttpRequest로 Blob 가져오기
+                const xhr = new XMLHttpRequest();
+                xhr.responseType = 'blob';
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const blob = xhr.response;
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    } else {
+                        console.error('이미지 다운로드 오류:', xhr.status);
+                        alert('이미지 다운로드에 실패했습니다.');
+                    }
+                };
+                xhr.onerror = function() {
+                    console.error('이미지 다운로드 네트워크 오류');
                     alert('이미지 다운로드에 실패했습니다.');
-                }
+                };
+                xhr.open('GET', currentImage.url);
+                xhr.send();
             };
 
             // 이전/다음 이미지
