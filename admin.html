@@ -1242,14 +1242,34 @@
             };
 
             // 이미지 다운로드
-            const handleDownloadImage = () => {
+            const handleDownloadImage = async () => {
                 if (previewImages.length === 0) return;
                 
-                const currentImage = previewImages[currentImageIndex];
-                const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
-                
-                // 안내 메시지 표시
-                alert('💾 이미지 다운로드 방법:\n\n1. 이미지에서 우클릭\n2. "다른 이름으로 이미지 저장" 선택\n3. 저장 위치를 선택하고 저장\n\n또는\n\n아래 이미지를 드래그해서 폴더로 이동하세요.');
+                try {
+                    const currentImage = previewImages[currentImageIndex];
+                    const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
+                    
+                    // fetch로 Blob 가져오기 (CORS 설정 완료)
+                    const response = await fetch(currentImage.url);
+                    if (!response.ok) throw new Error('이미지 다운로드 실패');
+                    
+                    const blob = await response.blob();
+                    
+                    // Blob URL 생성 후 다운로드
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Blob URL 메모리 해제
+                    window.URL.revokeObjectURL(blobUrl);
+                } catch (error) {
+                    console.error('이미지 다운로드 오류:', error);
+                    alert('이미지 다운로드에 실패했습니다.\n\n대안: 이미지에서 우클릭 → "다른 이름으로 이미지 저장"을 선택하세요.');
+                }
             };
 
             // 이전/다음 이미지
