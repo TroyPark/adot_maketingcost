@@ -995,7 +995,7 @@
                 if (!user) return;
 
                 const unsubscribe = db.collection('costs')
-                    .where('userId', '==', user.uid)
+                    .where('branchName', '==', userInfo.branchName)
                     .onSnapshot((snapshot) => {
                         const costsData = snapshot.docs.map(doc => ({
                             id: doc.id,
