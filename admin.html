@@ -947,6 +947,11 @@
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
+            ),
+            Toolkit: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
             )
         };
 
@@ -969,8 +974,1481 @@
             offline: { label: '오프라인 광고', className: 'offline' },
             event: { label: '이벤트/프로모션', className: 'event' },
             material: { label: '홍보물 제작', className: 'material' },
+            toolkit: { label: '툴킷', className: 'toolkit' },
+            '툴킷': { label: '툴킷', className: 'toolkit' },
             other: { label: '기타', className: 'other' }
         };
+
+        // 마케팅 툴킷 관리 페이지
+        function ToolkitManagementPage() {
+            const [toolkits, setToolkits] = useState([]);
+            const [orders, setOrders] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showCreateModal, setShowCreateModal] = useState(false);
+            const [showEditModal, setShowEditModal] = useState(false);
+            const [editingToolkit, setEditingToolkit] = useState(null);
+            const [selectedToolkit, setSelectedToolkit] = useState('all'); // 툴킷 필터
+            const [activeTab, setActiveTab] = useState('toolkits'); // 탭 상태: 'toolkits' 또는 'orders'
+            const [toolkitSubTab, setToolkitSubTab] = useState('active'); // 툴킷 서브탭: 'active' 또는 'completed'
+            const [newToolkit, setNewToolkit] = useState({
+                name: '',
+                description: '', // 설명
+                image: null,
+                imagePreview: '',
+                dueDate: '', // 취합 완료일
+                minOrderQty: '', // 최소 주문 수량
+                orderUnit: '', // 주문 단위 (배수)
+                showTotalOrders: true, // 전 지점 현황 노출 (기본값: true)
+                priceRanges: [{
+                    minQty: 0,
+                    maxQty: '',
+                    pricePerUnit: ''
+                }]
+            });
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            const loadData = async () => {
+                setLoading(true);
+                try {
+                    // 툴킷 목록 가져오기 (오래된 것부터 → 최신 툴킷이 오른쪽에 표시됨)
+                    const toolkitsSnapshot = await db.collection('toolkits').orderBy('createdAt', 'asc').get();
+                    const toolkitsData = [];
+                    toolkitsSnapshot.forEach(doc => {
+                        toolkitsData.push({ id: doc.id, ...doc.data() });
+                    });
+                    setToolkits(toolkitsData);
+
+                    // 모든 주문 가져오기
+                    const ordersSnapshot = await db.collection('toolkitOrders').get();
+                    const ordersData = [];
+                    ordersSnapshot.forEach(doc => {
+                        ordersData.push({ id: doc.id, ...doc.data() });
+                    });
+                    setOrders(ordersData);
+                } catch (error) {
+                    console.error('데이터 로드 오류:', error);
+                    alert('데이터를 불러오는데 실패했습니다.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 툴킷별 전체 주문 수량 계산
+            const getTotalOrderQty = (toolkitId) => {
+                return orders
+                    .filter(order => order.toolkitId === toolkitId)
+                    .reduce((sum, order) => sum + Number(order.quantity || 0), 0);
+            };
+
+            // 수량에 따른 단가 계산
+            const getPricePerUnit = (toolkit, totalQty) => {
+                if (!toolkit.priceRanges) return 0;
+                
+                const sortedRanges = [...toolkit.priceRanges].sort((a, b) => a.minQty - b.minQty);
+                
+                for (let i = sortedRanges.length - 1; i >= 0; i--) {
+                    const range = sortedRanges[i];
+                    if (totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty)) {
+                        return Number(range.pricePerUnit || 0);
+                    }
+                }
+                
+                return Number(sortedRanges[0]?.pricePerUnit || 0);
+            };
+
+            // 툴킷 생성
+            const handleCreateToolkit = async (e) => {
+                e.preventDefault();
+                
+                if (!newToolkit.name.trim()) {
+                    alert('툴킷 이름을 입력하세요.');
+                    return;
+                }
+
+                // 가격 구간 유효성 검사
+                const validRanges = newToolkit.priceRanges.filter(range => 
+                    range.minQty !== '' && range.pricePerUnit !== ''
+                );
+
+                if (validRanges.length === 0) {
+                    alert('최소 1개 이상의 가격 구간을 설정하세요.');
+                    return;
+                }
+
+                try {
+                    let imageUrl = '';
+                    
+                    // 이미지가 있으면 업로드
+                    if (newToolkit.image) {
+                        const timestamp = Date.now();
+                        const fileName = `${timestamp}_${newToolkit.image.name}`;
+                        const filePath = `toolkits/${fileName}`;
+                        
+                        const storageRef = storage.ref(filePath);
+                        const uploadTask = await storageRef.put(newToolkit.image);
+                        imageUrl = await uploadTask.ref.getDownloadURL();
+                    }
+
+                    await db.collection('toolkits').add({
+                        name: newToolkit.name,
+                        description: newToolkit.description || '',
+                        imageUrl: imageUrl,
+                        dueDate: newToolkit.dueDate || null,
+                        minOrderQty: newToolkit.minOrderQty ? Number(newToolkit.minOrderQty) : null,
+                        orderUnit: newToolkit.orderUnit ? Number(newToolkit.orderUnit) : null,
+                        showTotalOrders: newToolkit.showTotalOrders === true,
+                        priceRanges: validRanges.map(range => ({
+                            minQty: Number(range.minQty),
+                            maxQty: range.maxQty === '' ? null : Number(range.maxQty),
+                            pricePerUnit: Number(range.pricePerUnit)
+                        })),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: auth.currentUser.email
+                    });
+
+                    alert('툴킷이 생성되었습니다.');
+                    setShowCreateModal(false);
+                    setNewToolkit({
+                        name: '',
+                        image: null,
+                        imagePreview: '',
+                        dueDate: '',
+                        minOrderQty: '',
+                        orderUnit: '',
+                        priceRanges: [{
+                            minQty: 0,
+                            maxQty: '',
+                            pricePerUnit: ''
+                        }]
+                    });
+                    loadData();
+                } catch (error) {
+                    console.error('툴킷 생성 오류:', error);
+                    alert('툴킷 생성에 실패했습니다.');
+                }
+            };
+
+            // 툴킷 삭제
+            const handleDeleteToolkit = async (toolkitId, toolkitName) => {
+                if (!confirm(`"${toolkitName}" 툴킷을 삭제하시겠습니까?\n\n관련된 모든 주문 정보와 비용도 함께 삭제됩니다.`)) {
+                    return;
+                }
+
+                try {
+                    // 해당 툴킷의 모든 주문 삭제 및 연결된 비용 삭제
+                    const ordersToDelete = orders.filter(order => order.toolkitId === toolkitId);
+                    const batch = db.batch();
+                    
+                    // 주문과 연결된 비용도 함께 삭제
+                    for (const order of ordersToDelete) {
+                        // 툴킷 주문 삭제
+                        batch.delete(db.collection('toolkitOrders').doc(order.id));
+                        
+                        // 연결된 비용 삭제
+                        if (order.costId) {
+                            batch.delete(db.collection('costs').doc(order.costId));
+                        }
+                    }
+                    
+                    // 툴킷 이미지 삭제 (있는 경우)
+                    const toolkitDoc = await db.collection('toolkits').doc(toolkitId).get();
+                    if (toolkitDoc.exists && toolkitDoc.data().imageUrl) {
+                        const imageRef = storage.refFromURL(toolkitDoc.data().imageUrl);
+                        await imageRef.delete().catch(err => console.log('이미지 삭제 실패:', err));
+                    }
+                    
+                    // 툴킷 삭제
+                    batch.delete(db.collection('toolkits').doc(toolkitId));
+                    
+                    await batch.commit();
+                    alert('툴킷과 관련된 모든 데이터가 삭제되었습니다.');
+                    loadData();
+                } catch (error) {
+                    console.error('툴킷 삭제 오류:', error);
+                    alert('툴킷 삭제에 실패했습니다: ' + error.message);
+                }
+            };
+
+            // 가격 구간 입력 핸들러
+            const handleRangeChange = (index, field, value) => {
+                const newRanges = [...newToolkit.priceRanges];
+                newRanges[index] = { ...newRanges[index], [field]: value };
+                setNewToolkit({ ...newToolkit, priceRanges: newRanges });
+            };
+
+            // 가격 구간 추가
+            const handleAddRange = () => {
+                setNewToolkit({
+                    ...newToolkit,
+                    priceRanges: [...newToolkit.priceRanges, {
+                        minQty: '',
+                        maxQty: '',
+                        pricePerUnit: ''
+                    }]
+                });
+            };
+
+            // 가격 구간 삭제
+            const handleRemoveRange = (index) => {
+                if (newToolkit.priceRanges.length === 1) {
+                    alert('최소 1개의 가격 구간이 필요합니다.');
+                    return;
+                }
+                const newRanges = newToolkit.priceRanges.filter((_, idx) => idx !== index);
+                setNewToolkit({ ...newToolkit, priceRanges: newRanges });
+            };
+
+            // 이미지 업로드 핸들러
+            const handleImageChange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // 파일 타입 검증
+                if (!file.type.match('image/(jpeg|png)')) {
+                    alert('JPG 또는 PNG 파일만 업로드 가능합니다.');
+                    e.target.value = '';
+                    return;
+                }
+
+                // 이미지 크기(픽셀) 검증
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
+                
+                img.onload = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    if (img.width !== 560 || img.height !== 700) {
+                        alert(`이미지 크기가 올바르지 않습니다.\n필수: 560 x 700 픽셀\n현재: ${img.width} x ${img.height} 픽셀`);
+                        e.target.value = '';
+                        setNewToolkit({...newToolkit, image: null, imagePreview: ''});
+                        return;
+                    }
+
+                    // 미리보기 생성
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setNewToolkit({
+                            ...newToolkit,
+                            image: file,
+                            imagePreview: reader.result
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                };
+                
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    alert('이미지 파일을 읽을 수 없습니다.');
+                    e.target.value = '';
+                };
+                
+                img.src = objectUrl;
+            };
+
+            // 이미지 제거
+            const handleRemoveImage = () => {
+                setNewToolkit({...newToolkit, image: null, imagePreview: ''});
+            };
+            
+            // 툴킷 취합 완료
+            const handleCompleteToolkit = async (toolkitId, toolkitName) => {
+                if (!confirm(`"${toolkitName}" 툴킷을 취합 완료 처리하시겠습니까?\n\n취합 완료된 툴킷은 사용자 페이지에서 더 이상 보이지 않으며,\n"취합 완료 툴킷" 탭으로 이동합니다.`)) {
+                    return;
+                }
+
+                try {
+                    await db.collection('toolkits').doc(toolkitId).update({
+                        isCompleted: true,
+                        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    alert('툴킷이 취합 완료 처리되었습니다.');
+                    setToolkitSubTab('completed'); // 취합 완료 탭으로 전환
+                    loadData();
+                } catch (error) {
+                    console.error('취합 완료 처리 오류:', error);
+                    alert('취합 완료 처리에 실패했습니다.');
+                }
+            };
+
+            // 툴킷 수정 모달 열기
+            const handleEditToolkit = (toolkit) => {
+                setEditingToolkit({
+                    ...toolkit,
+                    image: null,
+                    imagePreview: toolkit.imageUrl || '',
+                    oldImageUrl: toolkit.imageUrl || ''
+                });
+                setShowEditModal(true);
+            };
+
+            // 툴킷 수정 저장
+            const handleUpdateToolkit = async (e) => {
+                e.preventDefault();
+                
+                if (!editingToolkit.name.trim()) {
+                    alert('툴킷 이름을 입력하세요.');
+                    return;
+                }
+
+                const validRanges = editingToolkit.priceRanges.filter(range => 
+                    range.minQty !== '' && range.pricePerUnit !== ''
+                );
+
+                if (validRanges.length === 0) {
+                    alert('최소 1개 이상의 가격 구간을 설정하세요.');
+                    return;
+                }
+
+                try {
+                    let imageUrl = editingToolkit.oldImageUrl || '';
+                    
+                    // 새 이미지가 있으면 업로드
+                    if (editingToolkit.image) {
+                        // 기존 이미지 삭제 (있으면)
+                        if (editingToolkit.oldImageUrl) {
+                            try {
+                                const oldImageRef = storage.refFromURL(editingToolkit.oldImageUrl);
+                                await oldImageRef.delete();
+                            } catch (error) {
+                                console.log('기존 이미지 삭제 오류 (무시):', error);
+                            }
+                        }
+
+                        // 새 이미지 업로드
+                        const timestamp = Date.now();
+                        const fileName = `${timestamp}_${editingToolkit.image.name}`;
+                        const filePath = `toolkits/${fileName}`;
+                        
+                        const storageRef = storage.ref(filePath);
+                        const uploadTask = await storageRef.put(editingToolkit.image);
+                        imageUrl = await uploadTask.ref.getDownloadURL();
+                    }
+
+                    await db.collection('toolkits').doc(editingToolkit.id).update({
+                        name: editingToolkit.name,
+                        description: editingToolkit.description || '',
+                        imageUrl: imageUrl,
+                        dueDate: editingToolkit.dueDate || null,
+                        minOrderQty: editingToolkit.minOrderQty ? Number(editingToolkit.minOrderQty) : null,
+                        orderUnit: editingToolkit.orderUnit ? Number(editingToolkit.orderUnit) : null,
+                        showTotalOrders: editingToolkit.showTotalOrders !== false,
+                        priceRanges: validRanges.map(range => ({
+                            minQty: Number(range.minQty),
+                            maxQty: range.maxQty === '' ? null : Number(range.maxQty),
+                            pricePerUnit: Number(range.pricePerUnit)
+                        })),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('툴킷이 수정되었습니다.');
+                    setShowEditModal(false);
+                    setEditingToolkit(null);
+                    loadData();
+                } catch (error) {
+                    console.error('툴킷 수정 오류:', error);
+                    alert('툴킷 수정에 실패했습니다.');
+                }
+            };
+
+            // 수정용 가격 구간 추가
+            const handleEditAddRange = () => {
+                setEditingToolkit({
+                    ...editingToolkit,
+                    priceRanges: [...editingToolkit.priceRanges, {
+                        minQty: '',
+                        maxQty: '',
+                        pricePerUnit: ''
+                    }]
+                });
+            };
+
+            // 수정용 가격 구간 삭제
+            const handleEditRemoveRange = (index) => {
+                if (editingToolkit.priceRanges.length === 1) {
+                    alert('최소 1개의 가격 구간이 필요합니다.');
+                    return;
+                }
+                const newRanges = editingToolkit.priceRanges.filter((_, idx) => idx !== index);
+                setEditingToolkit({ ...editingToolkit, priceRanges: newRanges });
+            };
+
+            // 수정용 가격 구간 입력 핸들러
+            const handleEditRangeChange = (index, field, value) => {
+                const newRanges = [...editingToolkit.priceRanges];
+                newRanges[index] = { ...newRanges[index], [field]: value };
+                setEditingToolkit({ ...editingToolkit, priceRanges: newRanges });
+            };
+
+            // 수정용 이미지 업로드
+            const handleEditImageChange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!file.type.match('image/(jpeg|png)')) {
+                    alert('JPG 또는 PNG 파일만 업로드 가능합니다.');
+                    e.target.value = '';
+                    return;
+                }
+
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
+                
+                img.onload = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    if (img.width !== 560 || img.height !== 700) {
+                        alert(`이미지 크기가 올바르지 않습니다.\n필수: 560 x 700 픽셀\n현재: ${img.width} x ${img.height} 픽셀`);
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setEditingToolkit({
+                            ...editingToolkit,
+                            image: file,
+                            imagePreview: reader.result
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                };
+                
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    alert('이미지 파일을 읽을 수 없습니다.');
+                    e.target.value = '';
+                };
+                
+                img.src = objectUrl;
+            };
+
+            // 수정용 이미지 제거
+            const handleEditRemoveImage = () => {
+                setEditingToolkit({...editingToolkit, image: null, imagePreview: ''});
+            };
+
+            // 주문 현황 필터링
+            const filteredOrders = orders.filter(order => {
+                if (selectedToolkit !== 'all' && order.toolkitId !== selectedToolkit) {
+                    return false;
+                }
+                return true;
+            });
+
+            // 엑셀 다운로드
+            const handleExportOrdersExcel = () => {
+                if (filteredOrders.length === 0) {
+                    alert('내보낼 데이터가 없습니다.');
+                    return;
+                }
+
+                // CSV 데이터 생성
+                const headers = ['툴킷명', '지점명', '팀', '주문 수량', '단가', '예상 금액', '주문일시'];
+                const rows = filteredOrders.map(order => {
+                    const toolkit = toolkits.find(t => t.id === order.toolkitId);
+                    const pricePerUnit = order.pricePerUnit || 0;
+                    const totalAmount = (order.quantity || 0) * pricePerUnit;
+                    return [
+                        order.toolkitName || toolkit?.name || '-',
+                        order.branchName || '미설정',
+                        order.team || '-',
+                        `${Number(order.quantity || 0).toLocaleString()}개`,
+                        `${pricePerUnit.toLocaleString()}원`,
+                        `${totalAmount.toLocaleString()}원`,
+                        formatDate(order.updatedAt || order.createdAt)
+                    ];
+                });
+
+                // BOM 추가 (한글 깨짐 방지)
+                const BOM = '\uFEFF';
+                const csvContent = BOM + [
+                    headers.join(','),
+                    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                ].join('\n');
+
+                // 파일 다운로드
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                const today = new Date();
+                const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `툴킷_주문현황_${dateStr}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            if (loading) {
+                return <div className="loading-spinner"><p>데이터를 불러오는 중...</p></div>;
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">마케팅 툴킷 관리</h2>
+                        <p className="page-subtitle">마케팅 툴킷 생성 및 전체 지점 신청 현황</p>
+                    </div>
+
+                    {/* 탭 네비게이션 */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '10px',
+                        marginBottom: '20px',
+                        borderBottom: '2px solid #e5e7eb'
+                    }}>
+                        <button
+                            onClick={() => setActiveTab('toolkits')}
+                            style={{
+                                padding: '12px 24px',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: activeTab === 'toolkits' ? '3px solid #f07c00' : '3px solid transparent',
+                                color: activeTab === 'toolkits' ? '#f07c00' : '#666',
+                                fontWeight: activeTab === 'toolkits' ? '700' : '500',
+                                fontSize: '15px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                marginBottom: '-2px'
+                            }}
+                        >
+                            툴킷 목록
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('orders')}
+                            style={{
+                                padding: '12px 24px',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: activeTab === 'orders' ? '3px solid #f07c00' : '3px solid transparent',
+                                color: activeTab === 'orders' ? '#f07c00' : '#666',
+                                fontWeight: activeTab === 'orders' ? '700' : '500',
+                                fontSize: '15px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                marginBottom: '-2px'
+                            }}
+                        >
+                            전체 지점별 주문 현황
+                        </button>
+                    </div>
+
+                    {/* 툴킷 목록 탭 */}
+                    {activeTab === 'toolkits' && (
+                        <div className="content-area">
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+                                <h3 style={{fontSize: '18px', color: '#001236', fontWeight: '700', margin: 0}}>
+                                    툴킷 목록
+                                </h3>
+                                <div style={{display: 'flex', gap: '10px'}}>
+                                    <button 
+                                        className="btn btn-sm"
+                                        style={{background: '#10b981'}}
+                                        onClick={() => setShowCreateModal(true)}
+                                    >
+                                        + 툴킷 생성
+                                    </button>
+                                    <button 
+                                        className="btn btn-sm"
+                                        onClick={loadData}
+                                        style={{background: '#6c757d'}}
+                                    >
+                                        🔄 새로고침
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 툴킷 서브탭 */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '10px',
+                                marginBottom: '20px',
+                                borderBottom: '2px solid #e5e7eb'
+                            }}>
+                                <button
+                                    onClick={() => setToolkitSubTab('active')}
+                                    style={{
+                                        padding: '10px 20px',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderBottom: toolkitSubTab === 'active' ? '3px solid #10b981' : '3px solid transparent',
+                                        color: toolkitSubTab === 'active' ? '#10b981' : '#666',
+                                        fontWeight: toolkitSubTab === 'active' ? '600' : '500',
+                                        fontSize: '14px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        marginBottom: '-2px'
+                                    }}
+                                >
+                                    🟢 활성 툴킷 ({toolkits.filter(t => !t.isCompleted).length})
+                                </button>
+                                <button
+                                    onClick={() => setToolkitSubTab('completed')}
+                                    style={{
+                                        padding: '10px 20px',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderBottom: toolkitSubTab === 'completed' ? '3px solid #10b981' : '3px solid transparent',
+                                        color: toolkitSubTab === 'completed' ? '#10b981' : '#666',
+                                        fontWeight: toolkitSubTab === 'completed' ? '600' : '500',
+                                        fontSize: '14px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        marginBottom: '-2px'
+                                    }}
+                                >
+                                    ✓ 취합 완료 툴킷 ({toolkits.filter(t => t.isCompleted).length})
+                                </button>
+                            </div>
+
+                    {/* 툴킷 목록 */}
+                    {(() => {
+                        const filteredToolkits = toolkits.filter(toolkit => 
+                            toolkitSubTab === 'active' ? !toolkit.isCompleted : toolkit.isCompleted
+                        );
+                        
+                        if (filteredToolkits.length === 0) {
+                            return (
+                                <div className="empty-state">
+                                    <p>{toolkitSubTab === 'active' ? '활성 툴킷이 없습니다.' : '취합 완료된 툴킷이 없습니다.'}</p>
+                                </div>
+                            );
+                        }
+                        
+                        return (
+                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px'}}>
+                                {filteredToolkits.map(toolkit => {
+                                const totalQty = getTotalOrderQty(toolkit.id);
+                                const pricePerUnit = getPricePerUnit(toolkit, totalQty);
+                                const totalAmount = totalQty * pricePerUnit;
+                                const branchOrders = orders.filter(order => order.toolkitId === toolkit.id);
+
+                                return (
+                                    <div key={toolkit.id} style={{
+                                        padding: '20px',
+                                        background: 'white',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                        border: '1px solid #e5e7eb',
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }}>
+                                        {/* 이미지 */}
+                                        <div style={{marginBottom: '15px', textAlign: 'center'}}>
+                                            {toolkit.imageUrl ? (
+                                                <div style={{position: 'relative', display: 'inline-block'}}>
+                                                    <img 
+                                                        src={toolkit.imageUrl} 
+                                                        alt={toolkit.name}
+                                                        style={{
+                                                            width: '100%',
+                                                            maxWidth: '360px',
+                                                            height: 'auto',
+                                                            aspectRatio: '360/450',
+                                                            objectFit: 'cover',
+                                                            borderRadius: '8px',
+                                                            border: '2px solid #e5e7eb',
+                                                            display: 'block',
+                                                            margin: '0 auto'
+                                                        }}
+                                                    />
+                                                    {/* D-day 배지 */}
+                                                    {toolkit.dueDate && (() => {
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        const due = new Date(toolkit.dueDate);
+                                                        due.setHours(0, 0, 0, 0);
+                                                        const diffTime = due - today;
+                                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                        
+                                                        return (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: '8px',
+                                                                right: '8px',
+                                                                background: diffDays < 0 ? '#dc2626' : diffDays === 0 ? '#f59e0b' : '#10b981',
+                                                                color: 'white',
+                                                                padding: '6px 12px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '13px',
+                                                                fontWeight: '700',
+                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                                            }}>
+                                                                {diffDays < 0 ? `D+${Math.abs(diffDays)}` : diffDays === 0 ? 'D-Day' : `D-${diffDays}`}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        fontSize: '11px',
+                                                        color: '#999',
+                                                        marginTop: '6px',
+                                                        fontStyle: 'italic'
+                                                    }}>
+                                                        #예시 이미지입니다.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{
+                                                    width: '100%',
+                                                    maxWidth: '360px',
+                                                    aspectRatio: '360/450',
+                                                    background: '#f3f4f6',
+                                                    borderRadius: '8px',
+                                                    border: '2px solid #ddd',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '13px',
+                                                    color: '#9ca3af',
+                                                    margin: '0 auto'
+                                                }}>
+                                                    이미지 없음
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 툴킷 이름 */}
+                                        <h3 style={{fontSize: '18px', fontWeight: '700', color: '#001236', marginBottom: '6px', textAlign: 'center'}}>
+                                            {toolkit.name}
+                                        </h3>
+
+                                        {/* 설명 */}
+                                        {toolkit.description && (
+                                            <div style={{fontSize: '13px', color: '#666', marginBottom: '10px', textAlign: 'center', lineHeight: '1.6', padding: '0 10px', whiteSpace: 'pre-wrap'}}>
+                                                {toolkit.description}
+                                            </div>
+                                        )}
+
+                                        {/* 생성일 & 취합 상태 */}
+                                        <div style={{textAlign: 'center', marginBottom: '15px'}}>
+                                            <p style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>
+                                                생성일: {formatDate(toolkit.createdAt)}
+                                            </p>
+                                            {toolkit.isCompleted && (
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    fontSize: '11px',
+                                                    background: '#d1fae5',
+                                                    color: '#065f46',
+                                                    padding: '3px 10px',
+                                                    borderRadius: '12px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    ✓ 취합 완료
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* 전체 주문 현황 */}
+                                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px'}}>
+                                            <div style={{padding: '12px', background: '#f9fafb', borderRadius: '8px', textAlign: 'center', border: '1px solid #e5e7eb'}}>
+                                                <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>전체 주문</div>
+                                                <div style={{fontSize: '18px', fontWeight: '700', color: '#001236'}}>{totalQty.toLocaleString()}개</div>
+                                            </div>
+                                            <div style={{padding: '12px', background: '#fff7ed', borderRadius: '8px', textAlign: 'center', border: '1px solid #fed7aa'}}>
+                                                <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>현재 단가</div>
+                                                <div style={{fontSize: '18px', fontWeight: '700', color: '#f07c00'}}>{pricePerUnit.toLocaleString()}원</div>
+                                            </div>
+                                        </div>
+
+                                        {/* 예상 총 금액 */}
+                                        <div style={{padding: '12px', background: '#fff7ed', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #fed7aa'}}>
+                                            <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>예상 총 금액</div>
+                                            <div style={{fontSize: '20px', fontWeight: '700', color: '#f07c00'}}>{totalAmount.toLocaleString()}원</div>
+                                        </div>
+
+                                        {/* 가격 구간 */}
+                                        <div style={{marginBottom: '15px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb'}}>
+                                            <div style={{fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#001236'}}>📊 가격 구간</div>
+                                            <div style={{fontSize: '11px', lineHeight: '1.7'}}>
+                                                {toolkit.priceRanges && toolkit.priceRanges.map((range, idx) => (
+                                                    <div 
+                                                        key={idx}
+                                                        style={{
+                                                            color: totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty) ? '#f07c00' : '#666',
+                                                            fontWeight: totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty) ? '600' : '400'
+                                                        }}
+                                                    >
+                                                        {range.minQty}개{range.maxQty ? `~${range.maxQty}개` : '이상'}: {range.pricePerUnit.toLocaleString()}원
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* 지점별 주문 수 */}
+                                        <div style={{marginBottom: '15px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb'}}>
+                                            <div style={{fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#001236'}}>🏪 지점별 주문</div>
+                                            <div style={{fontSize: '11px', color: '#666'}}>
+                                                {branchOrders.length}개 지점 신청
+                                            </div>
+                                        </div>
+
+                                        {/* 관리 버튼들 */}
+                                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto'}}>
+                                            {toolkit.isCompleted ? (
+                                                <button 
+                                                    className="btn btn-sm"
+                                                    style={{
+                                                        background: '#f59e0b',
+                                                        width: '100%',
+                                                        padding: '10px'
+                                                    }}
+                                                    onClick={async () => {
+                                                        if (confirm(`"${toolkit.name}" 툴킷을 다시 활성화하시겠습니까?\n\n사용자 페이지에서 다시 보이게 됩니다.`)) {
+                                                            try {
+                                                                await db.collection('toolkits').doc(toolkit.id).update({
+                                                                    isCompleted: false,
+                                                                    completedAt: null
+                                                                });
+                                                                alert('툴킷이 재활성화되었습니다.');
+                                                                setToolkitSubTab('active');
+                                                                loadData();
+                                                            } catch (error) {
+                                                                console.error('재활성화 오류:', error);
+                                                                alert('재활성화에 실패했습니다.');
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    🔄 재활성화
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    className="btn btn-sm"
+                                                    style={{
+                                                        background: '#6b7280',
+                                                        width: '100%',
+                                                        padding: '10px'
+                                                    }}
+                                                    onClick={() => handleCompleteToolkit(toolkit.id, toolkit.name)}
+                                                >
+                                                    📋 취합 완료
+                                                </button>
+                                            )}
+                                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
+                                                <button 
+                                                    className="btn btn-sm"
+                                                    style={{background: '#f07c00', padding: '10px'}}
+                                                    onClick={() => handleEditToolkit(toolkit)}
+                                                >
+                                                    ✏️ 수정
+                                                </button>
+                                                <button 
+                                                    className="btn btn-sm btn-danger"
+                                                    style={{padding: '10px'}}
+                                                    onClick={() => handleDeleteToolkit(toolkit.id, toolkit.name)}
+                                                >
+                                                    🗑️ 삭제
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                );
+                            })}
+                            </div>
+                        );
+                    })()}
+                    </div>
+                    )}
+
+                    {/* 전체 지점별 주문 현황 탭 */}
+                    {activeTab === 'orders' && (
+                        <div className="content-area">
+                            <h3 style={{fontSize: '18px', marginBottom: '20px', color: '#001236', fontWeight: '700'}}>
+                                전체 지점별 주문 현황
+                            </h3>
+
+                            {/* 필터 및 다운로드 영역 */}
+                            {orders.length > 0 && (
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '15px',
+                                    alignItems: 'center',
+                                    marginBottom: '20px'
+                                }}>
+                                    {/* 툴킷 필터 */}
+                                    <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                        <label style={{fontSize: '14px', color: '#666', whiteSpace: 'nowrap'}}>
+                                            툴킷 선택
+                                        </label>
+                                        <select
+                                            value={selectedToolkit}
+                                            onChange={(e) => setSelectedToolkit(e.target.value)}
+                                            style={{
+                                                padding: '8px 12px',
+                                                borderRadius: '6px',
+                                                border: '1px solid #ddd',
+                                                fontSize: '14px',
+                                                minWidth: '200px'
+                                            }}
+                                        >
+                                            <option value="all">전체 툴킷</option>
+                                            {toolkits.map(toolkit => (
+                                                <option key={toolkit.id} value={toolkit.id}>
+                                                    {toolkit.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* 필터 초기화 */}
+                                    {selectedToolkit !== 'all' && (
+                                        <button
+                                            onClick={() => setSelectedToolkit('all')}
+                                            style={{
+                                                padding: '8px 16px',
+                                                borderRadius: '6px',
+                                                border: 'none',
+                                                background: '#6c757d',
+                                                color: 'white',
+                                                fontSize: '13px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            필터 초기화
+                                        </button>
+                                    )}
+
+                                    {/* 결과 및 다운로드 */}
+                                    <div style={{marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '15px'}}>
+                                        <span style={{fontSize: '14px', color: '#666'}}>
+                                            총 <strong style={{color: '#001236'}}>{filteredOrders.length}</strong>건
+                                        </span>
+                                        <button 
+                                            className="btn btn-sm btn-success" 
+                                            onClick={handleExportOrdersExcel}
+                                            style={{whiteSpace: 'nowrap'}}
+                                        >
+                                            📥 엑셀 다운로드
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {orders.length === 0 ? (
+                                <p style={{fontSize: '13px', color: '#999', textAlign: 'center', padding: '40px'}}>
+                                    아직 주문이 없습니다.
+                                </p>
+                            ) : filteredOrders.length === 0 ? (
+                                <p style={{fontSize: '13px', color: '#999', textAlign: 'center', padding: '40px'}}>
+                                    선택한 조건에 해당하는 주문이 없습니다.
+                                </p>
+                            ) : (
+                                <div style={{overflowX: 'auto'}}>
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{width: '140px', textAlign: 'center'}}>툴킷명</th>
+                                                <th style={{width: '144px', textAlign: 'center'}}>지점명</th>
+                                                <th style={{width: '80px', textAlign: 'center'}}>팀</th>
+                                                <th style={{width: '120px', textAlign: 'center'}}>주문 수량</th>
+                                                <th style={{width: '120px', textAlign: 'center'}}>단가</th>
+                                                <th style={{width: '140px', textAlign: 'center'}}>예상 금액</th>
+                                                <th style={{width: '160px', textAlign: 'center'}}>주문일시</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredOrders.map(order => {
+                                                const toolkit = toolkits.find(t => t.id === order.toolkitId);
+                                                const pricePerUnit = order.pricePerUnit || 0;
+                                                const totalAmount = (order.quantity || 0) * pricePerUnit;
+                                                return (
+                                                    <tr key={order.id}>
+                                                        <td style={{fontWeight: '600', color: '#001236', textAlign: 'center'}}>
+                                                            {order.toolkitName || toolkit?.name || '-'}
+                                                        </td>
+                                                        <td style={{textAlign: 'center'}}>
+                                                            <span style={{
+                                                                background: '#f07c00',
+                                                                color: 'white',
+                                                                padding: '4px 10px',
+                                                                borderRadius: '4px',
+                                                                fontSize: '12px',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {order.branchName || '미설정'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{order.team || '-'}</td>
+                                                        <td style={{fontWeight: '600', color: '#001236', textAlign: 'center'}}>
+                                                            {Number(order.quantity || 0).toLocaleString()}개
+                                                        </td>
+                                                        <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>
+                                                            {pricePerUnit.toLocaleString()}원
+                                                        </td>
+                                                        <td style={{color: '#f07c00', fontWeight: '600', textAlign: 'center'}}>
+                                                            {totalAmount.toLocaleString()}원
+                                                        </td>
+                                                        <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>
+                                                            {formatDate(order.updatedAt || order.createdAt)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 툴킷 생성 모달 */}
+                    {showCreateModal && (
+                        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                            <div className="modal" style={{maxWidth: '800px', maxHeight: '90vh', overflow: 'auto'}} onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>툴킷 생성</h3>
+                                    <button className="modal-close" onClick={() => setShowCreateModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleCreateToolkit}>
+                                    <div className="modal-body">
+                                        <div className="form-group">
+                                            <label>툴킷 이름 *</label>
+                                            <input 
+                                                type="text"
+                                                value={newToolkit.name}
+                                                onChange={(e) => setNewToolkit({...newToolkit, name: e.target.value})}
+                                                placeholder="예: 포스터 A4"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>설명</label>
+                                            <textarea 
+                                                value={newToolkit.description}
+                                                onChange={(e) => setNewToolkit({...newToolkit, description: e.target.value})}
+                                                placeholder="툴킷에 대한 설명을 입력하세요"
+                                                rows="3"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '6px',
+                                                    fontSize: '14px',
+                                                    resize: 'vertical'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>예시 이미지 (560 x 700 픽셀)</label>
+                                            <p style={{fontSize: '12px', color: '#666', marginBottom: '10px'}}>
+                                                * 정확히 560 x 700 픽셀 크기의 JPG 또는 PNG 파일만 업로드 가능합니다.
+                                            </p>
+                                            {newToolkit.imagePreview ? (
+                                                <div style={{position: 'relative', display: 'inline-block'}}>
+                                                    <img 
+                                                        src={newToolkit.imagePreview} 
+                                                        alt="미리보기"
+                                                        style={{
+                                                            maxWidth: '280px',
+                                                            maxHeight: '350px',
+                                                            border: '2px solid #ddd',
+                                                            borderRadius: '8px'
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleRemoveImage}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '8px',
+                                                            right: '8px',
+                                                            background: '#dc2626',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '50%',
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '18px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <input 
+                                                    type="file"
+                                                    accept="image/jpeg,image/png"
+                                                    onChange={handleImageChange}
+                                                    style={{fontSize: '14px'}}
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>취합 완료일</label>
+                                            <input 
+                                                type="date"
+                                                value={newToolkit.dueDate}
+                                                onChange={(e) => setNewToolkit({...newToolkit, dueDate: e.target.value})}
+                                                placeholder="취합 완료일을 선택하세요"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 이미지 위에 D-day 형태로 표시됩니다.
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>최소 주문 수량 (선택)</label>
+                                            <input 
+                                                type="number"
+                                                value={newToolkit.minOrderQty}
+                                                onChange={(e) => setNewToolkit({...newToolkit, minOrderQty: e.target.value})}
+                                                placeholder="예: 100"
+                                                min="0"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 지점에서 최소 수량 이상만 주문 가능합니다.
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>주문 단위 (선택)</label>
+                                            <input 
+                                                type="number"
+                                                value={newToolkit.orderUnit}
+                                                onChange={(e) => setNewToolkit({...newToolkit, orderUnit: e.target.value})}
+                                                placeholder="예: 50 (50개 단위로만 주문 가능)"
+                                                min="1"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 해당 배수로만 주문 가능 (예: 50 설정 시 50개, 100개, 150개...)
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={newToolkit.showTotalOrders}
+                                                    onChange={(e) => setNewToolkit({...newToolkit, showTotalOrders: e.target.checked})}
+                                                    style={{marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer'}}
+                                                />
+                                                <span>지점 페이지에서 전 지점 현황 노출</span>
+                                            </label>
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 체크 시 지점 페이지에서 "전 지점 현재 주문 수량 합계"가 표시됩니다.
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                                                <label style={{marginBottom: 0}}>가격 구간 설정</label>
+                                                <button 
+                                                    type="button"
+                                                    className="btn btn-sm"
+                                                    style={{background: '#10b981', padding: '6px 12px', fontSize: '12px'}}
+                                                    onClick={handleAddRange}
+                                                >
+                                                    ➕ 구간 추가
+                                                </button>
+                                            </div>
+                                            <p style={{fontSize: '12px', color: '#666', marginBottom: '10px'}}>
+                                                * 전체 지점의 주문 합계에 따라 개당 단가가 결정됩니다.
+                                            </p>
+                                            <div style={{display: 'grid', gap: '10px'}}>
+                                                {newToolkit.priceRanges.map((range, idx) => (
+                                                    <div key={idx} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', padding: '10px', background: '#f8f9fa', borderRadius: '4px', alignItems: 'end'}}>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최소 수량</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.minQty}
+                                                                onChange={(e) => handleRangeChange(idx, 'minQty', e.target.value)}
+                                                                placeholder="0"
+                                                                min="0"
+                                                                style={{fontSize: '13px'}}
+                                                                disabled={idx === 0}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최대 수량 (선택)</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.maxQty}
+                                                                onChange={(e) => handleRangeChange(idx, 'maxQty', e.target.value)}
+                                                                placeholder="없으면 이상"
+                                                                min={range.minQty}
+                                                                style={{fontSize: '13px'}}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>개당 단가 (원)</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.pricePerUnit}
+                                                                onChange={(e) => handleRangeChange(idx, 'pricePerUnit', e.target.value)}
+                                                                placeholder="1000"
+                                                                min="0"
+                                                                style={{fontSize: '13px'}}
+                                                            />
+                                                        </div>
+                                                        <button 
+                                                            type="button"
+                                                            className="btn btn-sm btn-danger"
+                                                            onClick={() => handleRemoveRange(idx)}
+                                                            style={{padding: '8px 12px', fontSize: '12px', height: '38px'}}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
+                                            취소
+                                        </button>
+                                        <button type="submit" className="btn" style={{background: '#10b981'}}>
+                                            생성하기
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 툴킷 수정 모달 */}
+                    {showEditModal && editingToolkit && (
+                        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+                            <div className="modal" style={{maxWidth: '800px', maxHeight: '90vh', overflow: 'auto'}} onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>툴킷 수정</h3>
+                                    <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleUpdateToolkit}>
+                                    <div className="modal-body">
+                                        <div className="form-group">
+                                            <label>툴킷 이름 *</label>
+                                            <input 
+                                                type="text"
+                                                value={editingToolkit.name}
+                                                onChange={(e) => setEditingToolkit({...editingToolkit, name: e.target.value})}
+                                                placeholder="예: 포스터 A4"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>설명</label>
+                                            <textarea 
+                                                value={editingToolkit.description || ''}
+                                                onChange={(e) => setEditingToolkit({...editingToolkit, description: e.target.value})}
+                                                placeholder="툴킷에 대한 설명을 입력하세요"
+                                                rows="3"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '6px',
+                                                    fontSize: '14px',
+                                                    resize: 'vertical'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>예시 이미지 (560 x 700 픽셀)</label>
+                                            <p style={{fontSize: '12px', color: '#666', marginBottom: '10px'}}>
+                                                * 정확히 560 x 700 픽셀 크기의 JPG 또는 PNG 파일만 업로드 가능합니다.
+                                            </p>
+                                            {editingToolkit.imagePreview ? (
+                                                <div style={{position: 'relative', display: 'inline-block'}}>
+                                                    <img 
+                                                        src={editingToolkit.imagePreview} 
+                                                        alt="미리보기"
+                                                        style={{
+                                                            maxWidth: '280px',
+                                                            maxHeight: '350px',
+                                                            border: '2px solid #ddd',
+                                                            borderRadius: '8px'
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleEditRemoveImage}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '8px',
+                                                            right: '8px',
+                                                            background: '#dc2626',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '50%',
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '18px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <input 
+                                                    type="file"
+                                                    accept="image/jpeg,image/png"
+                                                    onChange={handleEditImageChange}
+                                                    style={{fontSize: '14px'}}
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="form-group">
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                                                <label style={{marginBottom: 0}}>가격 구간 설정</label>
+                                                <button 
+                                                    type="button"
+                                                    className="btn btn-sm"
+                                                    style={{background: '#10b981', padding: '6px 12px', fontSize: '12px'}}
+                                                    onClick={handleEditAddRange}
+                                                >
+                                                    ➕ 구간 추가
+                                                </button>
+                                            </div>
+                                            <p style={{fontSize: '12px', color: '#666', marginBottom: '10px'}}>
+                                                * 전체 지점의 주문 합계에 따라 개당 단가가 결정됩니다.
+                                            </p>
+                                            <div style={{display: 'grid', gap: '10px'}}>
+                                                {editingToolkit.priceRanges.map((range, idx) => (
+                                                    <div key={idx} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', padding: '10px', background: '#f8f9fa', borderRadius: '4px', alignItems: 'end'}}>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최소 수량</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.minQty}
+                                                                onChange={(e) => handleEditRangeChange(idx, 'minQty', e.target.value)}
+                                                                placeholder="0"
+                                                                min="0"
+                                                                style={{fontSize: '13px'}}
+                                                                disabled={idx === 0}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최대 수량 (선택)</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.maxQty || ''}
+                                                                onChange={(e) => handleEditRangeChange(idx, 'maxQty', e.target.value)}
+                                                                placeholder="없으면 이상"
+                                                                min={range.minQty}
+                                                                style={{fontSize: '13px'}}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>개당 단가 (원)</label>
+                                                            <input 
+                                                                type="number"
+                                                                value={range.pricePerUnit}
+                                                                onChange={(e) => handleEditRangeChange(idx, 'pricePerUnit', e.target.value)}
+                                                                placeholder="1000"
+                                                                min="0"
+                                                                style={{fontSize: '13px'}}
+                                                            />
+                                                        </div>
+                                                        <button 
+                                                            type="button"
+                                                            className="btn btn-sm btn-danger"
+                                                            onClick={() => handleEditRemoveRange(idx)}
+                                                            style={{padding: '8px 12px', fontSize: '12px', height: '38px'}}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>취합 완료일</label>
+                                            <input 
+                                                type="date"
+                                                value={editingToolkit.dueDate || ''}
+                                                onChange={(e) => setEditingToolkit({...editingToolkit, dueDate: e.target.value})}
+                                                placeholder="취합 완료일을 선택하세요"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 이미지 위에 D-day 형태로 표시됩니다.
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>최소 주문 수량 (선택)</label>
+                                            <input 
+                                                type="number"
+                                                value={editingToolkit.minOrderQty || ''}
+                                                onChange={(e) => setEditingToolkit({...editingToolkit, minOrderQty: e.target.value})}
+                                                placeholder="예: 100"
+                                                min="0"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 지점에서 최소 수량 이상만 주문 가능합니다.
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>주문 단위 (선택)</label>
+                                            <input 
+                                                type="number"
+                                                value={editingToolkit.orderUnit || ''}
+                                                onChange={(e) => setEditingToolkit({...editingToolkit, orderUnit: e.target.value})}
+                                                placeholder="예: 50 (50개 단위로만 주문 가능)"
+                                                min="1"
+                                            />
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 설정 시 해당 배수로만 주문 가능 (예: 50 설정 시 50개, 100개, 150개...)
+                                            </p>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={editingToolkit.showTotalOrders !== false}
+                                                    onChange={(e) => setEditingToolkit({...editingToolkit, showTotalOrders: e.target.checked})}
+                                                    style={{marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer'}}
+                                                />
+                                                <span>지점 페이지에서 전 지점 현황 노출</span>
+                                            </label>
+                                            <p style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                                                * 체크 시 지점 페이지에서 "전 지점 현재 주문 수량 합계"가 표시됩니다.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
+                                            취소
+                                        </button>
+                                        <button type="submit" className="btn" style={{background: '#f07c00'}}>
+                                            수정 완료
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
         // 마케팅 비용 페이지
         function MarketingCostPage() {
@@ -1916,7 +3394,7 @@
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th style={{width: '40px'}}>
+                                            <th style={{width: '40px', textAlign: 'center'}}>
                                                 <input 
                                                     type="checkbox"
                                                     checked={paginatedCosts.length > 0 && paginatedCosts.every(cost => selectedCosts.includes(cost.id))}
@@ -1924,15 +3402,15 @@
                                                     style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                                 />
                                             </th>
-                                            <th style={{width: '144px'}}>지점</th>
-                                            <th style={{width: '80px'}}>팀</th>
-                                            <th style={{width: '140px'}}>날짜</th>
-                                            <th style={{width: '140px'}}>항목</th>
-                                            <th style={{width: '120px'}}>금액</th>
+                                            <th style={{width: '144px', textAlign: 'center'}}>지점</th>
+                                            <th style={{width: '80px', textAlign: 'center'}}>팀</th>
+                                            <th style={{width: '140px', textAlign: 'center'}}>날짜</th>
+                                            <th style={{width: '140px', textAlign: 'center'}}>항목</th>
+                                            <th style={{width: '120px', textAlign: 'center'}}>금액</th>
                                             <th style={{minWidth: '110px'}}>설명</th>
-                                            <th style={{width: '140px'}}>등록자</th>
-                                            <th style={{width: '160px'}}>등록일시</th>
-                                            <th style={{width: '60px'}}>증빙</th>
+                                            <th style={{width: '140px', textAlign: 'center'}}>등록자</th>
+                                            <th style={{width: '160px', textAlign: 'center'}}>등록일시</th>
+                                            <th style={{width: '60px', textAlign: 'center'}}>증빙</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1946,7 +3424,7 @@
                                                     setDetailCost(cost);
                                                 }}
                                             >
-                                                <td onClick={(e) => e.stopPropagation()}>
+                                                <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
                                                     <input 
                                                         type="checkbox"
                                                         checked={selectedCosts.includes(cost.id)}
@@ -1954,7 +3432,7 @@
                                                         style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                                     />
                                                 </td>
-                                                <td>
+                                                <td style={{textAlign: 'center'}}>
                                                     <span style={{
                                                         background: '#f07c00',
                                                         color: 'white',
@@ -1966,35 +3444,37 @@
                                                         {cost.branchName || '미설정'}
                                                     </span>
                                                 </td>
-                                                <td style={{fontSize: '13px', color: '#666'}}>{cost.team || '-'}</td>
-                                                <td>{formatCostDate(cost.date)}</td>
-                                                <td>
+                                                <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{cost.team || '-'}</td>
+                                                <td style={{textAlign: 'center'}}>{formatCostDate(cost.date)}</td>
+                                                <td style={{textAlign: 'center'}}>
                                                     <span className={`status-badge ${categories[cost.category]?.className || ''}`} style={{
                                                         background: cost.category === 'online' ? '#e3f2fd' :
                                                                    cost.category === 'offline' ? '#f3e5f5' :
                                                                    cost.category === 'event' ? '#fff3e0' :
-                                                                   cost.category === 'material' ? '#e8f5e9' : '#eceff1',
+                                                                   cost.category === 'material' ? '#e8f5e9' :
+                                                                   (cost.category === 'toolkit' || cost.category === '툴킷') ? '#ffebee' : '#eceff1',
                                                         color: cost.category === 'online' ? '#1976d2' :
                                                                cost.category === 'offline' ? '#7b1fa2' :
                                                                cost.category === 'event' ? '#f57c00' :
-                                                               cost.category === 'material' ? '#388e3c' : '#546e7a'
+                                                               cost.category === 'material' ? '#388e3c' :
+                                                               (cost.category === 'toolkit' || cost.category === '툴킷') ? '#c62828' : '#546e7a'
                                                     }}>
                                                         {categories[cost.category]?.label || cost.category}
                                                     </span>
                                                 </td>
-                                                <td style={{fontWeight: '600', color: '#001236'}}>
+                                                <td style={{fontWeight: '600', color: '#001236', textAlign: 'center'}}>
                                                     {formatAmount(cost.amount)}
                                                 </td>
                                                 <td className="description-cell" title={cost.description || '-'}>
                                                     {cost.description || '-'}
                                                 </td>
-                                                <td style={{fontSize: '12px', color: '#666'}}>
+                                                <td style={{fontSize: '12px', color: '#666', textAlign: 'center'}}>
                                                     {cost.userEmail}
                                                 </td>
-                                                <td style={{fontSize: '12px', color: '#666'}}>
+                                                <td style={{fontSize: '12px', color: '#666', textAlign: 'center'}}>
                                                     {formatDate(cost.createdAt)}
                                                 </td>
-                                                <td onClick={(e) => e.stopPropagation()}>
+                                                <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
                                                     {cost.canVerifyAtHQ ? (
                                                         <span style={{
                                                             background: '#fff3e0',
@@ -4350,7 +5830,7 @@
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th style={{width: '40px'}}>
+                                        <th style={{width: '40px', textAlign: 'center'}}>
                                             <input 
                                                 type="checkbox"
                                                 checked={selectedInquiries.length === filteredInquiries.length && filteredInquiries.length > 0}
@@ -4359,12 +5839,12 @@
                                             />
                                         </th>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
-                                        <th style={{width: '100px', whiteSpace: 'nowrap'}}>상태</th>
-                                        <th style={{width: '110px'}}>지점</th>
-                                        <th style={{width: '70px'}}>팀</th>
+                                        <th style={{width: '100px', whiteSpace: 'nowrap', textAlign: 'center'}}>상태</th>
+                                        <th style={{width: '110px', textAlign: 'center'}}>지점</th>
+                                        <th style={{width: '70px', textAlign: 'center'}}>팀</th>
                                         <th style={{width: '30%'}}>제목</th>
-                                        <th style={{width: '90px'}}>작성자</th>
-                                        <th style={{width: '160px'}}>작성일</th>
+                                        <th style={{width: '90px', textAlign: 'center'}}>작성자</th>
+                                        <th style={{width: '160px', textAlign: 'center'}}>작성일</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -4376,7 +5856,7 @@
                                                 background: selectedInquiries.includes(inquiry.id) ? 'rgba(233, 69, 96, 0.1)' : 'transparent'
                                             }}
                                         >
-                                            <td onClick={(e) => e.stopPropagation()}>
+                                            <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
                                                 <input 
                                                     type="checkbox"
                                                     checked={selectedInquiries.includes(inquiry.id)}
@@ -4385,8 +5865,8 @@
                                                 />
                                             </td>
                                             <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}} onClick={() => openDetail(inquiry)}>{index + 1}</td>
-                                            <td onClick={() => openDetail(inquiry)}>{getStatusBadge(inquiry.status)}</td>
-                                            <td onClick={() => openDetail(inquiry)}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
                                                 <span style={{
                                                     background: '#f07c00',
                                                     color: 'white',
@@ -4398,7 +5878,7 @@
                                                     {inquiry.branchName || '-'}
                                                 </span>
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
                                                 {inquiry.team ? (
                                                     <span style={{
                                                         background: '#e3f2fd',
@@ -4413,7 +5893,7 @@
                                                 ) : '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} style={{fontWeight: '500'}}>{inquiry.title}</td>
-                                            <td onClick={() => openDetail(inquiry)}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
                                                 {inquiry.position ? (
                                                     <span style={{
                                                         background: '#f3e5f5',
@@ -4429,7 +5909,7 @@
                                                     <span style={{fontSize: '13px', color: '#666'}}>{inquiry.userName || '-'}</span>
                                                 )}
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{formatDateLocal(inquiry.createdAt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -5264,7 +6744,7 @@
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th style={{width: '40px'}}>
+                                        <th style={{width: '40px', textAlign: 'center'}}>
                                             <input 
                                                 type="checkbox"
                                                 checked={selectedAbpInquiries.length === filteredInquiries.length && filteredInquiries.length > 0}
@@ -5273,12 +6753,12 @@
                                             />
                                         </th>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
-                                        <th style={{width: '100px'}}>상태</th>
-                                        <th style={{width: '150px'}}>문의 부서</th>
-                                        <th style={{width: '150px'}}>지점</th>
+                                        <th style={{width: '100px', textAlign: 'center'}}>상태</th>
+                                        <th style={{width: '150px', textAlign: 'center'}}>문의 부서</th>
+                                        <th style={{width: '150px', textAlign: 'center'}}>지점</th>
                                         <th style={{width: '180px'}}>문의 내용</th>
-                                        <th style={{width: '100px'}}>작성자</th>
-                                        <th style={{width: '180px'}}>작성일</th>
+                                        <th style={{width: '100px', textAlign: 'center'}}>작성자</th>
+                                        <th style={{width: '180px', textAlign: 'center'}}>작성일</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -5290,7 +6770,7 @@
                                                 background: selectedAbpInquiries.includes(inquiry.id) ? 'rgba(16, 185, 129, 0.1)' : 'transparent'
                                             }}
                                         >
-                                            <td onClick={(e) => e.stopPropagation()}>
+                                            <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
                                                 <input 
                                                     type="checkbox"
                                                     checked={selectedAbpInquiries.includes(inquiry.id)}
@@ -5299,8 +6779,8 @@
                                                 />
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
-                                            <td onClick={() => openDetail(inquiry)}>{getStatusBadge(inquiry.status)}</td>
-                                            <td onClick={() => openDetail(inquiry)}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
                                                 <span style={{
                                                     background: '#d1fae5',
                                                     color: '#047857',
@@ -5312,7 +6792,7 @@
                                                     {getTeamName(inquiry.targetTeam)}
                                                 </span>
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
                                                 <span style={{
                                                     background: '#f07c00',
                                                     color: 'white',
@@ -5332,8 +6812,8 @@
                                             }}>
                                                 {inquiry.content}
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px'}}>{inquiry.authorName || '-'}</td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', textAlign: 'center'}}>{inquiry.authorName || '-'}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{formatDateLocal(inquiry.createdAt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -5771,11 +7251,12 @@
         }
 
         // 사이드바 컴포넌트
-        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess }) {
+        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess }) {
             const menuItems = [
                 { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
                 { id: 'abpComm', name: '기획본부 소통 창구', icon: Icons.AbpComm },
                 { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
+                { id: 'toolkit', name: '마케팅 툴킷 신청', icon: Icons.Toolkit },
                 { id: 'round', name: 'Round 관리', icon: Icons.Round },
                 { id: 'users', name: '사용자 관리', icon: Icons.Users },
                 { id: 'settings', name: '설정', icon: Icons.Settings }
@@ -5785,6 +7266,8 @@
             const handleMenuClick = (itemId) => {
                 if (itemId === 'round') {
                     onRoundAccess();
+                } else if (itemId === 'toolkit') {
+                    onToolkitAccess();
                 } else {
                     setCurrentPage(itemId);
                 }
@@ -5840,6 +7323,12 @@
             const [roundPassword, setRoundPassword] = useState('');
             const [roundAccessGranted, setRoundAccessGranted] = useState(false);
             const [isVerifying, setIsVerifying] = useState(false);
+            
+            // 툴킷 관리 접근 관련 상태
+            const [showToolkitPasswordModal, setShowToolkitPasswordModal] = useState(false);
+            const [toolkitPassword, setToolkitPassword] = useState('');
+            const [toolkitAccessGranted, setToolkitAccessGranted] = useState(false);
+            const [isVerifyingToolkit, setIsVerifyingToolkit] = useState(false);
 
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -5924,6 +7413,50 @@
                     setIsVerifying(false);
                 }
             };
+            
+            // 툴킷 관리 페이지 접근 시도
+            const handleToolkitAccess = () => {
+                if (toolkitAccessGranted) {
+                    setCurrentPage('toolkit');
+                } else {
+                    setToolkitPassword('');
+                    setShowToolkitPasswordModal(true);
+                }
+            };
+
+            // 툴킷 비밀번호 확인 (Round 비밀번호와 동일)
+            const handleToolkitPasswordSubmit = async (e) => {
+                e.preventDefault();
+                setIsVerifyingToolkit(true);
+                
+                try {
+                    // Firestore에서 비밀번호 가져오기
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+                    
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
+                        setIsVerifyingToolkit(false);
+                        return;
+                    }
+                    
+                    const storedPassword = doc.data().password;
+                    
+                    if (toolkitPassword === storedPassword) {
+                        setToolkitAccessGranted(true);
+                        setShowToolkitPasswordModal(false);
+                        setCurrentPage('toolkit');
+                        setToolkitPassword('');
+                    } else {
+                        alert('비밀번호가 올바르지 않습니다.');
+                        setToolkitPassword('');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인에 실패했습니다.');
+                } finally {
+                    setIsVerifyingToolkit(false);
+                }
+            };
 
             const handleLogout = async () => {
                 if (confirm('로그아웃 하시겠습니까?')) {
@@ -5948,6 +7481,8 @@
                         return <InquiryPage />;
                     case 'abpComm':
                         return <AbpCommunicationPage />;
+                    case 'toolkit':
+                        return <ToolkitManagementPage />;
                     case 'round':
                         return <RoundManagementPage />;
                     case 'users':
@@ -5967,6 +7502,7 @@
                         user={user}
                         onLogout={handleLogout}
                         onRoundAccess={handleRoundAccess}
+                        onToolkitAccess={handleToolkitAccess}
                     />
                     <main className="main-content">
                         {renderPage()}
@@ -6015,6 +7551,56 @@
                                             disabled={isVerifying}
                                         >
                                             {isVerifying ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 툴킷 관리 비밀번호 모달 */}
+                    {showToolkitPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowToolkitPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>🔒 마케팅 툴킷 관리 접근</h3>
+                                    <button className="modal-close" onClick={() => setShowToolkitPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleToolkitPasswordSubmit}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '10px', color: '#666'}}>
+                                            마케팅 툴킷 관리에 접근하려면 고유 비밀번호를 입력하세요.
+                                        </p>
+                                        <p style={{marginBottom: '15px', fontSize: '13px', color: '#888'}}>
+                                            담당자 : 박영주 / 010-4037-0928
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={toolkitPassword}
+                                                onChange={(e) => setToolkitPassword(e.target.value)}
+                                                placeholder="고유 비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowToolkitPasswordModal(false)}
+                                            disabled={isVerifyingToolkit}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isVerifyingToolkit}
+                                        >
+                                            {isVerifyingToolkit ? '확인 중...' : '확인'}
                                         </button>
                                     </div>
                                 </form>
