@@ -339,6 +339,11 @@
             color: #388e3c;
         }
 
+        .category-badge.toolkit {
+            background: #ffebee;
+            color: #c62828;
+        }
+
         .category-badge.other {
             background: #eceff1;
             color: #546e7a;
@@ -939,6 +944,11 @@
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
+            ),
+            Toolkit: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
             )
         };
 
@@ -948,8 +958,839 @@
             offline: { label: '오프라인 광고', className: 'offline' },
             event: { label: '이벤트/프로모션', className: 'event' },
             material: { label: '홍보물 제작', className: 'material' },
+            toolkit: { label: '툴킷', className: 'toolkit' },
+            '툴킷': { label: '툴킷', className: 'toolkit' },
             other: { label: '기타', className: 'other' }
         };
+
+        // 마케팅 툴킷 신청 페이지
+        function ToolkitOrderPage({ user, userInfo }) {
+            const [toolkits, setToolkits] = useState([]);
+            const [myOrders, setMyOrders] = useState({});
+            const [allOrders, setAllOrders] = useState([]);
+            const [loading, setLoading] = useState(true);
+            
+            // 예산 관련 상태
+            const [currentRound, setCurrentRound] = useState(null);
+            const [branchBudget, setBranchBudget] = useState(0);
+            const [costs, setCosts] = useState([]);
+
+            useEffect(() => {
+                loadData();
+            }, [user]);
+            
+            // 현재 Round와 배정 비용 로드
+            useEffect(() => {
+                if (!userInfo?.branchName) return;
+
+                const today = new Date().toISOString().split('T')[0];
+
+                const roundsUnsubscribe = db.collection('rounds')
+                    .onSnapshot(async (snapshot) => {
+                        const roundsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+
+                        const activeRound = roundsData.find(round => {
+                            return today >= round.startDate && today <= round.endDate;
+                        });
+
+                        if (activeRound) {
+                            setCurrentRound(activeRound);
+
+                            try {
+                                const budgetDoc = await db.collection('roundBudgets').doc(activeRound.id).get();
+                                if (budgetDoc.exists) {
+                                    const budgets = budgetDoc.data().budgets || {};
+                                    setBranchBudget(budgets[userInfo.branchName] || 0);
+                                }
+                            } catch (error) {
+                                console.error('배정 비용 로드 오류:', error);
+                            }
+                        } else {
+                            setCurrentRound(null);
+                            setBranchBudget(0);
+                        }
+                    });
+
+                return () => roundsUnsubscribe();
+            }, [userInfo]);
+            
+            // 마케팅 비용 로드 (지점별)
+            useEffect(() => {
+                if (!user || !userInfo?.branchName) return;
+
+                const unsubscribe = db.collection('costs')
+                    .where('branchName', '==', userInfo.branchName)
+                    .onSnapshot((snapshot) => {
+                        const costsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setCosts(costsData);
+                    }, (error) => {
+                        console.error('비용 목록 로드 오류:', error);
+                    });
+
+                return () => unsubscribe();
+            }, [user, userInfo?.branchName]);
+
+            const loadData = async () => {
+                setLoading(true);
+                try {
+                    // 툴킷 목록 가져오기 (취합 완료되지 않은 것만, 오래된 것부터 → 최신 툴킷이 오른쪽에 표시됨)
+                    const toolkitsSnapshot = await db.collection('toolkits').orderBy('createdAt', 'asc').get();
+                    const toolkitsData = [];
+                    toolkitsSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        // 취합 완료되지 않은 툴킷만 표시
+                        if (!data.isCompleted) {
+                            toolkitsData.push({ id: doc.id, ...data });
+                        }
+                    });
+                    setToolkits(toolkitsData);
+
+                    // 내 주문 가져오기
+                    const myOrdersSnapshot = await db.collection('toolkitOrders')
+                        .where('userId', '==', user.uid)
+                        .get();
+                    
+                    const myOrdersMap = {};
+                    myOrdersSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        myOrdersMap[data.toolkitId] = { id: doc.id, ...data };
+                    });
+                    setMyOrders(myOrdersMap);
+
+                    // 모든 주문 가져오기 (전체 수량 계산용)
+                    const allOrdersSnapshot = await db.collection('toolkitOrders').get();
+                    const allOrdersData = [];
+                    allOrdersSnapshot.forEach(doc => {
+                        allOrdersData.push({ id: doc.id, ...doc.data() });
+                    });
+                    setAllOrders(allOrdersData);
+                    
+                    // 가격 변동 확인 및 비용 자동 업데이트
+                    await updateCostsIfPriceChanged(toolkitsData, allOrdersData, myOrdersMap);
+                } catch (error) {
+                    console.error('데이터 로드 오류:', error);
+                    alert('데이터를 불러오는데 실패했습니다.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            // 가격 변동 시 비용 자동 업데이트
+            const updateCostsIfPriceChanged = async (toolkitsData, allOrdersData, myOrdersMap) => {
+                try {
+                    const batch = db.batch();
+                    let hasUpdates = false;
+
+                    for (const [toolkitId, order] of Object.entries(myOrdersMap)) {
+                        if (!order.costId) continue; // 연결된 비용이 없으면 스킵
+
+                        // 현재 단가 계산
+                        const toolkit = toolkitsData.find(t => t.id === toolkitId);
+                        if (!toolkit) continue;
+
+                        const totalQty = allOrdersData
+                            .filter(o => o.toolkitId === toolkitId)
+                            .reduce((sum, o) => sum + Number(o.quantity || 0), 0);
+
+                        const currentPricePerUnit = getPricePerUnitHelper(toolkit, totalQty);
+                        const currentTotalAmount = order.quantity * currentPricePerUnit;
+
+                        // 저장된 단가와 다르면 업데이트
+                        if (order.pricePerUnit !== currentPricePerUnit || order.totalAmount !== currentTotalAmount) {
+                            // toolkitOrders 업데이트
+                            const orderRef = db.collection('toolkitOrders').doc(order.id);
+                            batch.update(orderRef, {
+                                pricePerUnit: currentPricePerUnit,
+                                totalAmount: currentTotalAmount,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+
+                            // costs 업데이트
+                            const costRef = db.collection('costs').doc(order.costId);
+                            batch.update(costRef, {
+                                description: `${toolkit.name} (${order.quantity}개)`,
+                                amount: currentTotalAmount,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+
+                            hasUpdates = true;
+                        }
+                    }
+
+                    if (hasUpdates) {
+                        await batch.commit();
+                        console.log('가격 변동으로 인한 비용 자동 업데이트 완료');
+                    }
+                } catch (error) {
+                    console.error('비용 자동 업데이트 오류:', error);
+                }
+            };
+            
+            // getPricePerUnit 헬퍼 함수 (allOrders를 매개변수로 받지 않음)
+            const getPricePerUnitHelper = (toolkit, totalQty) => {
+                if (!toolkit.priceRanges) return 0;
+                
+                const sortedRanges = [...toolkit.priceRanges].sort((a, b) => a.minQty - b.minQty);
+                
+                for (let i = sortedRanges.length - 1; i >= 0; i--) {
+                    const range = sortedRanges[i];
+                    if (totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty)) {
+                        return Number(range.pricePerUnit || 0);
+                    }
+                }
+                
+                return Number(sortedRanges[0]?.pricePerUnit || 0);
+            };
+
+            // 툴킷별 전체 주문 수량 계산 (현재 입력 중인 수량 포함)
+            const getTotalOrderQty = (toolkitId) => {
+                // 다른 사용자들의 주문 수량
+                const othersTotal = allOrders
+                    .filter(order => order.toolkitId === toolkitId && order.userId !== user.uid)
+                    .reduce((sum, order) => sum + Number(order.quantity || 0), 0);
+                
+                // 현재 사용자의 입력 중인 수량 (myOrders에서)
+                const myQty = Number(myOrders[toolkitId]?.quantity || 0);
+                
+                return othersTotal + myQty;
+            };
+
+            // 수량에 따른 단가 계산
+            const getPricePerUnit = (toolkit, totalQty) => {
+                if (!toolkit.priceRanges) return 0;
+                
+                const sortedRanges = [...toolkit.priceRanges].sort((a, b) => a.minQty - b.minQty);
+                
+                for (let i = sortedRanges.length - 1; i >= 0; i--) {
+                    const range = sortedRanges[i];
+                    if (totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty)) {
+                        return Number(range.pricePerUnit || 0);
+                    }
+                }
+                
+                return Number(sortedRanges[0]?.pricePerUnit || 0);
+            };
+
+            // 특정 툴킷의 모든 주문 및 비용 업데이트 (가격 구간 변경 시)
+            const updateAllOrdersForToolkit = async (toolkitId) => {
+                try {
+                    // 1. 해당 툴킷 정보 가져오기
+                    const toolkitDoc = await db.collection('toolkits').doc(toolkitId).get();
+                    if (!toolkitDoc.exists) return;
+                    const toolkit = { id: toolkitDoc.id, ...toolkitDoc.data() };
+
+                    // 2. 해당 툴킷의 모든 주문 가져오기
+                    const ordersSnapshot = await db.collection('toolkitOrders')
+                        .where('toolkitId', '==', toolkitId)
+                        .get();
+                    
+                    if (ordersSnapshot.empty) return;
+
+                    // 3. 전체 수량 계산
+                    let totalQty = 0;
+                    ordersSnapshot.forEach(doc => {
+                        totalQty += Number(doc.data().quantity || 0);
+                    });
+
+                    // 4. 새로운 단가 계산
+                    const newPricePerUnit = getPricePerUnit(toolkit, totalQty);
+
+                    // 5. Batch로 모든 주문과 비용 업데이트
+                    const batch = db.batch();
+                    
+                    ordersSnapshot.forEach(doc => {
+                        const orderData = doc.data();
+                        const quantity = Number(orderData.quantity || 0);
+                        const newTotalAmount = quantity * newPricePerUnit;
+
+                        // 주문 업데이트
+                        batch.update(doc.ref, {
+                            pricePerUnit: newPricePerUnit,
+                            totalAmount: newTotalAmount,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // 연결된 비용도 업데이트
+                        if (orderData.costId) {
+                            const costRef = db.collection('costs').doc(orderData.costId);
+                            batch.update(costRef, {
+                                amount: newTotalAmount,
+                                description: `${toolkit.name} (${quantity}개)`,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+                    });
+
+                    await batch.commit();
+                    console.log(`툴킷 ${toolkitId}의 모든 주문이 업데이트되었습니다. 새 단가: ${newPricePerUnit}원`);
+                } catch (error) {
+                    console.error('주문 일괄 업데이트 오류:', error);
+                }
+            };
+
+            // 주문 수량 변경
+            const handleQuantityChange = (toolkitId, value) => {
+                const quantity = value === '' ? '' : Math.max(0, Number(value));
+                setMyOrders(prev => ({
+                    ...prev,
+                    [toolkitId]: {
+                        ...prev[toolkitId],
+                        quantity: quantity,
+                        toolkitId: toolkitId
+                    }
+                }));
+            };
+
+            // 주문 저장 (비용도 함께 저장/업데이트)
+            const handleSaveOrder = async (toolkit) => {
+                const order = myOrders[toolkit.id];
+                const quantity = Number(order?.quantity || 0);
+
+                if (quantity === 0) {
+                    alert('수량을 입력해주세요.');
+                    return;
+                }
+
+                // 최소 주문 수량 체크
+                if (toolkit.minOrderQty && quantity < toolkit.minOrderQty) {
+                    alert(`최소 주문 수량은 ${toolkit.minOrderQty}개입니다.\n현재 입력: ${quantity}개`);
+                    return;
+                }
+
+                // 주문 단위(배수) 체크
+                if (toolkit.orderUnit) {
+                    const baseQty = toolkit.minOrderQty || 0;
+                    const diff = quantity - baseQty;
+                    
+                    if (diff % toolkit.orderUnit !== 0) {
+                        const validQty = baseQty + Math.ceil(diff / toolkit.orderUnit) * toolkit.orderUnit;
+                        alert(`주문 단위는 ${toolkit.orderUnit}개입니다.\n현재 입력: ${quantity}개\n\n가장 가까운 유효 수량: ${validQty}개`);
+                        return;
+                    }
+                }
+
+                try {
+                    // 현재 단가 계산 (저장 전 전체 수량 기반)
+                    const currentTotalQty = getTotalOrderQty(toolkit.id);
+                    const pricePerUnit = getPricePerUnit(toolkit, currentTotalQty);
+                    const totalAmount = quantity * pricePerUnit;
+
+                    const orderData = {
+                        toolkitId: toolkit.id,
+                        toolkitName: toolkit.name,
+                        userId: user.uid,
+                        userEmail: user.email,
+                        branchName: userInfo?.branchName || '미설정',
+                        team: userInfo?.team || '',
+                        quantity: quantity,
+                        pricePerUnit: pricePerUnit,
+                        totalAmount: totalAmount,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    let orderDocId = order?.id;
+                    let costDocId = order?.costId;
+
+                    // 1. 툴킷 주문 저장/업데이트
+                    if (orderDocId) {
+                        // 기존 주문 업데이트
+                        await db.collection('toolkitOrders').doc(orderDocId).update(orderData);
+                    } else {
+                        // 새 주문 생성
+                        orderData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        const orderRef = await db.collection('toolkitOrders').add(orderData);
+                        orderDocId = orderRef.id;
+                    }
+
+                    // 2. 마케팅 비용 저장/업데이트
+                    const costData = {
+                        category: 'toolkit',
+                        description: `${toolkit.name} (${quantity}개)`,
+                        amount: totalAmount,
+                        date: new Date().toISOString().split('T')[0],
+                        userId: user.uid,
+                        userEmail: user.email,
+                        branchName: userInfo?.branchName || '미설정',
+                        team: userInfo?.team || '',
+                        round: currentRound?.name || '',
+                        toolkitOrderId: orderDocId,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (costDocId) {
+                        // 기존 비용 업데이트
+                        await db.collection('costs').doc(costDocId).update(costData);
+                    } else {
+                        // 새 비용 생성
+                        costData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        const costRef = await db.collection('costs').add(costData);
+                        costDocId = costRef.id;
+                        
+                        // toolkitOrders에 costId 저장
+                        await db.collection('toolkitOrders').doc(orderDocId).update({ costId: costDocId });
+                    }
+
+                    // 3. 다른 지점들의 비용도 업데이트 (가격 구간이 변경될 수 있으므로)
+                    await updateAllOrdersForToolkit(toolkit.id);
+
+                    alert(order?.id ? '주문이 수정되었습니다.' : '주문이 등록되었습니다.');
+                    loadData();
+                } catch (error) {
+                    console.error('주문 저장 오류:', error);
+                    alert('주문 저장에 실패했습니다.');
+                }
+            };
+
+            // 주문 취소 (툴킷 주문 및 연결된 비용 삭제)
+            const handleCancelOrder = async (toolkit) => {
+                const order = myOrders[toolkit.id];
+                
+                if (!order?.id) {
+                    alert('취소할 주문이 없습니다.');
+                    return;
+                }
+
+                if (!confirm(`"${toolkit.name}" 주문을 취소하시겠습니까?\n연결된 비용도 함께 삭제됩니다.`)) {
+                    return;
+                }
+
+                try {
+                    // 1. 연결된 비용 삭제 (존재하는 경우만)
+                    if (order.costId) {
+                        try {
+                            const costDoc = await db.collection('costs').doc(order.costId).get();
+                            if (costDoc.exists) {
+                                await db.collection('costs').doc(order.costId).delete();
+                            }
+                        } catch (costError) {
+                            console.error('비용 삭제 오류:', costError);
+                            // 비용 삭제 실패해도 주문은 삭제 진행
+                        }
+                    }
+
+                    // 2. 툴킷 주문 삭제
+                    await db.collection('toolkitOrders').doc(order.id).delete();
+
+                    // 3. 다른 지점들의 비용도 업데이트 (가격 구간이 변경될 수 있으므로)
+                    await updateAllOrdersForToolkit(toolkit.id);
+
+                    alert('주문이 취소되었습니다.');
+                    loadData();
+                } catch (error) {
+                    console.error('주문 취소 오류:', error);
+                    alert('주문 취소에 실패했습니다: ' + error.message);
+                }
+            };
+
+            if (loading) {
+                return <div className="loading-spinner"><p>데이터를 불러오는 중...</p></div>;
+            }
+
+            // 내 주문 총 금액 계산
+            const myTotalAmount = toolkits.reduce((sum, toolkit) => {
+                const myQty = Number(myOrders[toolkit.id]?.quantity || 0);
+                const totalQty = getTotalOrderQty(toolkit.id);
+                const pricePerUnit = getPricePerUnit(toolkit, totalQty);
+                return sum + (myQty * pricePerUnit);
+            }, 0);
+            
+            // 잔여 예산 계산
+            const totalSpent = costs.reduce((sum, cost) => sum + (cost.amount || 0), 0);
+            const remainingBudget = branchBudget - totalSpent;
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">마케팅 툴킷 신청</h2>
+                        <p className="page-subtitle">필요한 마케팅 툴킷을 신청하세요</p>
+                    </div>
+
+                    {/* 예산 정보 */}
+                    {currentRound && branchBudget > 0 && (
+                        <div style={{
+                            background: 'linear-gradient(135deg, #001236 0%, #002856 100%)',
+                            borderRadius: '12px',
+                            padding: '24px',
+                            marginBottom: '20px',
+                            color: 'white'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '16px'
+                            }}>
+                                <div>
+                                    <h3 style={{fontSize: '14px', opacity: 0.9, marginBottom: '4px'}}>
+                                        {currentRound.name}
+                                    </h3>
+                                    <p style={{fontSize: '12px', opacity: 0.7}}>
+                                        {currentRound.startDate} ~ {currentRound.endDate}
+                                    </p>
+                                </div>
+                                <div style={{
+                                    background: totalSpent > branchBudget ? '#dc3545' : '#f07c00',
+                                    padding: '6px 14px',
+                                    borderRadius: '20px',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                }}>
+                                    {branchBudget > 0 ? Math.round((totalSpent / branchBudget) * 100) : 0}% 사용
+                                </div>
+                            </div>
+                            
+                            {/* 프로그레스 바 */}
+                            <div style={{
+                                background: 'rgba(255,255,255,0.2)',
+                                borderRadius: '10px',
+                                height: '12px',
+                                marginBottom: '16px',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    width: `${Math.min((totalSpent / branchBudget) * 100, 100)}%`,
+                                    height: '100%',
+                                    background: totalSpent > branchBudget ? '#dc3545' : '#f07c00',
+                                    transition: 'width 0.5s ease'
+                                }} />
+                            </div>
+                            
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px'}}>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 비용</div>
+                                    <div style={{fontSize: '20px', fontWeight: '700'}}>
+                                        ₩{branchBudget.toLocaleString()}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>사용 비용</div>
+                                    <div style={{fontSize: '20px', fontWeight: '700'}}>
+                                        ₩{totalSpent.toLocaleString()}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 비용</div>
+                                    <div style={{
+                                        fontSize: '20px', 
+                                        fontWeight: '700',
+                                        color: remainingBudget < 0 ? '#ff6b6b' : '#4ade80'
+                                    }}>
+                                        ₩{remainingBudget.toLocaleString()}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {remainingBudget < myTotalAmount && myTotalAmount > 0 && (
+                                <div style={{
+                                    marginTop: '16px',
+                                    padding: '12px 16px',
+                                    background: 'rgba(254, 202, 202, 0.2)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    border: '1px solid rgba(254, 202, 202, 0.3)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    <span>⚠️</span>
+                                    툴킷 신청 금액이 잔여 예산을 초과합니다!
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 안내 사항 */}
+                    <div style={{
+                        marginBottom: '20px',
+                        padding: '20px',
+                        background: 'white',
+                        borderRadius: '10px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <h4 style={{fontSize: '14px', marginBottom: '12px', color: '#001236', fontWeight: '600'}}>📌 안내사항</h4>
+                        <ul style={{fontSize: '13px', color: '#666', lineHeight: '1.8', paddingLeft: '20px', margin: 0}}>
+                            <li><strong>전체 지점의 주문 합계</strong>에 따라 개당 단가가 결정됩니다.</li>
+                            <li>다른 지점의 신청 현황을 확인하여 <strong>예상 단가</strong>를 참고하세요.</li>
+                            <li><strong style={{color: '#dc2626'}}>배송비는 별도로 청구됩니다.</strong></li>
+                            <li>주문 수정은 언제든지 가능합니다.</li>
+                            <li>툴킷 신청 시 자동으로 <strong>마케팅 비용</strong>에 등록됩니다.</li>
+                        </ul>
+                    </div>
+
+                    {/* 내 주문 총 금액 */}
+                    {myTotalAmount > 0 && (
+                        <div style={{
+                            marginBottom: '20px',
+                            padding: '20px',
+                            background: 'white',
+                            borderRadius: '10px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                            border: '1px solid #e5e7eb',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <div>
+                                <div style={{fontSize: '13px', color: '#666', marginBottom: '6px'}}>내 지점 예상 총 금액</div>
+                                <div style={{fontSize: '26px', fontWeight: '700', color: '#f07c00'}}>
+                                    {myTotalAmount.toLocaleString()}원
+                                </div>
+                            </div>
+                            <div style={{fontSize: '12px', color: '#999', textAlign: 'right'}}>
+                                (배송비 별도)
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 툴킷 목록 */}
+                    <div className="content-area">
+                        {toolkits.length === 0 ? (
+                            <div className="empty-state">
+                                <p>등록된 툴킷이 없습니다.</p>
+                            </div>
+                        ) : (
+                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px'}}>
+                                {toolkits.map(toolkit => {
+                                const totalQty = getTotalOrderQty(toolkit.id);
+                                const myQty = Number(myOrders[toolkit.id]?.quantity || 0);
+                                const pricePerUnit = getPricePerUnit(toolkit, totalQty);
+                                const myAmount = myQty * pricePerUnit;
+
+                                return (
+                                    <div key={toolkit.id} style={{
+                                        padding: '30px',
+                                        background: 'white',
+                                        borderRadius: '10px',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                        border: '1px solid #e5e7eb',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                                    }}>
+                                        {/* 이미지 */}
+                                        <div style={{textAlign: 'center', marginBottom: '15px'}}>
+                                            {toolkit.imageUrl ? (
+                                                <div style={{position: 'relative', display: 'inline-block'}}>
+                                                    <img 
+                                                        src={toolkit.imageUrl} 
+                                                        alt={toolkit.name}
+                                                        style={{
+                                                            width: '100%',
+                                                            maxWidth: '360px',
+                                                            height: 'auto',
+                                                            aspectRatio: '360/450',
+                                                            objectFit: 'cover',
+                                                            borderRadius: '8px',
+                                                            border: '2px solid #ddd'
+                                                        }}
+                                                    />
+                                                    {/* D-day 배지 */}
+                                                    {toolkit.dueDate && (() => {
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        const due = new Date(toolkit.dueDate);
+                                                        due.setHours(0, 0, 0, 0);
+                                                        const diffTime = due - today;
+                                                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                        
+                                                        return (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: '8px',
+                                                                right: '8px',
+                                                                background: diffDays < 0 ? '#dc2626' : diffDays === 0 ? '#f59e0b' : '#10b981',
+                                                                color: 'white',
+                                                                padding: '6px 12px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '13px',
+                                                                fontWeight: '700',
+                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                                            }}>
+                                                                {diffDays < 0 ? `D+${Math.abs(diffDays)}` : diffDays === 0 ? 'D-Day' : `D-${diffDays}`}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    <div style={{
+                                                        fontSize: '11px',
+                                                        color: '#999',
+                                                        marginTop: '6px',
+                                                        fontStyle: 'italic'
+                                                    }}>
+                                                        #예시 이미지입니다.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{
+                                                    width: '100%',
+                                                    maxWidth: '360px',
+                                                    aspectRatio: '360/450',
+                                                    background: '#f3f4f6',
+                                                    borderRadius: '8px',
+                                                    border: '2px solid #ddd',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '13px',
+                                                    color: '#9ca3af',
+                                                    margin: '0 auto'
+                                                }}>
+                                                    이미지 없음
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 툴킷 이름 */}
+                                        <h3 style={{fontSize: '16px', fontWeight: '700', color: '#001236', marginBottom: '10px', textAlign: 'center', minHeight: '48px', lineHeight: '1.5', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                            {toolkit.name}
+                                        </h3>
+
+                                        {/* 설명 */}
+                                        {toolkit.description && (
+                                            <div style={{fontSize: '13px', color: '#666', marginBottom: '12px', textAlign: 'center', lineHeight: '1.6', padding: '0 10px', whiteSpace: 'pre-wrap'}}>
+                                                {toolkit.description}
+                                            </div>
+                                        )}
+
+                                        {/* 주문 완료 표시 */}
+                                        <div style={{fontSize: '12px', color: '#16a34a', marginBottom: '10px', textAlign: 'center', minHeight: '18px'}}>
+                                            {myOrders[toolkit.id]?.id && '✓ 주문 완료'}
+                                        </div>
+
+                                        {/* 전체 현황 */}
+                                        <div style={{display: 'grid', gridTemplateColumns: toolkit.showTotalOrders !== false ? '1fr 1fr' : '1fr', gap: '10px', alignItems: 'start', marginBottom: '15px'}}>
+                                            {toolkit.showTotalOrders !== false && (
+                                                <div style={{padding: '12px', background: '#f9fafb', borderRadius: '8px', textAlign: 'center', border: '1px solid #e5e7eb'}}>
+                                                    <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>전 지점 현재 주문 수량 합계</div>
+                                                    <div style={{fontSize: '16px', fontWeight: '700', color: '#001236'}}>{totalQty.toLocaleString()}개</div>
+                                                </div>
+                                            )}
+                                            <div style={{padding: '12px', background: '#fff7ed', borderRadius: '8px', textAlign: 'center', border: '1px solid #fed7aa'}}>
+                                                <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>현재 개당 단가</div>
+                                                <div style={{fontSize: '16px', fontWeight: '700', color: '#f07c00'}}>{pricePerUnit.toLocaleString()}원</div>
+                                            </div>
+                                        </div>
+
+                                        {/* 가격 구간 */}
+                                        <div style={{marginBottom: '15px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb'}}>
+                                            <div style={{fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#001236'}}>가격 구간</div>
+                                            <div style={{fontSize: '11px', lineHeight: '1.7'}}>
+                                                {toolkit.priceRanges && toolkit.priceRanges.map((range, idx) => (
+                                                    <div 
+                                                        key={idx}
+                                                        style={{
+                                                            color: totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty) ? '#f07c00' : '#666',
+                                                            fontWeight: totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty) ? '600' : '400'
+                                                        }}
+                                                    >
+                                                        {range.minQty}개{range.maxQty ? `~${range.maxQty}개` : '이상'}: {range.pricePerUnit.toLocaleString()}원
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* 주문 제한 안내 */}
+                                        {(toolkit.minOrderQty || toolkit.orderUnit) && (
+                                            <div style={{
+                                                padding: '10px',
+                                                background: '#fef3c7',
+                                                border: '1px solid #fcd34d',
+                                                borderRadius: '6px',
+                                                marginBottom: '12px',
+                                                textAlign: 'center'
+                                            }}>
+                                                <div style={{fontSize: '11px', color: '#92400e', fontWeight: '600', display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                                    {toolkit.minOrderQty && (
+                                                        <div>⚠️ 최소 주문 수량: {toolkit.minOrderQty.toLocaleString()}개</div>
+                                                    )}
+                                                    {toolkit.orderUnit && (
+                                                        <div>📦 주문 단위: {toolkit.orderUnit.toLocaleString()}개 배수</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 신청 수량 */}
+                                        <div className="form-group" style={{marginTop: 'auto', marginBottom: '10px'}}>
+                                            <label style={{fontSize: '12px', marginBottom: '6px'}}>신청 수량</label>
+                                            <input 
+                                                type="number"
+                                                value={myOrders[toolkit.id]?.quantity || ''}
+                                                onChange={(e) => handleQuantityChange(toolkit.id, e.target.value)}
+                                                placeholder="0"
+                                                min="0"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '6px',
+                                                    fontSize: '14px',
+                                                    textAlign: 'center'
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* 예상 금액 */}
+                                        <div style={{padding: '14px', background: '#fff7ed', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', border: '1px solid #fed7aa'}}>
+                                            <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>예상 금액</div>
+                                            <div style={{fontSize: '20px', fontWeight: '700', color: '#f07c00'}}>
+                                                {myAmount.toLocaleString()}원
+                                            </div>
+                                        </div>
+
+                                        {/* 버튼 영역 */}
+                                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                            {/* 저장 버튼 */}
+                                            <button 
+                                                className="btn"
+                                                style={{background: '#f07c00', width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600'}}
+                                                onClick={() => handleSaveOrder(toolkit)}
+                                            >
+                                                💾 저장
+                                            </button>
+
+                                            {/* 신청 취소 버튼 - 기존 주문이 있을 때만 표시 */}
+                                            {myOrders[toolkit.id]?.id && (
+                                                <button 
+                                                    className="btn"
+                                                    style={{
+                                                        background: 'white',
+                                                        border: '2px solid #e94560',
+                                                        color: '#e94560',
+                                                        width: '100%',
+                                                        padding: '12px',
+                                                        fontSize: '14px',
+                                                        fontWeight: '600'
+                                                    }}
+                                                    onClick={() => handleCancelOrder(toolkit)}
+                                                >
+                                                    ✕ 신청 취소
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
 
         // 마케팅 비용 페이지
         function MarketingCostPage({ user, userInfo }) {
@@ -990,9 +1831,9 @@
             const [currentRound, setCurrentRound] = useState(null);
             const [branchBudget, setBranchBudget] = useState(0);
 
-            // Firestore에서 비용 목록 로드
+            // Firestore에서 비용 목록 로드 (지점별)
             useEffect(() => {
-                if (!user) return;
+                if (!user || !userInfo?.branchName) return;
 
                 const unsubscribe = db.collection('costs')
                     .where('branchName', '==', userInfo.branchName)
@@ -1015,7 +1856,7 @@
                     });
 
                 return () => unsubscribe();
-            }, [user]);
+            }, [user, userInfo?.branchName]);
 
             // 현재 진행 중인 Round와 배정 비용 로드
             useEffect(() => {
@@ -1509,7 +2350,7 @@
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th style={{width: '50px'}}>
+                                            <th style={{width: '50px', textAlign: 'center'}}>
                                                 <input 
                                                     type="checkbox"
                                                     checked={selectedCosts.length === costs.length && costs.length > 0}
@@ -1517,17 +2358,17 @@
                                                     style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                                 />
                                             </th>
-                                            <th>날짜</th>
-                                            <th>항목</th>
-                                            <th>금액</th>
-                                            <th>설명</th>
-                                            <th style={{width: '80px'}}>증빙</th>
+                                            <th style={{textAlign: 'center'}}>날짜</th>
+                                            <th style={{textAlign: 'center'}}>항목</th>
+                                            <th style={{textAlign: 'center'}}>금액</th>
+                                            <th style={{textAlign: 'center'}}>설명</th>
+                                            <th style={{width: '80px', textAlign: 'center'}}>증빙</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {costs.map(cost => (
                                             <tr key={cost.id} className={selectedCosts.includes(cost.id) ? 'selected' : ''}>
-                                                <td>
+                                                <td style={{textAlign: 'center'}}>
                                                     <input 
                                                         type="checkbox"
                                                         checked={selectedCosts.includes(cost.id)}
@@ -1535,15 +2376,15 @@
                                                         style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                                     />
                                                 </td>
-                                                <td>{formatDate(cost.date)}</td>
-                                                <td>
+                                                <td style={{textAlign: 'center'}}>{formatDate(cost.date)}</td>
+                                                <td style={{textAlign: 'center'}}>
                                                     <span className={`category-badge ${categories[cost.category]?.className}`}>
                                                         {categories[cost.category]?.label || cost.category}
                                                     </span>
                                                 </td>
-                                                <td className="amount">{formatAmount(cost.amount)}</td>
+                                                <td className="amount" style={{textAlign: 'center'}}>{formatAmount(cost.amount)}</td>
                                                 <td>{cost.description || '-'}</td>
-                                                <td>
+                                                <td style={{textAlign: 'center'}}>
                                                     {cost.canVerifyAtHQ ? (
                                                         <span style={{
                                                             background: '#fff3e0',
@@ -2793,10 +3634,10 @@
                                 <thead>
                                     <tr>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
-                                        <th style={{width: '100px', whiteSpace: 'nowrap'}}>상태</th>
-                                        <th style={{width: '40%'}}>제목</th>
-                                        <th style={{width: '90px'}}>작성자</th>
-                                        <th style={{width: '160px'}}>작성일</th>
+                                        <th style={{width: '100px', whiteSpace: 'nowrap', textAlign: 'center'}}>상태</th>
+                                        <th style={{width: '40%', textAlign: 'center'}}>제목</th>
+                                        <th style={{width: '90px', textAlign: 'center'}}>작성자</th>
+                                        <th style={{width: '160px', textAlign: 'center'}}>작성일</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2807,9 +3648,9 @@
                                             style={{cursor: 'pointer'}}
                                         >
                                             <td style={{textAlign: 'center', color: '#666', fontSize: '13px'}}>{index + 1}</td>
-                                            <td>{getStatusBadge(inquiry.status)}</td>
+                                            <td style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
                                             <td style={{fontWeight: '500'}}>{inquiry.title}</td>
-                                            <td>
+                                            <td style={{textAlign: 'center'}}>
                                                 {inquiry.position ? (
                                                     <span style={{
                                                         background: '#e8f4fd',
@@ -2823,7 +3664,7 @@
                                                     </span>
                                                 ) : '-'}
                                             </td>
-                                            <td style={{fontSize: '13px', color: '#666'}}>
+                                            <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>
                                                 {formatDate(inquiry.createdAt)}
                                             </td>
                                         </tr>
@@ -3148,16 +3989,47 @@
         }
 
         // 사이드바 컴포넌트
-        function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout, onCostAccess }) {
-            const menuItems = [
+        function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout, onCostAccess, onToolkitAccess }) {
+            const [visibleMenus, setVisibleMenus] = useState([]);
+            const allMenuItems = [
                 { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
                 { id: 'cost', name: '마케팅 비용', icon: Icons.Cost, requiresPassword: true },
+                { id: 'toolkit', name: '마케팅 툴킷 신청', icon: Icons.Toolkit, requiresPassword: true },
                 { id: 'settings', name: '설정', icon: Icons.Settings }
             ];
 
+            useEffect(() => {
+                // Firestore에서 사이드바 설정 로드
+                const loadMenuConfig = async () => {
+                    try {
+                        const doc = await db.collection('sidebarConfig').doc('user').get();
+                        if (doc.exists) {
+                            const config = doc.data().menus;
+                            const filtered = allMenuItems.filter(item => {
+                                const configItem = config.find(c => c.id === item.id);
+                                return configItem ? configItem.visible !== false : true;
+                            });
+                            setVisibleMenus(filtered);
+                        } else {
+                            setVisibleMenus(allMenuItems);
+                        }
+                    } catch (error) {
+                        console.error('사이드바 설정 로드 오류:', error);
+                        setVisibleMenus(allMenuItems);
+                    }
+                };
+                loadMenuConfig();
+            }, []);
+
+            const menuItems = visibleMenus;
+
             const handleMenuClick = (item) => {
                 if (item.requiresPassword) {
-                    onCostAccess();
+                    if (item.id === 'cost') {
+                        onCostAccess();
+                    } else if (item.id === 'toolkit') {
+                        onToolkitAccess();
+                    }
                 } else {
                     setCurrentPage(item.id);
                 }
@@ -3223,6 +4095,11 @@
             const [showCostPasswordModal, setShowCostPasswordModal] = useState(false);
             const [costPasswordInput, setCostPasswordInput] = useState('');
             const [isVerifyingCostPassword, setIsVerifyingCostPassword] = useState(false);
+            
+            // 마케팅 툴킷 신청 비밀번호 모달 상태
+            const [showToolkitPasswordModal, setShowToolkitPasswordModal] = useState(false);
+            const [toolkitPasswordInput, setToolkitPasswordInput] = useState('');
+            const [isVerifyingToolkitPassword, setIsVerifyingToolkitPassword] = useState(false);
             
             // 이메일 인증 상태 (마케팅 비용 비밀번호 변경용)
             const [isEmailVerified, setIsEmailVerified] = useState(false);
@@ -3352,6 +4229,45 @@
                     setIsVerifyingCostPassword(false);
                 }
             };
+            
+            // 마케팅 툴킷 신청 접근 핸들러
+            const handleToolkitAccess = () => {
+                // 비밀번호가 설정되어 있지 않으면 바로 접근
+                if (!userInfo?.marketingPassword) {
+                    alert('마케팅 비용 비밀번호가 설정되어 있지 않습니다.\n설정 페이지에서 비밀번호를 먼저 설정해주세요.');
+                    setCurrentPage('settings');
+                    return;
+                }
+                setToolkitPasswordInput('');
+                setShowToolkitPasswordModal(true);
+            };
+
+            // 마케팅 툴킷 신청 비밀번호 확인
+            const verifyToolkitPassword = async (e) => {
+                e.preventDefault();
+                
+                if (!toolkitPasswordInput) {
+                    alert('비밀번호를 입력해주세요.');
+                    return;
+                }
+
+                setIsVerifyingToolkitPassword(true);
+
+                try {
+                    if (toolkitPasswordInput === userInfo.marketingPassword) {
+                        setShowToolkitPasswordModal(false);
+                        setToolkitPasswordInput('');
+                        setCurrentPage('toolkit');
+                    } else {
+                        alert('비밀번호가 올바르지 않습니다.');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인에 실패했습니다.');
+                } finally {
+                    setIsVerifyingToolkitPassword(false);
+                }
+            };
 
             if (loading) {
                 return <div className="loading">로딩 중...</div>;
@@ -3363,6 +4279,8 @@
                         return <MarketingCostPage user={user} userInfo={userInfo} />;
                     case 'inquiry':
                         return <InquiryPage user={user} userInfo={userInfo} />;
+                    case 'toolkit':
+                        return <ToolkitOrderPage user={user} userInfo={userInfo} />;
                     case 'settings':
                         return <SettingsPage user={user} userInfo={userInfo} setUserInfo={setUserInfo} isEmailVerified={isEmailVerified} setIsEmailVerified={setIsEmailVerified} needsReauth={needsReauth} setNeedsReauth={setNeedsReauth} />;
                     default:
@@ -3379,6 +4297,7 @@
                         userInfo={userInfo}
                         onLogout={handleLogout}
                         onCostAccess={handleCostAccess}
+                        onToolkitAccess={handleToolkitAccess}
                     />
                     <main className="main-content">
                         {renderPage()}
@@ -3424,6 +4343,53 @@
                                             disabled={isVerifyingCostPassword}
                                         >
                                             {isVerifyingCostPassword ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 마케팅 툴킷 신청 비밀번호 모달 */}
+                    {showToolkitPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowToolkitPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="modal-header">
+                                    <h3>🔒 마케팅 툴킷 신청 접근</h3>
+                                    <button className="modal-close" onClick={() => setShowToolkitPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={verifyToolkitPassword}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+                                            마케팅 툴킷 신청 페이지에 접근하려면 비밀번호를 입력하세요.
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={toolkitPasswordInput}
+                                                onChange={(e) => setToolkitPasswordInput(e.target.value)}
+                                                placeholder="마케팅 비용 비밀번호"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button 
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowToolkitPasswordModal(false)}
+                                            disabled={isVerifyingToolkitPassword}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn btn-sm"
+                                            disabled={isVerifyingToolkitPassword}
+                                        >
+                                            {isVerifyingToolkitPassword ? '확인 중...' : '확인'}
                                         </button>
                                     </div>
                                 </form>
