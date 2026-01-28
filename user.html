@@ -1198,29 +1198,45 @@
             // 특정 툴킷의 모든 주문 및 비용 업데이트 (가격 구간 변경 시)
             const updateAllOrdersForToolkit = async (toolkitId) => {
                 try {
+                    console.log(`[updateAllOrdersForToolkit] 시작: 툴킷 ID = ${toolkitId}`);
+                    
                     // 1. 해당 툴킷 정보 가져오기
                     const toolkitDoc = await db.collection('toolkits').doc(toolkitId).get();
-                    if (!toolkitDoc.exists) return;
+                    if (!toolkitDoc.exists) {
+                        console.log(`[updateAllOrdersForToolkit] 툴킷을 찾을 수 없음`);
+                        return;
+                    }
                     const toolkit = { id: toolkitDoc.id, ...toolkitDoc.data() };
+                    console.log(`[updateAllOrdersForToolkit] 툴킷 이름: ${toolkit.name}`);
 
                     // 2. 해당 툴킷의 모든 주문 가져오기
                     const ordersSnapshot = await db.collection('toolkitOrders')
                         .where('toolkitId', '==', toolkitId)
                         .get();
                     
-                    if (ordersSnapshot.empty) return;
+                    if (ordersSnapshot.empty) {
+                        console.log(`[updateAllOrdersForToolkit] 주문이 없음`);
+                        return;
+                    }
+                    console.log(`[updateAllOrdersForToolkit] 총 ${ordersSnapshot.size}개의 주문 발견`);
 
                     // 3. 전체 수량 계산
                     let totalQty = 0;
                     ordersSnapshot.forEach(doc => {
-                        totalQty += Number(doc.data().quantity || 0);
+                        const qty = Number(doc.data().quantity || 0);
+                        totalQty += qty;
+                        console.log(`[updateAllOrdersForToolkit] 주문 ${doc.id}: ${qty}개, costId: ${doc.data().costId || '없음'}`);
                     });
+                    console.log(`[updateAllOrdersForToolkit] 전체 수량: ${totalQty}개`);
 
                     // 4. 새로운 단가 계산
                     const newPricePerUnit = getPricePerUnit(toolkit, totalQty);
+                    console.log(`[updateAllOrdersForToolkit] 새 단가: ${newPricePerUnit}원`);
 
                     // 5. Batch로 모든 주문과 비용 업데이트
                     const batch = db.batch();
+                    let orderUpdateCount = 0;
+                    let costUpdateCount = 0;
                     
                     ordersSnapshot.forEach(doc => {
                         const orderData = doc.data();
@@ -1233,6 +1249,7 @@
                             totalAmount: newTotalAmount,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
+                        orderUpdateCount++;
 
                         // 연결된 비용도 업데이트
                         if (orderData.costId) {
@@ -1242,13 +1259,17 @@
                                 description: `${toolkit.name} (${quantity}개)`,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
+                            costUpdateCount++;
+                        } else {
+                            console.warn(`[updateAllOrdersForToolkit] 주문 ${doc.id}에 costId가 없음 - 비용 업데이트 스킵`);
                         }
                     });
 
+                    console.log(`[updateAllOrdersForToolkit] Batch 커밋 시작: 주문 ${orderUpdateCount}개, 비용 ${costUpdateCount}개`);
                     await batch.commit();
-                    console.log(`툴킷 ${toolkitId}의 모든 주문이 업데이트되었습니다. 새 단가: ${newPricePerUnit}원`);
+                    console.log(`[updateAllOrdersForToolkit] ✅ 완료: 툴킷 "${toolkit.name}", 새 단가: ${newPricePerUnit.toLocaleString()}원`);
                 } catch (error) {
-                    console.error('주문 일괄 업데이트 오류:', error);
+                    console.error('[updateAllOrdersForToolkit] ❌ 오류:', error);
                 }
             };
 
@@ -1294,10 +1315,27 @@
                 }
 
                 try {
-                    // 현재 단가 계산 (저장 전 전체 수량 기반)
-                    const currentTotalQty = getTotalOrderQty(toolkit.id);
-                    const pricePerUnit = getPricePerUnit(toolkit, currentTotalQty);
+                    // 🔥 최신 주문 목록을 Firestore에서 직접 가져와서 정확한 단가 계산
+                    const latestOrdersSnapshot = await db.collection('toolkitOrders')
+                        .where('toolkitId', '==', toolkit.id)
+                        .get();
+                    
+                    // 다른 사용자들의 총 수량 계산
+                    let othersTotal = 0;
+                    latestOrdersSnapshot.forEach(doc => {
+                        const orderData = doc.data();
+                        // 현재 사용자의 기존 주문은 제외 (새로 저장될 것이므로)
+                        if (doc.id !== order?.id) {
+                            othersTotal += Number(orderData.quantity || 0);
+                        }
+                    });
+                    
+                    // 전체 수량 = 다른 사용자들 + 현재 입력값
+                    const newTotalQty = othersTotal + quantity;
+                    const pricePerUnit = getPricePerUnit(toolkit, newTotalQty);
                     const totalAmount = quantity * pricePerUnit;
+                    
+                    console.log(`[handleSaveOrder] 툴킷: ${toolkit.name}, 다른 사용자: ${othersTotal}개, 내 수량: ${quantity}개, 총: ${newTotalQty}개, 단가: ${pricePerUnit}원`);
 
                     const orderData = {
                         toolkitId: toolkit.id,
