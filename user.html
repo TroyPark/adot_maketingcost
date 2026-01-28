@@ -979,6 +979,24 @@
                 loadData();
             }, [user]);
             
+            // 툴킷 주문 실시간 감지 (다른 지점의 주문 변경 시 자동 업데이트)
+            useEffect(() => {
+                if (!user) return;
+
+                const unsubscribe = db.collection('toolkitOrders')
+                    .onSnapshot((snapshot) => {
+                        // 주문이 추가/수정/삭제되면 데이터 다시 로드
+                        if (!snapshot.metadata.hasPendingWrites) {
+                            // 로컬 변경이 아닌 서버 업데이트만 처리
+                            loadData();
+                        }
+                    }, (error) => {
+                        console.error('툴킷 주문 실시간 감지 오류:', error);
+                    });
+
+                return () => unsubscribe();
+            }, [user]);
+            
             // 현재 Round와 배정 비용 로드
             useEffect(() => {
                 if (!userInfo?.branchName) return;
@@ -1518,7 +1536,7 @@
                         <ul style={{fontSize: '13px', color: '#666', lineHeight: '1.8', paddingLeft: '20px', margin: 0}}>
                             <li><strong>전체 지점의 주문 합계</strong>에 따라 개당 단가가 결정됩니다.</li>
                             <li>다른 지점의 신청 현황을 확인하여 <strong>예상 단가</strong>를 참고하세요.</li>
-                            <li><strong style={{color: '#dc2626'}}>배송비는 별도로 청구됩니다. 착불 금액 지점에서 선 지불 후 마케팅 비용에 작성 가능합니다.</strong></li>
+                            <li><strong style={{color: '#dc2626'}}>배송비는 별도로 청구됩니다.</strong></li>
                             <li>주문 수정은 언제든지 가능합니다.</li>
                             <li>툴킷 신청 시 자동으로 <strong>마케팅 비용</strong>에 등록됩니다.</li>
                         </ul>
