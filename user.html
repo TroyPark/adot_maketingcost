@@ -1288,8 +1288,10 @@
 
             // 주문 저장 (비용도 함께 저장/업데이트)
             const handleSaveOrder = async (toolkit) => {
+                console.log('🚀 [handleSaveOrder] 시작:', toolkit.name);
                 const order = myOrders[toolkit.id];
                 const quantity = Number(order?.quantity || 0);
+                console.log('📦 [handleSaveOrder] 수량:', quantity);
 
                 if (quantity === 0) {
                     alert('수량을 입력해주세요.');
@@ -1393,13 +1395,15 @@
                     }
 
                     // 3. 다른 지점들의 비용도 업데이트 (가격 구간이 변경될 수 있으므로)
+                    console.log('🔄 [handleSaveOrder] updateAllOrdersForToolkit 호출 전');
                     await updateAllOrdersForToolkit(toolkit.id);
+                    console.log('✅ [handleSaveOrder] updateAllOrdersForToolkit 호출 후');
 
                     alert(order?.id ? '주문이 수정되었습니다.' : '주문이 등록되었습니다.');
                     loadData();
                 } catch (error) {
-                    console.error('주문 저장 오류:', error);
-                    alert('주문 저장에 실패했습니다.');
+                    console.error('❌ [handleSaveOrder] 주문 저장 오류:', error);
+                    alert('주문 저장에 실패했습니다: ' + error.message);
                 }
             };
 
