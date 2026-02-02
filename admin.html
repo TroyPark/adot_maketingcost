@@ -3201,9 +3201,29 @@
                                             </div>
                                         </div>
                                         <div>
-                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 지점 수</div>
+                                            <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>
+                                                {selectedTeam === 'all' ? '배정 지점 수' : `${selectedTeam} 지점 수`}
+                                            </div>
                                             <div style={{fontSize: '22px', fontWeight: '700'}}>
-                                                {Object.keys(branchBudgets).filter(k => branchBudgets[k] > 0).length}개
+                                                {(() => {
+                                                    if (selectedTeam === 'all') {
+                                                        // 전체: 예산이 배정된 지점 수
+                                                        return Object.keys(branchBudgets).filter(k => branchBudgets[k] > 0).length;
+                                                    } else {
+                                                        // 특정 팀: 해당 팀의 비용이 있는 지점 수
+                                                        const branchesWithTeamCosts = new Set();
+                                                        costs.forEach(cost => {
+                                                            if (!currentRound) return;
+                                                            const costDate = cost.date;
+                                                            if (costDate >= currentRound.startDate && 
+                                                                costDate <= currentRound.endDate && 
+                                                                cost.team === selectedTeam) {
+                                                                branchesWithTeamCosts.add(cost.branchName);
+                                                            }
+                                                        });
+                                                        return branchesWithTeamCosts.size;
+                                                    }
+                                                })()}개
                                             </div>
                                         </div>
                                     </div>
