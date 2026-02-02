@@ -1007,13 +1007,43 @@
             });
 
             useEffect(() => {
-                loadData();
+                // 툴킷 실시간 리스너
+                const unsubscribeToolkits = db.collection('toolkits')
+                    .orderBy('createdAt', 'asc')
+                    .onSnapshot((snapshot) => {
+                        const toolkitsData = [];
+                        snapshot.forEach(doc => {
+                            toolkitsData.push({ id: doc.id, ...doc.data() });
+                        });
+                        setToolkits(toolkitsData);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('툴킷 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                // 주문 실시간 리스너
+                const unsubscribeOrders = db.collection('toolkitOrders')
+                    .onSnapshot((snapshot) => {
+                        const ordersData = [];
+                        snapshot.forEach(doc => {
+                            ordersData.push({ id: doc.id, ...doc.data() });
+                        });
+                        setOrders(ordersData);
+                    }, (error) => {
+                        console.error('주문 로드 오류:', error);
+                    });
+
+                return () => {
+                    unsubscribeToolkits();
+                    unsubscribeOrders();
+                };
             }, []);
 
             const loadData = async () => {
+                // 수동 새로고침용 (필요 시)
                 setLoading(true);
                 try {
-                    // 툴킷 목록 가져오기 (오래된 것부터 → 최신 툴킷이 오른쪽에 표시됨)
                     const toolkitsSnapshot = await db.collection('toolkits').orderBy('createdAt', 'asc').get();
                     const toolkitsData = [];
                     toolkitsSnapshot.forEach(doc => {
@@ -1021,7 +1051,6 @@
                     });
                     setToolkits(toolkitsData);
 
-                    // 모든 주문 가져오기
                     const ordersSnapshot = await db.collection('toolkitOrders').get();
                     const ordersData = [];
                     ordersSnapshot.forEach(doc => {
