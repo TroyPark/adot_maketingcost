@@ -3720,111 +3720,43 @@
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                         gap: '8px',
-                                        marginTop: '24px',
-                                        padding: '16px 0'
+                                        marginTop: '30px',
+                                        paddingTop: '20px',
+                                        borderTop: '1px solid #eee'
                                     }}>
                                         <button
-                                            onClick={() => setCurrentPage(1)}
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                             disabled={currentPage === 1}
                                             style={{
                                                 padding: '8px 12px',
-                                                border: '1px solid #ddd',
                                                 borderRadius: '6px',
-                                                background: currentPage === 1 ? '#f5f5f5' : 'white',
-                                                color: currentPage === 1 ? '#999' : '#333',
-                                                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            ««
-                                        </button>
-                                        <button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            style={{
-                                                padding: '8px 12px',
                                                 border: '1px solid #ddd',
-                                                borderRadius: '6px',
                                                 background: currentPage === 1 ? '#f5f5f5' : 'white',
-                                                color: currentPage === 1 ? '#999' : '#333',
                                                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                                                fontSize: '13px'
+                                                fontSize: '14px'
                                             }}
                                         >
                                             ‹ 이전
                                         </button>
                                         
-                                        {(() => {
-                                            const pages = [];
-                                            let startPage = Math.max(1, currentPage - 2);
-                                            let endPage = Math.min(totalPages, startPage + 4);
-                                            
-                                            if (endPage - startPage < 4) {
-                                                startPage = Math.max(1, endPage - 4);
-                                            }
-                                            
-                                            for (let i = startPage; i <= endPage; i++) {
-                                                pages.push(
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => setCurrentPage(i)}
-                                                        style={{
-                                                            padding: '8px 14px',
-                                                            border: currentPage === i ? '2px solid #e94560' : '1px solid #ddd',
-                                                            borderRadius: '6px',
-                                                            background: currentPage === i ? '#e94560' : 'white',
-                                                            color: currentPage === i ? 'white' : '#333',
-                                                            cursor: 'pointer',
-                                                            fontWeight: currentPage === i ? '700' : '400',
-                                                            fontSize: '14px',
-                                                            minWidth: '40px'
-                                                        }}
-                                                    >
-                                                        {i}
-                                                    </button>
-                                                );
-                                            }
-                                            return pages;
-                                        })()}
+                                        <span style={{fontSize: '14px', color: '#666', minWidth: '120px', textAlign: 'center'}}>
+                                            {currentPage} / {totalPages} 페이지 (총 {filteredCosts.length}건)
+                                        </span>
                                         
                                         <button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                             disabled={currentPage === totalPages}
                                             style={{
                                                 padding: '8px 12px',
-                                                border: '1px solid #ddd',
                                                 borderRadius: '6px',
+                                                border: '1px solid #ddd',
                                                 background: currentPage === totalPages ? '#f5f5f5' : 'white',
-                                                color: currentPage === totalPages ? '#999' : '#333',
                                                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                                fontSize: '13px'
+                                                fontSize: '14px'
                                             }}
                                         >
                                             다음 ›
                                         </button>
-                                        <button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            style={{
-                                                padding: '8px 12px',
-                                                border: '1px solid #ddd',
-                                                borderRadius: '6px',
-                                                background: currentPage === totalPages ? '#f5f5f5' : 'white',
-                                                color: currentPage === totalPages ? '#999' : '#333',
-                                                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            »»
-                                        </button>
-                                        
-                                        <span style={{
-                                            marginLeft: '16px',
-                                            fontSize: '13px',
-                                            color: '#666'
-                                        }}>
-                                            {currentPage} / {totalPages} 페이지
-                                        </span>
                                     </div>
                                 )}
                             </>
