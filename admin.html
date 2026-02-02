@@ -2605,7 +2605,12 @@
                 
                 return costs.filter(cost => {
                     const costDate = cost.date;
-                    return costDate >= currentRound.startDate && costDate <= currentRound.endDate;
+                    if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
+                    
+                    // 팀 필터 적용
+                    if (selectedTeam !== 'all' && cost.team !== selectedTeam) return false;
+                    
+                    return true;
                 }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
             };
 
@@ -2616,13 +2621,26 @@
                 return costs.filter(cost => {
                     if (cost.branchName !== branchName) return false;
                     const costDate = cost.date;
-                    return costDate >= currentRound.startDate && costDate <= currentRound.endDate;
+                    if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
+                    
+                    // 팀 필터 적용
+                    if (selectedTeam !== 'all' && cost.team !== selectedTeam) return false;
+                    
+                    return true;
                 }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
             };
 
             // 필터링된 비용
             // 필터링된 비용 목록
             const filteredCosts = costs.filter(cost => {
+                // Round 기간 필터 (현재 Round가 있을 때)
+                if (currentRound) {
+                    const costDate = cost.date;
+                    if (costDate < currentRound.startDate || costDate > currentRound.endDate) {
+                        return false;
+                    }
+                }
+                
                 // 지점 필터
                 if (selectedBranch !== 'all' && cost.branchName !== selectedBranch) {
                     return false;
@@ -2633,7 +2651,7 @@
                     return false;
                 }
                 
-                // 날짜 필터 (cost.date 기준)
+                // 추가 날짜 필터 (cost.date 기준)
                 if (startDate || endDate) {
                     const costDate = new Date(cost.date);
                     
@@ -2998,7 +3016,7 @@
                                 marginBottom: '16px'
                             }}>
                                 <div>
-                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px'}}>
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap'}}>
                                         <div style={{
                                             display: 'inline-block',
                                             background: '#e94560',
@@ -3009,6 +3027,46 @@
                                         }}>
                                             현재 진행중
                                         </div>
+                                        
+                                        {/* 팀 필터 버튼 */}
+                                        <div style={{display: 'flex', gap: '6px'}}>
+                                            <button
+                                                onClick={() => setSelectedTeam('all')}
+                                                style={{
+                                                    padding: '4px 12px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    background: selectedTeam === 'all' ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                                                    color: 'white',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                전체
+                                            </button>
+                                            {['1팀', '2팀', '3팀', '4팀'].map(team => (
+                                                <button
+                                                    key={team}
+                                                    onClick={() => setSelectedTeam(team)}
+                                                    style={{
+                                                        padding: '4px 12px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        background: selectedTeam === team ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                                                        color: 'white',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    {team}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        
                                         {selectedBranch !== 'all' && (
                                             <div style={{
                                                 display: 'inline-block',
@@ -3113,7 +3171,10 @@
                                             {costs.filter(cost => {
                                                 if (cost.branchName !== selectedBranch) return false;
                                                 const costDate = cost.date;
-                                                return costDate >= currentRound.startDate && costDate <= currentRound.endDate;
+                                                if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
+                                                // 팀 필터 적용
+                                                if (selectedTeam !== 'all' && cost.team !== selectedTeam) return false;
+                                                return true;
                                             }).length}건
                                         </div>
                                     </div>
@@ -3163,6 +3224,16 @@
                                                     .map(([branch, budget]) => {
                                                         const used = getRoundUsedByBranch(branch);
                                                         const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
+                                                        return { branch, budget, used, rate };
+                                                    })
+                                                    .filter(({ used }) => {
+                                                        // 팀 필터가 선택된 경우, 해당 팀의 비용이 있는 지점만 표시
+                                                        if (selectedTeam !== 'all') {
+                                                            return used > 0;
+                                                        }
+                                                        return true;
+                                                    })
+                                                    .map(({ branch, budget, used, rate }) => {
                                                         return (
                                                             <div 
                                                                 key={branch} 
