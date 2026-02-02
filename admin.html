@@ -2460,6 +2460,7 @@
             // 팀 필터 상태
             const [teams, setTeams] = useState([]);
             const [selectedTeam, setSelectedTeam] = useState('all');
+            const [branchTeamMap, setBranchTeamMap] = useState({}); // 지점-팀 매핑
             
             // 날짜 필터 상태
             const [startDate, setStartDate] = useState('');
@@ -2552,6 +2553,25 @@
                     }, (error) => {
                         console.error('비용 목록 로드 오류:', error);
                         setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, []);
+
+            // 지점-팀 매핑 로드 (users 컬렉션에서)
+            useEffect(() => {
+                const unsubscribe = db.collection('users')
+                    .onSnapshot((snapshot) => {
+                        const mapping = {};
+                        snapshot.docs.forEach(doc => {
+                            const userData = doc.data();
+                            if (userData.branchName && userData.team) {
+                                mapping[userData.branchName] = userData.team;
+                            }
+                        });
+                        setBranchTeamMap(mapping);
+                    }, (error) => {
+                        console.error('지점-팀 매핑 로드 오류:', error);
                     });
 
                 return () => unsubscribe();
@@ -3210,18 +3230,10 @@
                                                         // 전체: 예산이 배정된 지점 수
                                                         return Object.keys(branchBudgets).filter(k => branchBudgets[k] > 0).length;
                                                     } else {
-                                                        // 특정 팀: 해당 팀의 비용이 있는 지점 수
-                                                        const branchesWithTeamCosts = new Set();
-                                                        costs.forEach(cost => {
-                                                            if (!currentRound) return;
-                                                            const costDate = cost.date;
-                                                            if (costDate >= currentRound.startDate && 
-                                                                costDate <= currentRound.endDate && 
-                                                                cost.team === selectedTeam) {
-                                                                branchesWithTeamCosts.add(cost.branchName);
-                                                            }
-                                                        });
-                                                        return branchesWithTeamCosts.size;
+                                                        // 특정 팀: 해당 팀에 속한 지점 수
+                                                        return Object.keys(branchBudgets)
+                                                            .filter(branch => branchBudgets[branch] > 0 && branchTeamMap[branch] === selectedTeam)
+                                                            .length;
                                                     }
                                                 })()}개
                                             </div>
@@ -3241,19 +3253,16 @@
                                             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px'}}>
                                                 {Object.entries(branchBudgets)
                                                     .filter(([_, budget]) => budget > 0)
-                                                    .map(([branch, budget]) => {
-                                                        const used = getRoundUsedByBranch(branch);
-                                                        const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
-                                                        return { branch, budget, used, rate };
-                                                    })
-                                                    .filter(({ used }) => {
-                                                        // 팀 필터가 선택된 경우, 해당 팀의 비용이 있는 지점만 표시
+                                                    .filter(([branch, _]) => {
+                                                        // 팀 필터가 선택된 경우, 해당 팀에 속한 지점만 표시
                                                         if (selectedTeam !== 'all') {
-                                                            return used > 0;
+                                                            return branchTeamMap[branch] === selectedTeam;
                                                         }
                                                         return true;
                                                     })
-                                                    .map(({ branch, budget, used, rate }) => {
+                                                    .map(([branch, budget]) => {
+                                                        const used = getRoundUsedByBranch(branch);
+                                                        const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
                                                         return (
                                                             <div 
                                                                 key={branch} 
