@@ -2854,6 +2854,87 @@
                         }
                     }
 
+                    // 툴킷 비용인 경우, 연결된 주문도 삭제
+                    const deletedToolkitIds = new Set(); // 가격 재계산이 필요한 툴킷 ID
+                    for (const costId of selectedCosts) {
+                        const costData = costs.find(c => c.id === costId);
+                        if (costData && costData.category === 'toolkit') {
+                            // 해당 costId를 가진 주문 찾기
+                            const orderSnapshot = await db.collection('toolkitOrders')
+                                .where('costId', '==', costId)
+                                .get();
+                            
+                            // 주문 삭제 및 툴킷 ID 수집
+                            for (const orderDoc of orderSnapshot.docs) {
+                                const orderData = orderDoc.data();
+                                if (orderData.toolkitId) {
+                                    deletedToolkitIds.add(orderData.toolkitId);
+                                }
+                                await db.collection('toolkitOrders').doc(orderDoc.id).delete();
+                            }
+                        }
+                    }
+
+                    // 삭제된 주문이 있는 툴킷들의 가격 재계산
+                    for (const toolkitId of deletedToolkitIds) {
+                        try {
+                            // 해당 툴킷 정보 가져오기
+                            const toolkitDoc = await db.collection('toolkits').doc(toolkitId).get();
+                            if (!toolkitDoc.exists) continue;
+                            const toolkit = { id: toolkitDoc.id, ...toolkitDoc.data() };
+
+                            // 해당 툴킷의 남은 주문들 가져오기
+                            const remainingOrdersSnapshot = await db.collection('toolkitOrders')
+                                .where('toolkitId', '==', toolkitId)
+                                .get();
+                            
+                            if (remainingOrdersSnapshot.empty) continue;
+
+                            // 전체 수량 계산
+                            let totalQty = 0;
+                            remainingOrdersSnapshot.forEach(doc => {
+                                totalQty += Number(doc.data().quantity || 0);
+                            });
+
+                            // 새로운 단가 계산
+                            const priceRanges = toolkit.priceRanges || [];
+                            let newPricePerUnit = 0;
+                            for (let i = priceRanges.length - 1; i >= 0; i--) {
+                                if (totalQty >= priceRanges[i].minQty) {
+                                    newPricePerUnit = priceRanges[i].price;
+                                    break;
+                                }
+                            }
+
+                            // 모든 남은 주문과 비용 업데이트
+                            const updateBatch = db.batch();
+                            remainingOrdersSnapshot.forEach(doc => {
+                                const orderData = doc.data();
+                                const quantity = Number(orderData.quantity || 0);
+                                const newTotalAmount = quantity * newPricePerUnit;
+
+                                // 주문 업데이트
+                                updateBatch.update(doc.ref, {
+                                    pricePerUnit: newPricePerUnit,
+                                    totalAmount: newTotalAmount,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+
+                                // 연결된 비용 업데이트
+                                if (orderData.costId) {
+                                    const costRef = db.collection('costs').doc(orderData.costId);
+                                    updateBatch.update(costRef, {
+                                        amount: newTotalAmount,
+                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                    });
+                                }
+                            });
+                            await updateBatch.commit();
+                        } catch (error) {
+                            console.error(`툴킷 ${toolkitId} 가격 재계산 오류:`, error);
+                        }
+                    }
+
                     // Firestore에서 비용 데이터 삭제
                     const batch = db.batch();
                     selectedCosts.forEach(id => {
