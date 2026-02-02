@@ -1057,29 +1057,39 @@
             const loadData = async () => {
                 setLoading(true);
                 try {
-                    // 툴킷 목록 가져오기 (취합 완료되지 않은 것만, 오래된 것부터 → 최신 툴킷이 오른쪽에 표시됨)
+                    // 같은 지점의 주문 먼저 가져오기 (같은 지점의 모든 주문 표시)
+                    const branchOrdersSnapshot = await db.collection('toolkitOrders')
+                        .where('branchName', '==', userInfo?.branchName)
+                        .get();
+                    
+                    const myOrdersMap = {};
+                    const branchToolkitIds = new Set(); // 같은 지점이 신청한 툴킷 ID
+                    
+                    branchOrdersSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        branchToolkitIds.add(data.toolkitId);
+                        
+                        // 같은 지점의 모든 주문을 myOrdersMap에 저장 (가장 최근 주문으로 덮어씀)
+                        // 한 툴킷에 여러 명이 신청한 경우, 가장 최근 주문이 표시됨
+                        if (!myOrdersMap[data.toolkitId] || 
+                            (data.updatedAt && myOrdersMap[data.toolkitId].updatedAt && 
+                             data.updatedAt.toMillis() > myOrdersMap[data.toolkitId].updatedAt.toMillis())) {
+                            myOrdersMap[data.toolkitId] = { id: doc.id, ...data };
+                        }
+                    });
+                    setMyOrders(myOrdersMap);
+
+                    // 툴킷 목록 가져오기 (오래된 것부터 → 최신 툴킷이 오른쪽에 표시됨)
                     const toolkitsSnapshot = await db.collection('toolkits').orderBy('createdAt', 'asc').get();
                     const toolkitsData = [];
                     toolkitsSnapshot.forEach(doc => {
                         const data = doc.data();
-                        // 취합 완료되지 않은 툴킷만 표시
-                        if (!data.isCompleted) {
+                        // 취합 완료되지 않은 툴킷 또는 같은 지점이 신청한 툴킷만 표시
+                        if (!data.isCompleted || branchToolkitIds.has(doc.id)) {
                             toolkitsData.push({ id: doc.id, ...data });
                         }
                     });
                     setToolkits(toolkitsData);
-
-                    // 내 주문 가져오기
-                    const myOrdersSnapshot = await db.collection('toolkitOrders')
-                        .where('userId', '==', user.uid)
-                        .get();
-                    
-                    const myOrdersMap = {};
-                    myOrdersSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        myOrdersMap[data.toolkitId] = { id: doc.id, ...data };
-                    });
-                    setMyOrders(myOrdersMap);
 
                     // 모든 주문 가져오기 (전체 수량 계산용)
                     const allOrdersSnapshot = await db.collection('toolkitOrders').get();
