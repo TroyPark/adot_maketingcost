@@ -1084,8 +1084,8 @@
                     const toolkitsData = [];
                     toolkitsSnapshot.forEach(doc => {
                         const data = doc.data();
-                        // 취합 완료되지 않은 툴킷 또는 같은 지점이 신청한 툴킷만 표시
-                        if (!data.isCompleted || branchToolkitIds.has(doc.id)) {
+                        // 취합 완료되지 않은 툴킷만 표시 (완료된 툴킷은 신청 여부와 관계없이 숨김)
+                        if (!data.isCompleted) {
                             toolkitsData.push({ id: doc.id, ...data });
                         }
                     });
