@@ -15,6 +15,8 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- SheetJS for Excel handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -2480,7 +2482,7 @@
         }
 
         // 마케팅 비용 페이지
-        function MarketingCostPage() {
+        function MarketingCostPage({ user }) {
             const [costs, setCosts] = useState([]);
             const [loading, setLoading] = useState(true);
             const [branches, setBranches] = useState([]);
@@ -2512,6 +2514,17 @@
             // 결제요청서 모달 상태
             const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false);
             const [paymentRequestText, setPaymentRequestText] = useState('');
+
+            // 대량 업로드 모달 상태
+            const [showBulkUploadPasswordModal, setShowBulkUploadPasswordModal] = useState(false);
+            const [bulkUploadPassword, setBulkUploadPassword] = useState('');
+            const [isVerifyingBulkPassword, setIsVerifyingBulkPassword] = useState(false);
+            const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+            const [uploadFile, setUploadFile] = useState(null);
+            const [uploadPreviewData, setUploadPreviewData] = useState([]);
+            const [uploadErrors, setUploadErrors] = useState([]);
+            const [isUploading, setIsUploading] = useState(false);
+            const [uploadProgress, setUploadProgress] = useState(0);
 
             // 페이지네이션 상태
             const [currentPage, setCurrentPage] = useState(1);
@@ -3003,6 +3016,288 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            };
+
+            // 대량 업로드 모달 닫기 및 초기화
+            const closeBulkUploadModal = () => {
+                if (isUploading) return; // 업로드 중에는 닫지 못함
+                setShowBulkUploadModal(false);
+                setUploadFile(null);
+                setUploadPreviewData([]);
+                setUploadErrors([]);
+                setUploadProgress(0);
+            };
+
+            // 대량 업로드 비밀번호 검증
+            const handleBulkUploadPasswordSubmit = async (e) => {
+                e.preventDefault();
+                setIsVerifyingBulkPassword(true);
+                
+                try {
+                    // Firestore에서 비밀번호 가져오기
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+                    
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
+                        setIsVerifyingBulkPassword(false);
+                        return;
+                    }
+                    
+                    const storedPassword = doc.data().password;
+                    
+                    if (bulkUploadPassword === storedPassword) {
+                        setShowBulkUploadPasswordModal(false);
+                        setShowBulkUploadModal(true);
+                        setBulkUploadPassword('');
+                    } else {
+                        alert('비밀번호가 일치하지 않습니다.');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인 중 오류가 발생했습니다.');
+                } finally {
+                    setIsVerifyingBulkPassword(false);
+                }
+            };
+
+            // 템플릿 엑셀 다운로드
+            const handleDownloadTemplate = () => {
+                const headers = ['지점명', '팀', '날짜(YYYY-MM-DD)', '항목', '금액', '설명'];
+                const sampleData = [
+                    ['강남점', '성인', '2026-02-01', '온라인 광고비', '500000', 'Google 광고 캠페인'],
+                    ['홍대점', '주니어', '2026-02-02', '전단지', '300000', 'A4 전단지 5000매']
+                ];
+
+                // CSV 데이터 생성
+                const BOM = '\uFEFF';
+                const csvContent = BOM + [
+                    headers.join(','),
+                    ...sampleData.map(row => row.map(cell => `"${String(cell)}"`).join(','))
+                ].join('\n');
+
+                // 파일 다운로드
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', '마케팅비용_업로드_템플릿.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            // 파일 읽기 및 검증
+            const handleFileSelect = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                
+                if (!['csv', 'xlsx', 'xls'].includes(fileExtension)) {
+                    alert('CSV 또는 엑셀 파일만 업로드 가능합니다.');
+                    return;
+                }
+
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('파일 크기는 10MB 이하여야 합니다.');
+                    return;
+                }
+
+                setUploadFile(file);
+                
+                const reader = new FileReader();
+                
+                if (fileExtension === 'csv') {
+                    reader.onload = (e) => {
+                        const text = e.target.result;
+                        const lines = text.split('\n').filter(line => line.trim());
+                        
+                        if (lines.length < 2) {
+                            alert('파일에 데이터가 없습니다.');
+                            return;
+                        }
+
+                        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+                        const dataRows = lines.slice(1);
+                        
+                        const parsedData = dataRows.map((line, index) => {
+                            const values = line.split(',').map(v => v.replace(/"/g, '').trim());
+                            return {
+                                rowIndex: index + 2,
+                                branchName: values[0] || '',
+                                team: values[1] || '',
+                                date: values[2] || '',
+                                item: values[3] || '',
+                                amount: values[4] || '',
+                                description: values[5] || ''
+                            };
+                        });
+                        
+                        validateUploadData(parsedData);
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                } else {
+                    reader.onload = (e) => {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                        
+                        if (jsonData.length < 2) {
+                            alert('파일에 데이터가 없습니다.');
+                            return;
+                        }
+
+                        const headers = jsonData[0];
+                        const dataRows = jsonData.slice(1);
+                        
+                        const parsedData = dataRows.map((row, index) => {
+                            return {
+                                rowIndex: index + 2,
+                                branchName: String(row[0] || '').trim(),
+                                team: String(row[1] || '').trim(),
+                                date: String(row[2] || '').trim(),
+                                item: String(row[3] || '').trim(),
+                                amount: String(row[4] || '').trim(),
+                                description: String(row[5] || '').trim()
+                            };
+                        }).filter(row => row.branchName || row.date || row.amount); // 빈 행 제거
+                        
+                        validateUploadData(parsedData);
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            };
+
+            // 데이터 검증
+            const validateUploadData = (data) => {
+                const errors = [];
+                const validatedData = data.map((row, index) => {
+                    const rowErrors = [];
+
+                    // 필수 필드 검증
+                    if (!row.branchName) rowErrors.push('지점명 필수');
+                    if (!row.date) rowErrors.push('날짜 필수');
+                    if (!row.item) rowErrors.push('항목 필수');
+                    if (!row.amount) rowErrors.push('금액 필수');
+
+                    // 날짜 형식 검증
+                    const dateRegex = /^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/;
+                    if (row.date && !dateRegex.test(row.date)) {
+                        rowErrors.push('날짜 형식 오류 (YYYY-MM-DD)');
+                    }
+
+                    // 금액 검증
+                    const amountNum = Number(row.amount.replace(/,/g, ''));
+                    if (row.amount && (isNaN(amountNum) || amountNum <= 0)) {
+                        rowErrors.push('금액은 0보다 큰 숫자여야 함');
+                    }
+
+                    // 지점명 검증 (등록된 지점인지)
+                    if (row.branchName && !branches.includes(row.branchName)) {
+                        rowErrors.push('미등록 지점');
+                    }
+
+                    if (rowErrors.length > 0) {
+                        errors.push({
+                            row: row.rowIndex,
+                            errors: rowErrors
+                        });
+                    }
+
+                    return {
+                        ...row,
+                        amountNum,
+                        hasError: rowErrors.length > 0,
+                        errorMessages: rowErrors
+                    };
+                });
+
+                setUploadPreviewData(validatedData);
+                setUploadErrors(errors);
+            };
+
+            // 대량 업로드 실행
+            const handleBulkUpload = async () => {
+                if (uploadPreviewData.length === 0) {
+                    alert('업로드할 데이터가 없습니다.');
+                    return;
+                }
+
+                if (uploadErrors.length > 0) {
+                    const confirm = window.confirm(
+                        `${uploadErrors.length}개의 오류가 있습니다.\n오류가 있는 행은 제외하고 업로드하시겠습니까?`
+                    );
+                    if (!confirm) return;
+                }
+
+                setIsUploading(true);
+                setUploadProgress(0);
+
+                try {
+                    const validData = uploadPreviewData.filter(row => !row.hasError);
+                    const totalCount = validData.length;
+                    let uploadedCount = 0;
+                    let failedCount = 0;
+
+                    // Firestore batch write (500개씩)
+                    const BATCH_SIZE = 500;
+                    
+                    for (let i = 0; i < validData.length; i += BATCH_SIZE) {
+                        const batch = db.batch();
+                        const chunk = validData.slice(i, i + BATCH_SIZE);
+
+                        for (const row of chunk) {
+                            try {
+                                const docRef = db.collection('costs').doc();
+                                
+                                // 날짜 형식 변환
+                                const dateStr = row.date.replace(/[./]/g, '-');
+                                
+                                batch.set(docRef, {
+                                    userId: user.uid,
+                                    branchName: row.branchName,
+                                    team: row.team || '',
+                                    date: dateStr,
+                                    category: 'etc',
+                                    item: row.item,
+                                    amount: row.amountNum,
+                                    description: row.description || '',
+                                    userEmail: user.email,
+                                    userName: user.displayName || '관리자(대량업로드)',
+                                    imageUrls: [],
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    status: 'pending'
+                                });
+                                
+                                uploadedCount++;
+                            } catch (error) {
+                                console.error(`Row ${row.rowIndex} upload failed:`, error);
+                                failedCount++;
+                            }
+                        }
+
+                        await batch.commit();
+                        setUploadProgress(Math.round((i + chunk.length) / totalCount * 100));
+                    }
+
+                    setIsUploading(false);
+                    
+                    if (failedCount > 0) {
+                        alert(`업로드 완료!\n성공: ${uploadedCount}건\n실패: ${failedCount}건`);
+                    } else {
+                        alert(`${uploadedCount}건이 성공적으로 업로드되었습니다! 🎉`);
+                    }
+
+                    // 모달 닫기 및 초기화
+                    closeBulkUploadModal();
+
+                } catch (error) {
+                    console.error('대량 업로드 오류:', error);
+                    alert('업로드 중 오류가 발생했습니다: ' + error.message);
+                    setIsUploading(false);
+                }
             };
 
             // 결제요청서 생성
@@ -3562,6 +3857,13 @@
                                     총 <strong style={{color: '#001236'}}>{filteredCosts.length}</strong>건
                                 </span>
                                 <button 
+                                    className="btn btn-sm btn-primary" 
+                                    onClick={() => setShowBulkUploadPasswordModal(true)}
+                                    style={{whiteSpace: 'nowrap'}}
+                                >
+                                    📤 대량 업로드
+                                </button>
+                                <button 
                                     className="btn btn-sm btn-success" 
                                     onClick={handleExportExcel}
                                     style={{whiteSpace: 'nowrap'}}
@@ -3864,6 +4166,290 @@
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 대량 업로드 비밀번호 모달 */}
+                    {showBulkUploadPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowBulkUploadPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                                <div className="modal-header">
+                                    <h3>🔒 대량 업로드 인증</h3>
+                                    <button className="modal-close" onClick={() => setShowBulkUploadPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleBulkUploadPasswordSubmit}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '10px', color: '#666'}}>
+                                            대량 업로드 기능을 사용하려면 고유 비밀번호를 입력하세요.
+                                        </p>
+                                        <p style={{marginBottom: '15px', fontSize: '13px', color: '#888'}}>
+                                            담당자 : 박영주 / 010-4037-0928
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input 
+                                                type="password"
+                                                value={bulkUploadPassword}
+                                                onChange={(e) => setBulkUploadPassword(e.target.value)}
+                                                placeholder="고유 비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions">
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary"
+                                            onClick={() => {
+                                                setShowBulkUploadPasswordModal(false);
+                                                setBulkUploadPassword('');
+                                            }}
+                                        >
+                                            취소
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="btn"
+                                            disabled={isVerifyingBulkPassword}
+                                        >
+                                            {isVerifyingBulkPassword ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 대량 업로드 모달 */}
+                    {showBulkUploadModal && (
+                        <div className="modal-overlay" onClick={closeBulkUploadModal}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '900px', width: '95%', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column'}}>
+                                <div className="modal-header">
+                                    <h3>📤 마케팅 비용 대량 업로드</h3>
+                                    <button className="modal-close" onClick={closeBulkUploadModal} disabled={isUploading}>×</button>
+                                </div>
+                                <div className="modal-body" style={{padding: '20px', flex: 1, overflow: 'auto'}}>
+                                    {/* 안내 및 템플릿 다운로드 */}
+                                    {!uploadFile && (
+                                        <>
+                                            <div style={{
+                                                background: '#e3f2fd',
+                                                padding: '15px',
+                                                borderRadius: '8px',
+                                                marginBottom: '20px',
+                                                fontSize: '14px'
+                                            }}>
+                                                <h4 style={{marginBottom: '10px', fontSize: '15px'}}>📋 업로드 방법</h4>
+                                                <ol style={{marginLeft: '20px', lineHeight: '1.8'}}>
+                                                    <li>아래 "템플릿 다운로드" 버튼을 클릭하여 양식을 다운로드하세요.</li>
+                                                    <li>엑셀이나 CSV 편집기로 데이터를 입력하세요.</li>
+                                                    <li>작성한 파일을 아래 영역에 드래그하거나 파일 선택 버튼을 클릭하세요.</li>
+                                                    <li>미리보기에서 데이터를 확인한 후 업로드하세요.</li>
+                                                </ol>
+                                                <div style={{marginTop: '10px', padding: '10px', background: '#fff3cd', borderRadius: '5px', fontSize: '13px'}}>
+                                                    ⚠️ <strong>필수 항목:</strong> 지점명, 날짜(YYYY-MM-DD), 항목, 금액
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                className="btn btn-sm btn-secondary" 
+                                                onClick={handleDownloadTemplate}
+                                                style={{marginBottom: '20px'}}
+                                            >
+                                                📥 템플릿 다운로드
+                                            </button>
+
+                                            {/* 파일 드롭존 */}
+                                            <div style={{
+                                                border: '2px dashed #ccc',
+                                                borderRadius: '8px',
+                                                padding: '40px 20px',
+                                                textAlign: 'center',
+                                                background: '#fafafa',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s'
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.style.borderColor = '#4CAF50';
+                                                e.currentTarget.style.background = '#f1f8f4';
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.currentTarget.style.borderColor = '#ccc';
+                                                e.currentTarget.style.background = '#fafafa';
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.style.borderColor = '#ccc';
+                                                e.currentTarget.style.background = '#fafafa';
+                                                if (e.dataTransfer.files.length > 0) {
+                                                    const fakeEvent = { target: { files: [e.dataTransfer.files[0]] } };
+                                                    handleFileSelect(fakeEvent);
+                                                }
+                                            }}
+                                            onClick={() => document.getElementById('bulk-upload-file-input').click()}>
+                                                <div style={{fontSize: '48px', marginBottom: '10px'}}>📁</div>
+                                                <div style={{fontSize: '16px', fontWeight: '500', marginBottom: '5px'}}>
+                                                    파일을 드래그하거나 클릭하여 선택하세요
+                                                </div>
+                                                <div style={{fontSize: '13px', color: '#666'}}>
+                                                    지원 형식: CSV, Excel (.xlsx, .xls) | 최대 10MB
+                                                </div>
+                                            </div>
+                                            <input 
+                                                type="file" 
+                                                id="bulk-upload-file-input"
+                                                accept=".csv,.xlsx,.xls"
+                                                style={{display: 'none'}}
+                                                onChange={handleFileSelect}
+                                            />
+                                        </>
+                                    )}
+
+                                    {/* 미리보기 */}
+                                    {uploadFile && uploadPreviewData.length > 0 && (
+                                        <>
+                                            <div style={{marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div>
+                                                    <h4 style={{fontSize: '15px', marginBottom: '5px'}}>📊 데이터 미리보기</h4>
+                                                    <div style={{fontSize: '13px', color: '#666'}}>
+                                                        총 <strong>{uploadPreviewData.length}</strong>건 
+                                                        {uploadErrors.length > 0 && (
+                                                            <span style={{color: '#f44336', marginLeft: '10px'}}>
+                                                                | ⚠️ 오류 <strong>{uploadErrors.length}</strong>건
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    className="btn btn-sm btn-secondary" 
+                                                    onClick={() => {
+                                                        setUploadFile(null);
+                                                        setUploadPreviewData([]);
+                                                        setUploadErrors([]);
+                                                        document.getElementById('bulk-upload-file-input').value = '';
+                                                    }}
+                                                >
+                                                    다시 선택
+                                                </button>
+                                            </div>
+
+                                            {/* 오류 요약 */}
+                                            {uploadErrors.length > 0 && (
+                                                <div style={{
+                                                    background: '#ffebee',
+                                                    padding: '15px',
+                                                    borderRadius: '8px',
+                                                    marginBottom: '15px',
+                                                    maxHeight: '150px',
+                                                    overflow: 'auto'
+                                                }}>
+                                                    <h5 style={{fontSize: '14px', marginBottom: '10px', color: '#c62828'}}>⚠️ 오류 목록</h5>
+                                                    {uploadErrors.map((err, idx) => (
+                                                        <div key={idx} style={{fontSize: '13px', marginBottom: '5px'}}>
+                                                            <strong>행 {err.row}:</strong> {err.errors.join(', ')}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* 데이터 테이블 */}
+                                            <div style={{
+                                                maxHeight: '400px',
+                                                overflow: 'auto',
+                                                border: '1px solid #e0e0e0',
+                                                borderRadius: '8px'
+                                            }}>
+                                                <table style={{width: '100%', fontSize: '13px', borderCollapse: 'collapse'}}>
+                                                    <thead style={{position: 'sticky', top: 0, background: '#f5f5f5', zIndex: 1}}>
+                                                        <tr>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '50px'}}>행</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '100px'}}>지점명</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '80px'}}>팀</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '100px'}}>날짜</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '120px'}}>항목</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'right', minWidth: '100px'}}>금액</th>
+                                                            <th style={{padding: '10px', borderBottom: '2px solid #ddd', textAlign: 'left', minWidth: '150px'}}>설명</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {uploadPreviewData.map((row, idx) => (
+                                                            <tr key={idx} style={{
+                                                                background: row.hasError ? '#ffebee' : 'white',
+                                                                borderBottom: '1px solid #eee'
+                                                            }}>
+                                                                <td style={{padding: '8px', fontWeight: '500'}}>{row.rowIndex}</td>
+                                                                <td style={{padding: '8px'}}>{row.branchName || '-'}</td>
+                                                                <td style={{padding: '8px'}}>{row.team || '-'}</td>
+                                                                <td style={{padding: '8px'}}>{row.date || '-'}</td>
+                                                                <td style={{padding: '8px'}}>{row.item || '-'}</td>
+                                                                <td style={{padding: '8px', textAlign: 'right', fontWeight: '500'}}>
+                                                                    {row.amountNum ? formatAmount(row.amountNum) : row.amount}
+                                                                </td>
+                                                                <td style={{padding: '8px', fontSize: '12px', color: '#666'}}>
+                                                                    {row.hasError ? (
+                                                                        <span style={{color: '#c62828'}}>{row.errorMessages.join(', ')}</span>
+                                                                    ) : (
+                                                                        row.description || '-'
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* 업로드 진행률 */}
+                                            {isUploading && (
+                                                <div style={{marginTop: '20px'}}>
+                                                    <div style={{fontSize: '14px', marginBottom: '8px', textAlign: 'center'}}>
+                                                        업로드 중... {uploadProgress}%
+                                                    </div>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: '8px',
+                                                        background: '#e0e0e0',
+                                                        borderRadius: '4px',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <div style={{
+                                                            width: `${uploadProgress}%`,
+                                                            height: '100%',
+                                                            background: '#4CAF50',
+                                                            transition: 'width 0.3s'
+                                                        }}></div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                                <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={closeBulkUploadModal}
+                                        disabled={isUploading}
+                                    >
+                                        취소
+                                    </button>
+                                    {uploadPreviewData.length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm"
+                                            style={{
+                                                background: '#4CAF50',
+                                                color: 'white'
+                                            }}
+                                            onClick={handleBulkUpload}
+                                            disabled={isUploading || uploadPreviewData.filter(r => !r.hasError).length === 0}
+                                        >
+                                            {isUploading ? '업로드 중...' : `📤 업로드 (${uploadPreviewData.filter(r => !r.hasError).length}건)`}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -7752,7 +8338,7 @@
             const renderPage = () => {
                 switch (currentPage) {
                     case 'cost':
-                        return <MarketingCostPage />;
+                        return <MarketingCostPage user={user} />;
                     case 'inquiry':
                         return <InquiryPage />;
                     case 'abpComm':
@@ -7766,7 +8352,7 @@
                     case 'settings':
                         return <SettingsPage />;
                     default:
-                        return <MarketingCostPage />;
+                        return <MarketingCostPage user={user} />;
                 }
             };
 
