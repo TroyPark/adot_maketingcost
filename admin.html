@@ -2496,7 +2496,12 @@
             // 날짜 필터 상태
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
-            
+
+            // 포함/제외 필터 상태
+            const [filterColumn, setFilterColumn] = useState('branchName'); // 필터링할 열
+            const [filterMode, setFilterMode] = useState('include'); // 'include' 또는 'exclude'
+            const [filterValue, setFilterValue] = useState(''); // 필터링할 값
+
             // 선택 및 삭제 관련 상태
             const [selectedCosts, setSelectedCosts] = useState([]);
             const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -2716,20 +2721,59 @@
                 // 추가 날짜 필터 (cost.date 기준)
                 if (startDate || endDate) {
                     const costDate = new Date(cost.date);
-                    
+
                     if (startDate) {
                         const start = new Date(startDate);
                         start.setHours(0, 0, 0, 0);
                         if (costDate < start) return false;
                     }
-                    
+
                     if (endDate) {
                         const end = new Date(endDate);
                         end.setHours(23, 59, 59, 999);
                         if (costDate > end) return false;
                     }
                 }
-                
+
+                // 포함/제외 필터
+                if (filterValue.trim()) {
+                    let fieldValue = '';
+
+                    // 선택된 열의 값 가져오기
+                    switch (filterColumn) {
+                        case 'branchName':
+                            fieldValue = (cost.branchName || '').toLowerCase();
+                            break;
+                        case 'team':
+                            fieldValue = (cost.team || '').toLowerCase();
+                            break;
+                        case 'category':
+                            // 카테고리의 경우 label도 검색
+                            const categoryLabel = categories[cost.category]?.label || cost.category || '';
+                            fieldValue = categoryLabel.toLowerCase();
+                            break;
+                        case 'amount':
+                            fieldValue = String(cost.amount || '');
+                            break;
+                        case 'description':
+                            fieldValue = (cost.description || '').toLowerCase();
+                            break;
+                        default:
+                            fieldValue = '';
+                    }
+
+                    const searchValue = filterValue.toLowerCase().trim();
+                    const isMatch = fieldValue.includes(searchValue);
+
+                    // 포함 모드: 일치하면 true, 일치하지 않으면 false
+                    // 제외 모드: 일치하면 false, 일치하지 않으면 true
+                    if (filterMode === 'include') {
+                        if (!isMatch) return false;
+                    } else if (filterMode === 'exclude') {
+                        if (isMatch) return false;
+                    }
+                }
+
                 return true;
             });
             
@@ -2742,14 +2786,17 @@
             // 필터 변경 시 페이지 리셋
             useEffect(() => {
                 setCurrentPage(1);
-            }, [selectedBranch, selectedTeam, startDate, endDate]);
-            
+            }, [selectedBranch, selectedTeam, startDate, endDate, filterColumn, filterMode, filterValue]);
+
             // 필터 초기화
             const handleResetFilters = () => {
                 setSelectedBranch('all');
                 setSelectedTeam('all');
                 setStartDate('');
                 setEndDate('');
+                setFilterColumn('branchName');
+                setFilterMode('include');
+                setFilterValue('');
                 setCurrentPage(1);
             };
 
@@ -3802,7 +3849,7 @@
                             {/* 날짜 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                 <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>등록 일시:</label>
-                                <input 
+                                <input
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => {
@@ -3817,7 +3864,7 @@
                                     }}
                                 />
                                 <span style={{color: '#999'}}>~</span>
-                                <input 
+                                <input
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => {
@@ -3832,9 +3879,67 @@
                                     }}
                                 />
                             </div>
-                            
+
+                            {/* 포함/제외 필터 */}
+                            <div style={{display: 'flex', gap: '8px', alignItems: 'center', padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0'}}>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>필터:</label>
+                                <select
+                                    value={filterColumn}
+                                    onChange={(e) => {
+                                        setFilterColumn(e.target.value);
+                                        setSelectedCosts([]);
+                                    }}
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '13px',
+                                        minWidth: '100px'
+                                    }}
+                                >
+                                    <option value="branchName">지점명</option>
+                                    <option value="team">팀</option>
+                                    <option value="category">항목</option>
+                                    <option value="amount">금액</option>
+                                    <option value="description">설명</option>
+                                </select>
+                                <select
+                                    value={filterMode}
+                                    onChange={(e) => {
+                                        setFilterMode(e.target.value);
+                                        setSelectedCosts([]);
+                                    }}
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '13px',
+                                        minWidth: '80px'
+                                    }}
+                                >
+                                    <option value="include">포함</option>
+                                    <option value="exclude">제외</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    value={filterValue}
+                                    onChange={(e) => {
+                                        setFilterValue(e.target.value);
+                                        setSelectedCosts([]);
+                                    }}
+                                    placeholder="검색어 입력"
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ddd',
+                                        fontSize: '13px',
+                                        minWidth: '150px'
+                                    }}
+                                />
+                            </div>
+
                             {/* 필터 초기화 버튼 */}
-                            {(selectedBranch !== 'all' || selectedTeam !== 'all' || startDate || endDate) && (
+                            {(selectedBranch !== 'all' || selectedTeam !== 'all' || startDate || endDate || filterValue) && (
                                 <button
                                     onClick={handleResetFilters}
                                     style={{
