@@ -2929,10 +2929,6 @@
 
                     // 상세 모달 닫기
                     setDetailCost(null);
-
-                    // 해당 탭으로 자동 전환
-                    setExecutionTab(newStatus ? 'executed' : 'unexecuted');
-                    setCurrentPage(1);
                 } catch (error) {
                     console.error('집행 상태 업데이트 실패:', error);
                     alert('집행 상태 업데이트에 실패했습니다.');
@@ -4231,7 +4227,7 @@
                                     onClick={handleExportExcel}
                                     style={{whiteSpace: 'nowrap'}}
                                 >
-                                    {selectedCosts.length > 0 ? `선택 ${selectedCosts.length}건 엑셀` : '📊 전체 엑셀 다운로드'}
+                                    {selectedCosts.length > 0 ? `선택 ${selectedCosts.length}건 엑셀` : '전체 엑셀 다운로드'}
                                 </button>
                             </div>
                         </div>
