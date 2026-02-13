@@ -2442,6 +2442,7 @@
                                             <th style={{textAlign: 'center'}}>금액</th>
                                             <th style={{textAlign: 'center'}}>설명</th>
                                             <th style={{width: '80px', textAlign: 'center'}}>증빙</th>
+                                            <th style={{width: '80px', textAlign: 'center'}}>집행여부</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2490,7 +2491,7 @@
                                                             📋 본사증빙
                                                         </span>
                                                     ) : cost.images && cost.images.length > 0 ? (
-                                                        <button 
+                                                        <button
                                                             className="btn-preview"
                                                             onClick={() => openImagePreview(cost.images)}
                                                         >
@@ -2499,6 +2500,19 @@
                                                     ) : (
                                                         <span style={{color: '#999', fontSize: '12px'}}>-</span>
                                                     )}
+                                                </td>
+                                                <td style={{textAlign: 'center'}}>
+                                                    <span style={{
+                                                        background: cost.isExecuted ? '#e3f2fd' : '#f5f5f5',
+                                                        color: cost.isExecuted ? '#1976d2' : '#666',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {cost.isExecuted ? '집행완료' : '미집행'}
+                                                    </span>
                                                 </td>
                                             </tr>
                                         ))}
