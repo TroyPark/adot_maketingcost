@@ -2534,7 +2534,10 @@
             // 페이지네이션 상태
             const [currentPage, setCurrentPage] = useState(1);
             const ITEMS_PER_PAGE = 20;
-            
+
+            // 집행 탭 상태
+            const [executionTab, setExecutionTab] = useState('unexecuted'); // 'unexecuted' 또는 'executed'
+
             // Round 관련 상태
             const [currentRound, setCurrentRound] = useState(null);
             const [totalBudget, setTotalBudget] = useState(0);
@@ -2684,17 +2687,87 @@
             // Round 기간 내 지점별 사용 비용 계산
             const getRoundUsedByBranch = (branchName) => {
                 if (!currentRound) return 0;
-                
+
                 return costs.filter(cost => {
                     if (cost.branchName !== branchName) return false;
                     const costDate = cost.date;
                     if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
-                    
+
                     // 팀 필터 적용
                     if (selectedTeam !== 'all' && cost.team !== selectedTeam) return false;
-                    
+
                     return true;
                 }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+            };
+
+            // Round 기간 내 지점별 집행된 비용 계산
+            const getRoundExecutedByBranch = (branchName) => {
+                if (!currentRound) return 0;
+
+                return costs.filter(cost => {
+                    if (cost.branchName !== branchName) return false;
+                    const costDate = cost.date;
+                    if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
+
+                    // 팀 필터 적용
+                    if (selectedTeam !== 'all' && cost.team !== selectedTeam) return false;
+
+                    // 집행된 비용만
+                    if (!cost.isExecuted) return false;
+
+                    return true;
+                }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
+            };
+
+            // 지점별 소진율 엑셀 다운로드
+            const handleExportBranchStatus = () => {
+                if (!currentRound) {
+                    alert('활성화된 Round가 없습니다.');
+                    return;
+                }
+
+                // 데이터 준비
+                const excelData = Object.entries(branchBudgets)
+                    .filter(([_, budget]) => budget > 0)
+                    .filter(([branch, _]) => {
+                        // 팀 필터가 선택된 경우, 해당 팀에 속한 지점만 포함
+                        if (selectedTeam !== 'all') {
+                            return branchTeamMap[branch] === selectedTeam;
+                        }
+                        return true;
+                    })
+                    .map(([branch, budget]) => {
+                        const used = getRoundUsedByBranch(branch);
+                        const executed = getRoundExecutedByBranch(branch);
+                        const usageRate = budget > 0 ? ((used / budget) * 100).toFixed(2) : '0.00';
+                        const executionRate = budget > 0 ? ((executed / budget) * 100).toFixed(2) : '0.00';
+
+                        return {
+                            '지점': branch,
+                            '예산': budget,
+                            '사용 예산': used,
+                            '집행 예산': executed,
+                            '소진율(%)': usageRate,
+                            '집행율(%)': executionRate
+                        };
+                    });
+
+                if (excelData.length === 0) {
+                    alert('다운로드할 데이터가 없습니다.');
+                    return;
+                }
+
+                // 엑셀 파일 생성
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, '지점별 소진율');
+
+                // 파일명 생성
+                const teamSuffix = selectedTeam !== 'all' ? `_${selectedTeam}` : '';
+                const fileName = `지점별소진율_${currentRound.name}${teamSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+                // 다운로드
+                XLSX.writeFile(wb, fileName);
             };
 
             // 필터링된 비용
@@ -2774,6 +2847,15 @@
                     }
                 }
 
+                // 집행 탭 필터
+                if (executionTab === 'unexecuted') {
+                    // 미집행건: isExecuted가 false이거나 없는 항목
+                    if (cost.isExecuted === true) return false;
+                } else if (executionTab === 'executed') {
+                    // 집행건: isExecuted가 true인 항목
+                    if (cost.isExecuted !== true) return false;
+                }
+
                 return true;
             });
             
@@ -2815,13 +2897,45 @@
             const handleSelectAll = () => {
                 const currentPageIds = paginatedCosts.map(cost => cost.id);
                 const allCurrentPageSelected = currentPageIds.every(id => selectedCosts.includes(id));
-                
+
                 if (allCurrentPageSelected) {
                     // 현재 페이지 항목들을 선택 해제
                     setSelectedCosts(prev => prev.filter(id => !currentPageIds.includes(id)));
                 } else {
                     // 현재 페이지 항목들을 선택에 추가
                     setSelectedCosts(prev => [...new Set([...prev, ...currentPageIds])]);
+                }
+            };
+
+            // 집행 상태 토글
+            const toggleExecutionStatus = async (costId, currentStatus) => {
+                try {
+                    const newStatus = !currentStatus;
+                    const costRef = firebase.firestore().collection('costs').doc(costId);
+
+                    await costRef.update({
+                        isExecuted: newStatus,
+                        executedAt: newStatus ? firebase.firestore.FieldValue.serverTimestamp() : null
+                    });
+
+                    // 로컬 상태 업데이트
+                    setCosts(prevCosts =>
+                        prevCosts.map(cost =>
+                            cost.id === costId
+                                ? { ...cost, isExecuted: newStatus }
+                                : cost
+                        )
+                    );
+
+                    // 상세 모달 닫기
+                    setDetailCost(null);
+
+                    // 해당 탭으로 자동 전환
+                    setExecutionTab(newStatus ? 'executed' : 'unexecuted');
+                    setCurrentPage(1);
+                } catch (error) {
+                    console.error('집행 상태 업데이트 실패:', error);
+                    alert('집행 상태 업데이트에 실패했습니다.');
                 }
             };
 
@@ -3699,8 +3813,82 @@
                                             paddingTop: '20px',
                                             borderTop: '1px solid rgba(255,255,255,0.1)'
                                         }}>
-                                            <div style={{fontSize: '13px', fontWeight: '600', marginBottom: '12px', opacity: 0.9}}>
-                                                지점별 소진율
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                marginBottom: '12px'
+                                            }}>
+                                                <div style={{fontSize: '13px', fontWeight: '600', opacity: 0.9}}>
+                                                    지점별 소진율
+                                                </div>
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                                                    {/* 색상 범례 */}
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        gap: '8px',
+                                                        fontSize: '10px',
+                                                        opacity: 0.8
+                                                    }}>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
+                                                            <div style={{
+                                                                width: '12px',
+                                                                height: '12px',
+                                                                background: '#3b82f6',
+                                                                borderRadius: '2px'
+                                                            }}></div>
+                                                            <span>집행</span>
+                                                        </div>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
+                                                            <div style={{
+                                                                width: '12px',
+                                                                height: '12px',
+                                                                background: '#4ade80',
+                                                                borderRadius: '2px'
+                                                            }}></div>
+                                                            <span>~80%</span>
+                                                        </div>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
+                                                            <div style={{
+                                                                width: '12px',
+                                                                height: '12px',
+                                                                background: '#fbbf24',
+                                                                borderRadius: '2px'
+                                                            }}></div>
+                                                            <span>81~100%</span>
+                                                        </div>
+                                                        <div style={{display: 'flex', alignItems: 'center', gap: '3px'}}>
+                                                            <div style={{
+                                                                width: '12px',
+                                                                height: '12px',
+                                                                background: '#dc3545',
+                                                                borderRadius: '2px'
+                                                            }}></div>
+                                                            <span>100%+</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={handleExportBranchStatus}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            background: 'rgba(255,255,255,0.2)',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            color: 'white',
+                                                            fontSize: '12px',
+                                                            fontWeight: '600',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                                                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                                    >
+                                                        📊 엑셀 다운로드
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px'}}>
                                                 {Object.entries(branchBudgets)
@@ -3714,10 +3902,13 @@
                                                     })
                                                     .map(([branch, budget]) => {
                                                         const used = getRoundUsedByBranch(branch);
+                                                        const executed = getRoundExecutedByBranch(branch);
                                                         const rate = budget > 0 ? Math.round((used / budget) * 100) : 0;
+                                                        const executedRate = budget > 0 ? Math.round((executed / budget) * 100) : 0;
+                                                        const unexecutedRate = rate - executedRate;
                                                         return (
-                                                            <div 
-                                                                key={branch} 
+                                                            <div
+                                                                key={branch}
                                                                 style={{
                                                                     background: 'rgba(255,255,255,0.1)',
                                                                     borderRadius: '8px',
@@ -3734,11 +3925,21 @@
                                                             >
                                                                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px'}}>
                                                                     <span style={{fontSize: '13px', fontWeight: '600'}}>{branch}</span>
-                                                                    <span style={{
-                                                                        fontSize: '12px',
-                                                                        fontWeight: '700',
-                                                                        color: rate > 100 ? '#ff6b6b' : rate > 80 ? '#fbbf24' : '#4ade80'
-                                                                    }}>{rate}%</span>
+                                                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                                                        <span style={{
+                                                                            fontSize: '11px',
+                                                                            fontWeight: '600',
+                                                                            color: '#3b82f6',
+                                                                            background: 'rgba(59, 130, 246, 0.15)',
+                                                                            padding: '2px 6px',
+                                                                            borderRadius: '4px'
+                                                                        }}>{executedRate}%</span>
+                                                                        <span style={{
+                                                                            fontSize: '12px',
+                                                                            fontWeight: '700',
+                                                                            color: rate > 100 ? '#ff6b6b' : rate > 80 ? '#fbbf24' : '#4ade80'
+                                                                        }}>{rate}%</span>
+                                                                    </div>
                                                                 </div>
                                                                 <div style={{
                                                                     background: 'rgba(255,255,255,0.2)',
@@ -3749,7 +3950,11 @@
                                                                     <div style={{
                                                                         width: `${Math.min(rate, 100)}%`,
                                                                         height: '100%',
-                                                                        background: rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80',
+                                                                        background: executedRate > 0 && unexecutedRate > 0
+                                                                            ? `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(executedRate / rate) * 100}%, ${rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80'} ${(executedRate / rate) * 100}%, ${rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80'} 100%)`
+                                                                            : executedRate > 0
+                                                                            ? '#3b82f6'
+                                                                            : rate > 100 ? '#dc3545' : rate > 80 ? '#fbbf24' : '#4ade80',
                                                                         transition: 'width 0.3s'
                                                                     }} />
                                                                 </div>
@@ -3786,7 +3991,60 @@
                         <div className="page-header-actions">
                             <h3 className="section-title" style={{marginBottom: 0}}>비용 현황</h3>
                         </div>
-                        
+
+                        {/* 집행 상태 탭 */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '10px',
+                            marginBottom: '20px',
+                            borderBottom: '2px solid #e0e0e0'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setExecutionTab('unexecuted');
+                                    setSelectedCosts([]);
+                                    setCurrentPage(1);
+                                }}
+                                style={{
+                                    padding: '12px 24px',
+                                    border: 'none',
+                                    background: executionTab === 'unexecuted' ? '#001236' : 'transparent',
+                                    color: executionTab === 'unexecuted' ? 'white' : '#666',
+                                    fontSize: '15px',
+                                    fontWeight: executionTab === 'unexecuted' ? '600' : '500',
+                                    cursor: 'pointer',
+                                    borderRadius: '8px 8px 0 0',
+                                    transition: 'all 0.2s',
+                                    position: 'relative',
+                                    bottom: '-2px'
+                                }}
+                            >
+                                미집행건
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setExecutionTab('executed');
+                                    setSelectedCosts([]);
+                                    setCurrentPage(1);
+                                }}
+                                style={{
+                                    padding: '12px 24px',
+                                    border: 'none',
+                                    background: executionTab === 'executed' ? '#001236' : 'transparent',
+                                    color: executionTab === 'executed' ? 'white' : '#666',
+                                    fontSize: '15px',
+                                    fontWeight: executionTab === 'executed' ? '600' : '500',
+                                    cursor: 'pointer',
+                                    borderRadius: '8px 8px 0 0',
+                                    transition: 'all 0.2s',
+                                    position: 'relative',
+                                    bottom: '-2px'
+                                }}
+                            >
+                                집행건
+                            </button>
+                        </div>
+
                         {/* 필터 영역 */}
                         <div style={{
                             display: 'flex', 
@@ -4012,7 +4270,7 @@
                                     <thead>
                                         <tr>
                                             <th style={{width: '40px', textAlign: 'center'}}>
-                                                <input 
+                                                <input
                                                     type="checkbox"
                                                     checked={paginatedCosts.length > 0 && paginatedCosts.every(cost => selectedCosts.includes(cost.id))}
                                                     onChange={handleSelectAll}
@@ -4042,7 +4300,7 @@
                                                 }}
                                             >
                                                 <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
-                                                    <input 
+                                                    <input
                                                         type="checkbox"
                                                         checked={selectedCosts.includes(cost.id)}
                                                         onChange={() => handleSelectCost(cost.id)}
@@ -4105,7 +4363,7 @@
                                                             📋 본사증빙
                                                         </span>
                                                     ) : cost.images && cost.images.length > 0 ? (
-                                                        <button 
+                                                        <button
                                                             className="btn-preview"
                                                             onClick={() => openImagePreview(cost.images)}
                                                         >
@@ -4705,7 +4963,7 @@
                                                 📋 본사 증빙 가능
                                             </div>
                                         ) : detailCost.images && detailCost.images.length > 0 ? (
-                                            <button 
+                                            <button
                                                 className="btn btn-sm"
                                                 style={{
                                                     background: '#e94560',
@@ -4726,6 +4984,34 @@
                                         ) : (
                                             <div style={{color: '#999', fontSize: '14px'}}>증빙 자료 없음</div>
                                         )}
+                                    </div>
+
+                                    {/* 집행 상태 */}
+                                    <div className="detail-row" style={{flexDirection: 'column'}}>
+                                        <div className="detail-label" style={{marginBottom: '8px'}}>집행 상태</div>
+                                        <button
+                                            className="btn"
+                                            style={{
+                                                background: detailCost.isExecuted ? '#4CAF50' : '#6c757d',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '12px 20px',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                width: 'fit-content',
+                                                fontSize: '14px',
+                                                fontWeight: '600',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}
+                                            onClick={() => toggleExecutionStatus(detailCost.id, detailCost.isExecuted)}
+                                        >
+                                            {detailCost.isExecuted ? '✓ 집행 완료' : '미집행'}
+                                            <span style={{fontSize: '12px', opacity: 0.9}}>
+                                                (클릭하여 {detailCost.isExecuted ? '미집행으로' : '집행 완료로'} 변경)
+                                            </span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
