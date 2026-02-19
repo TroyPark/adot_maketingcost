@@ -2516,6 +2516,12 @@
             // 상세보기 모달 상태
             const [detailCost, setDetailCost] = useState(null);
 
+            // 비용 편집 관련 상태
+            const [isEditingCost, setIsEditingCost] = useState(false);
+            const [editedAmount, setEditedAmount] = useState('');
+            const [editPassword, setEditPassword] = useState('');
+            const [showPasswordModal, setShowPasswordModal] = useState(false);
+
             // 결제요청서 모달 상태
             const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false);
             const [paymentRequestText, setPaymentRequestText] = useState('');
@@ -2929,9 +2935,87 @@
 
                     // 상세 모달 닫기
                     setDetailCost(null);
+
+                    // 해당 탭으로 자동 전환
+                    setExecutionTab(newStatus ? 'executed' : 'unexecuted');
+                    setCurrentPage(1);
                 } catch (error) {
                     console.error('집행 상태 업데이트 실패:', error);
                     alert('집행 상태 업데이트에 실패했습니다.');
+                }
+            };
+
+            // 비용 편집 시작
+            const startEditingCost = () => {
+                setEditedAmount(detailCost.amount.toString());
+                setIsEditingCost(true);
+            };
+
+            // 비용 편집 취소
+            const cancelEditingCost = () => {
+                setIsEditingCost(false);
+                setEditedAmount('');
+            };
+
+            // 비용 변경 시도 (비밀번호 모달 열기)
+            const attemptUpdateCost = () => {
+                const newAmount = parseInt(editedAmount);
+                if (isNaN(newAmount) || newAmount < 0) {
+                    alert('올바른 금액을 입력해주세요.');
+                    return;
+                }
+                setEditPassword('');
+                setShowPasswordModal(true);
+            };
+
+            // 비용 변경 실행 (비밀번호 확인 후)
+            const updateCostAmount = async () => {
+                try {
+                    // Firestore에서 비밀번호 가져오기
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
+                        return;
+                    }
+
+                    const storedPassword = doc.data().password;
+
+                    if (editPassword !== storedPassword) {
+                        alert('비밀번호가 올바르지 않습니다.');
+                        return;
+                    }
+
+                    const newAmount = parseInt(editedAmount);
+                    const costRef = firebase.firestore().collection('costs').doc(detailCost.id);
+
+                    await costRef.update({
+                        amount: newAmount,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 로컬 상태 업데이트
+                    setCosts(prevCosts =>
+                        prevCosts.map(cost =>
+                            cost.id === detailCost.id
+                                ? { ...cost, amount: newAmount }
+                                : cost
+                        )
+                    );
+
+                    // detailCost 상태 업데이트
+                    setDetailCost(prev => ({ ...prev, amount: newAmount }));
+
+                    // 모달 닫기 및 상태 초기화
+                    setShowPasswordModal(false);
+                    setIsEditingCost(false);
+                    setEditPassword('');
+                    setEditedAmount('');
+
+                    alert('비용이 성공적으로 변경되었습니다.');
+                } catch (error) {
+                    console.error('비용 업데이트 실패:', error);
+                    alert('비용 업데이트에 실패했습니다.');
                 }
             };
 
@@ -4923,8 +5007,75 @@
                                     </div>
                                     <div className="detail-row">
                                         <div className="detail-label">금액</div>
-                                        <div className="detail-value" style={{fontWeight: '700', color: '#001236', fontSize: '16px'}}>
-                                            {formatAmount(detailCost.amount)}
+                                        <div className="detail-value" style={{fontWeight: '700', color: '#001236', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'}}>
+                                            {!isEditingCost ? (
+                                                <>
+                                                    <span>{formatAmount(detailCost.amount)}</span>
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        style={{
+                                                            background: '#4CAF50',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px',
+                                                            fontWeight: '600'
+                                                        }}
+                                                        onClick={startEditingCost}
+                                                    >
+                                                        ✏️ 편집
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '8px', width: '100%'}}>
+                                                    <input
+                                                        type="number"
+                                                        value={editedAmount}
+                                                        onChange={(e) => setEditedAmount(e.target.value)}
+                                                        style={{
+                                                            padding: '8px 12px',
+                                                            border: '2px solid #4CAF50',
+                                                            borderRadius: '4px',
+                                                            fontSize: '14px',
+                                                            width: '150px',
+                                                            fontWeight: '600'
+                                                        }}
+                                                        placeholder="금액 입력"
+                                                    />
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        style={{
+                                                            background: '#4CAF50',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px'
+                                                        }}
+                                                        onClick={attemptUpdateCost}
+                                                    >
+                                                        ✓ 저장
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        style={{
+                                                            background: '#6c757d',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px'
+                                                        }}
+                                                        onClick={cancelEditingCost}
+                                                    >
+                                                        ✗ 취소
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="detail-row">
@@ -5007,6 +5158,75 @@
                                             <span style={{fontSize: '12px', opacity: 0.9}}>
                                                 (클릭하여 {detailCost.isExecuted ? '미집행으로' : '집행 완료로'} 변경)
                                             </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 비밀번호 입력 모달 */}
+                    {showPasswordModal && (
+                        <div className="detail-modal-overlay" onClick={() => setShowPasswordModal(false)}>
+                            <div className="detail-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                                <div className="detail-modal-header">
+                                    <h3>🔒 비밀번호 확인</h3>
+                                    <button className="modal-close" onClick={() => setShowPasswordModal(false)}>×</button>
+                                </div>
+                                <div className="detail-modal-body" style={{padding: '24px'}}>
+                                    <p style={{marginBottom: '16px', fontSize: '14px', color: '#666'}}>
+                                        비용을 변경하려면 고유 비밀번호를 입력해주세요.
+                                        <br />
+                                        담당자: 박영주 / 010-4037-0928
+                                    </p>
+                                    <input
+                                        type="password"
+                                        value={editPassword}
+                                        onChange={(e) => setEditPassword(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                updateCostAmount();
+                                            }
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            border: '2px solid #ddd',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            marginBottom: '16px'
+                                        }}
+                                        placeholder="비밀번호 입력"
+                                        autoFocus
+                                    />
+                                    <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                                        <button
+                                            className="btn btn-sm"
+                                            style={{
+                                                background: '#6c757d',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '8px 16px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => setShowPasswordModal(false)}
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            className="btn btn-sm"
+                                            style={{
+                                                background: '#4CAF50',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '8px 16px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={updateCostAmount}
+                                        >
+                                            확인
                                         </button>
                                     </div>
                                 </div>
