@@ -267,7 +267,7 @@ async function createUser(email, password, displayName = '', branchName = '') {
 }
 
 // 관리자용 사용자 생성 (Firebase Functions 사용)
-async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniquePassword, displayName = '', branchName = '', team = '') {
+async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniquePassword, displayName = '', branchName = '', team = '', manager = '') {
     try {
         // 1. 관리자로 로그인되어 있는지 확인
         const adminUser = auth.currentUser;
@@ -278,13 +278,14 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
         // 2. Firebase Functions 호출
         const functions = firebase.app().functions();
         const createUserFunction = functions.httpsCallable('createUser');
-        
+
         const result = await createUserFunction({
             email: newUserEmail,
             password: newUserPassword,
             displayName: displayName,
             branchName: branchName,
             team: team,
+            manager: manager,
             uniquePassword: uniquePassword
         });
 
