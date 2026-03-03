@@ -8236,6 +8236,7 @@
             // 차트 업데이트
             useEffect(() => {
                 if (loading || Object.keys(dashboardData.students).length === 0 || users.length === 0) return;
+                if (activeTab !== 'overview') return; // 담당자별 현황 탭이 아니면 차트를 그리지 않음
 
                 const managerData = calculateManagerData();
                 const sortedManagers = Object.entries(managerData).sort((a, b) => b[1].students - a[1].students);
@@ -8306,7 +8307,7 @@
                         }
                     });
                 }
-            }, [dashboardData, users, startDate, endDate, loading]);
+            }, [dashboardData, users, startDate, endDate, loading, activeTab]);
 
             // 담당자의 지점별 상세 데이터 계산
             const calculateBranchDetails = (branches) => {
@@ -8994,11 +8995,7 @@
                         <>
                             {/* 기간 선택 및 빠른 비교 */}
                             <div style={{
-                                background: 'white',
-                                padding: '25px',
-                                borderRadius: '8px',
-                                marginBottom: '20px',
-                                border: '1px solid #e5e7eb'
+                                display: 'none'
                             }}>
                                 {/* 기간 선택 섹션 */}
                                 <div style={{ marginBottom: '20px' }}>
@@ -9373,8 +9370,502 @@
                                     return bVal - aVal;
                                 });
 
+                                // 전체 데이터 계산
+                                const totalDataA = {
+                                    students: Object.values(managerDataA).reduce((sum, data) => sum + data.students, 0),
+                                    registrations: Object.values(managerDataA).reduce((sum, data) => sum + data.registrations, 0),
+                                    withdrawals: Object.values(managerDataA).reduce((sum, data) => sum + data.withdrawals, 0)
+                                };
+                                const totalDataB = {
+                                    students: Object.values(managerDataB).reduce((sum, data) => sum + data.students, 0),
+                                    registrations: Object.values(managerDataB).reduce((sum, data) => sum + data.registrations, 0),
+                                    withdrawals: Object.values(managerDataB).reduce((sum, data) => sum + data.withdrawals, 0)
+                                };
+                                const totalDiffStudents = totalDataA.students - totalDataB.students;
+                                const totalDiffRegistrations = totalDataA.registrations - totalDataB.registrations;
+                                const totalDiffWithdrawals = totalDataA.withdrawals - totalDataB.withdrawals;
+                                const totalDiffPercentStudents = totalDataB.students > 0 ? ((totalDiffStudents / totalDataB.students) * 100) : 0;
+                                const totalDiffPercentRegistrations = totalDataB.registrations > 0 ? ((totalDiffRegistrations / totalDataB.registrations) * 100) : 0;
+                                const totalDiffPercentWithdrawals = totalDataB.withdrawals > 0 ? ((totalDiffWithdrawals / totalDataB.withdrawals) * 100) : 0;
+
                                 return (
                                     <>
+                                        {/* 기간 선택과 전체 비교를 감싸는 flex 컨테이너 */}
+                                        <div style={{ display: 'flex', gap: '20px', marginBottom: '30px', alignItems: 'stretch' }}>
+                                            {/* 기간 선택 박스 (좌측) */}
+                                            <div style={{
+                                                flex: '0 0 42%',
+                                                background: 'white',
+                                                padding: '20px',
+                                                borderRadius: '12px',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                                display: 'flex',
+                                                flexDirection: 'column'
+                                            }}>
+                                                <h3 style={{
+                                                    fontSize: '14px',
+                                                    fontWeight: '700',
+                                                    marginBottom: '18px',
+                                                    color: '#001236'
+                                                }}>
+                                                    비교 기간 선택
+                                                </h3>
+
+                                                {/* A 기간 */}
+                                                <div style={{
+                                                    marginBottom: '14px',
+                                                    padding: '14px',
+                                                    background: '#eff6ff',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #3b82f6'
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: '700',
+                                                        color: '#3b82f6',
+                                                        marginBottom: '10px',
+                                                        textAlign: 'center'
+                                                    }}>A 기간</div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600', minWidth: '45px' }}>시작일</label>
+                                                            <input
+                                                                type="date"
+                                                                value={startDateA}
+                                                                onChange={(e) => setStartDateA(e.target.value)}
+                                                                max={getYesterdayStr()}
+                                                                style={{
+                                                                    flex: 1,
+                                                                    padding: '8px 10px',
+                                                                    border: '1px solid #93c5fd',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '12px',
+                                                                    background: 'white'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600', minWidth: '45px' }}>종료일</label>
+                                                            <input
+                                                                type="date"
+                                                                value={endDateA}
+                                                                onChange={(e) => setEndDateA(e.target.value)}
+                                                                max={getYesterdayStr()}
+                                                                style={{
+                                                                    flex: 1,
+                                                                    padding: '8px 10px',
+                                                                    border: '1px solid #93c5fd',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '12px',
+                                                                    background: 'white'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* B 기간 */}
+                                                <div style={{
+                                                    marginBottom: '14px',
+                                                    padding: '14px',
+                                                    background: '#fef2f2',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #ef4444'
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: '700',
+                                                        color: '#ef4444',
+                                                        marginBottom: '10px',
+                                                        textAlign: 'center'
+                                                    }}>B 기간</div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600', minWidth: '45px' }}>시작일</label>
+                                                            <input
+                                                                type="date"
+                                                                value={startDateB}
+                                                                onChange={(e) => setStartDateB(e.target.value)}
+                                                                max={getYesterdayStr()}
+                                                                style={{
+                                                                    flex: 1,
+                                                                    padding: '8px 10px',
+                                                                    border: '1px solid #fca5a5',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '12px',
+                                                                    background: 'white'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <label style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600', minWidth: '45px' }}>종료일</label>
+                                                            <input
+                                                                type="date"
+                                                                value={endDateB}
+                                                                onChange={(e) => setEndDateB(e.target.value)}
+                                                                max={getYesterdayStr()}
+                                                                style={{
+                                                                    flex: 1,
+                                                                    padding: '8px 10px',
+                                                                    border: '1px solid #fca5a5',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '12px',
+                                                                    background: 'white'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* 빠른 비교 버튼 */}
+                                                <div style={{
+                                                    paddingTop: '14px',
+                                                    borderTop: '1px solid #e5e7eb'
+                                                }}>
+                                                    <div style={{ fontSize: '11px', fontWeight: '700', marginBottom: '10px', color: '#6b7280' }}>
+                                                        빠른 비교
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        <button
+                                                            onClick={() => {
+                                                                const end1 = new Date();
+                                                                end1.setDate(end1.getDate() - 1);
+                                                                const start1 = new Date(end1);
+                                                                start1.setDate(start1.getDate() - 6);
+                                                                const end2 = new Date(start1);
+                                                                end2.setDate(end2.getDate() - 1);
+                                                                const start2 = new Date(end2);
+                                                                start2.setDate(start2.getDate() - 6);
+                                                                setStartDateA(formatDateHelper(start1));
+                                                                setEndDateA(formatDateHelper(end1));
+                                                                setStartDateB(formatDateHelper(start2));
+                                                                setEndDateB(formatDateHelper(end2));
+                                                            }}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                border: '1px solid #3b82f6',
+                                                                background: 'white',
+                                                                color: '#3b82f6',
+                                                                borderRadius: '6px',
+                                                                fontSize: '11px',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.background = '#3b82f6';
+                                                                e.currentTarget.style.color = 'white';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.background = 'white';
+                                                                e.currentTarget.style.color = '#3b82f6';
+                                                            }}
+                                                        >
+                                                            최근 7일 vs 이전 7일
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const end1 = new Date();
+                                                                end1.setDate(end1.getDate() - 1);
+                                                                const start1 = new Date(end1);
+                                                                start1.setDate(start1.getDate() - 29);
+                                                                const end2 = new Date(start1);
+                                                                end2.setDate(end2.getDate() - 1);
+                                                                const start2 = new Date(end2);
+                                                                start2.setDate(start2.getDate() - 29);
+                                                                setStartDateA(formatDateHelper(start1));
+                                                                setEndDateA(formatDateHelper(end1));
+                                                                setStartDateB(formatDateHelper(start2));
+                                                                setEndDateB(formatDateHelper(end2));
+                                                            }}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                border: '1px solid #10b981',
+                                                                background: 'white',
+                                                                color: '#10b981',
+                                                                borderRadius: '6px',
+                                                                fontSize: '11px',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.background = '#10b981';
+                                                                e.currentTarget.style.color = 'white';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.background = 'white';
+                                                                e.currentTarget.style.color = '#10b981';
+                                                            }}
+                                                        >
+                                                            최근 30일 vs 이전 30일
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const today = new Date();
+                                                                const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                                                                const yesterday = new Date(today);
+                                                                yesterday.setDate(yesterday.getDate() - 1);
+                                                                const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                                                                const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                                                                setStartDateA(formatDateHelper(firstDayThisMonth));
+                                                                setEndDateA(formatDateHelper(yesterday));
+                                                                setStartDateB(formatDateHelper(firstDayLastMonth));
+                                                                setEndDateB(formatDateHelper(lastDayLastMonth));
+                                                            }}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                border: '1px solid #f59e0b',
+                                                                background: 'white',
+                                                                color: '#f59e0b',
+                                                                borderRadius: '6px',
+                                                                fontSize: '11px',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.background = '#f59e0b';
+                                                                e.currentTarget.style.color = 'white';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.background = 'white';
+                                                                e.currentTarget.style.color = '#f59e0b';
+                                                            }}
+                                                        >
+                                                            이번 달 vs 지난 달
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 전체 비교 카드 (우측) */}
+                                            <div style={{
+                                                flex: '1',
+                                                background: 'white',
+                                                padding: '20px',
+                                                borderRadius: '12px',
+                                                border: '1px solid #e5e7eb',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                                            }}>
+                                            <h3 style={{
+                                                fontSize: '14px',
+                                                fontWeight: '700',
+                                                marginBottom: '18px',
+                                                color: '#001236'
+                                            }}>
+                                                전체 기간 비교
+                                            </h3>
+
+                                            {/* A 기간 데이터 */}
+                                            <div style={{
+                                                marginBottom: '14px',
+                                                padding: '14px',
+                                                background: '#eff6ff',
+                                                borderRadius: '8px',
+                                                border: '1px solid #3b82f6'
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '11px',
+                                                    color: '#3b82f6',
+                                                    marginBottom: '10px',
+                                                    fontWeight: '700',
+                                                    textAlign: 'center'
+                                                }}>
+                                                    A 기간 ({startDateA} ~ {endDateA})
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
+                                                            {totalDataA.students.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
+                                                            {totalDataA.registrations.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
+                                                            {totalDataA.withdrawals.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* B 기간 데이터 */}
+                                            <div style={{
+                                                marginBottom: '14px',
+                                                padding: '14px',
+                                                background: '#fef2f2',
+                                                borderRadius: '8px',
+                                                border: '1px solid #ef4444'
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '11px',
+                                                    color: '#ef4444',
+                                                    marginBottom: '10px',
+                                                    fontWeight: '700',
+                                                    textAlign: 'center'
+                                                }}>
+                                                    B 기간 ({startDateB} ~ {endDateB})
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #fca5a5'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
+                                                            {totalDataB.students.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #fca5a5'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
+                                                            {totalDataB.registrations.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #fca5a5'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
+                                                            {totalDataB.withdrawals.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* 차이 표시 */}
+                                            <div style={{
+                                                padding: '14px',
+                                                background: '#f9fafb',
+                                                borderRadius: '8px',
+                                                border: '1px solid #d1d5db'
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '11px',
+                                                    color: '#6b7280',
+                                                    marginBottom: '10px',
+                                                    fontWeight: '700',
+                                                    textAlign: 'center'
+                                                }}>
+                                                    변화량 (A - B)
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: `1px solid ${totalDiffStudents >= 0 ? '#10b981' : '#e5e7eb'}`
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
+                                                        <div style={{
+                                                            fontSize: '18px',
+                                                            fontWeight: '700',
+                                                            color: totalDiffStudents >= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            {totalDiffStudents >= 0 ? '+' : ''}{totalDiffStudents.toLocaleString()}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: '600',
+                                                            marginTop: '4px',
+                                                            color: totalDiffStudents >= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            ({totalDiffPercentStudents >= 0 ? '+' : ''}{totalDiffPercentStudents.toFixed(1)}%)
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: `1px solid ${totalDiffRegistrations >= 0 ? '#10b981' : '#e5e7eb'}`
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
+                                                        <div style={{
+                                                            fontSize: '18px',
+                                                            fontWeight: '700',
+                                                            color: totalDiffRegistrations >= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            {totalDiffRegistrations >= 0 ? '+' : ''}{totalDiffRegistrations.toLocaleString()}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: '600',
+                                                            marginTop: '4px',
+                                                            color: totalDiffRegistrations >= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            ({totalDiffPercentRegistrations >= 0 ? '+' : ''}{totalDiffPercentRegistrations.toFixed(1)}%)
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: `1px solid ${totalDiffWithdrawals <= 0 ? '#10b981' : '#e5e7eb'}`
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
+                                                        <div style={{
+                                                            fontSize: '18px',
+                                                            fontWeight: '700',
+                                                            color: totalDiffWithdrawals <= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            {totalDiffWithdrawals >= 0 ? '+' : ''}{totalDiffWithdrawals.toLocaleString()}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: '600',
+                                                            marginTop: '4px',
+                                                            color: totalDiffWithdrawals <= 0 ? '#10b981' : '#6b7280'
+                                                        }}>
+                                                            ({totalDiffPercentWithdrawals >= 0 ? '+' : ''}{totalDiffPercentWithdrawals.toFixed(1)}%)
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        </div>
+
                                         {/* 담당자별 비교 카드 */}
                                         <div style={{
                                             display: 'grid',
@@ -12719,7 +13210,7 @@
         }
 
         // 사이드바 컴포넌트
-        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess, onDataAccess }) {
+        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess, onDataAccess, onUsersAccess }) {
             const menuItems = [
                 {
                     category: '대시보드',
@@ -12761,6 +13252,8 @@
                     onToolkitAccess();
                 } else if (itemId === 'data') {
                     onDataAccess();
+                } else if (itemId === 'users') {
+                    onUsersAccess();
                 } else {
                     setCurrentPage(itemId);
                 }
@@ -12833,6 +13326,12 @@
             const [dataPassword, setDataPassword] = useState('');
             const [dataAccessGranted, setDataAccessGranted] = useState(false);
             const [isVerifyingData, setIsVerifyingData] = useState(false);
+
+            // 사용자 관리 접근 관련 상태
+            const [showUsersPasswordModal, setShowUsersPasswordModal] = useState(false);
+            const [usersPassword, setUsersPassword] = useState('');
+            const [usersAccessGranted, setUsersAccessGranted] = useState(false);
+            const [isVerifyingUsers, setIsVerifyingUsers] = useState(false);
 
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -12999,6 +13498,50 @@
                 }
             };
 
+            // 사용자 관리 페이지 접근 시도
+            const handleUsersAccess = () => {
+                if (usersAccessGranted) {
+                    setCurrentPage('users');
+                } else {
+                    setUsersPassword('');
+                    setShowUsersPasswordModal(true);
+                }
+            };
+
+            // 사용자 관리 비밀번호 확인
+            const handleUsersPasswordSubmit = async (e) => {
+                e.preventDefault();
+                setIsVerifyingUsers(true);
+
+                try {
+                    // Firestore에서 비밀번호 가져오기
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
+                        setIsVerifyingUsers(false);
+                        return;
+                    }
+
+                    const storedPassword = doc.data().password;
+
+                    if (usersPassword === storedPassword) {
+                        setUsersAccessGranted(true);
+                        setShowUsersPasswordModal(false);
+                        setCurrentPage('users');
+                        setUsersPassword('');
+                    } else {
+                        alert('비밀번호가 올바르지 않습니다.');
+                        setUsersPassword('');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인에 실패했습니다.');
+                } finally {
+                    setIsVerifyingUsers(false);
+                }
+            };
+
             const handleLogout = async () => {
                 if (confirm('로그아웃 하시겠습니까?')) {
                     const result = await logout();
@@ -13051,6 +13594,7 @@
                         onRoundAccess={handleRoundAccess}
                         onToolkitAccess={handleToolkitAccess}
                         onDataAccess={handleDataAccess}
+                        onUsersAccess={handleUsersAccess}
                     />
                     <main className="main-content">
                         {renderPage()}
@@ -13199,6 +13743,56 @@
                                             disabled={isVerifyingData}
                                         >
                                             {isVerifyingData ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 사용자 관리 비밀번호 모달 */}
+                    {showUsersPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowUsersPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+                                <div className="modal-header">
+                                    <h3>🔐 사용자 관리 접근 인증</h3>
+                                    <button className="modal-close" onClick={() => setShowUsersPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleUsersPasswordSubmit}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '10px', color: '#666'}}>
+                                            사용자 관리에 접근하려면 고유 비밀번호를 입력하세요.
+                                        </p>
+                                        <p style={{marginBottom: '15px', fontSize: '13px', color: '#888'}}>
+                                            담당자 : 박영주 / 010-4037-0928
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input
+                                                type="password"
+                                                value={usersPassword}
+                                                onChange={(e) => setUsersPassword(e.target.value)}
+                                                placeholder="고유 비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowUsersPasswordModal(false)}
+                                            disabled={isVerifyingUsers}
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-sm"
+                                            disabled={isVerifyingUsers}
+                                        >
+                                            {isVerifyingUsers ? '확인 중...' : '확인'}
                                         </button>
                                     </div>
                                 </form>
