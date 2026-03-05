@@ -6662,7 +6662,7 @@
 
             // 차트 생성/업데이트
             useEffect(() => {
-                if (loading || Object.keys(dashboardData.students).length === 0) return;
+                if (loading || Object.keys(dashboardData.students).length === 0 || activeTab !== 'overview') return;
 
                 // 선택한 날짜 기준으로 최근 30일 계산
                 const endDate = new Date(selectedDate);
@@ -6881,7 +6881,7 @@
                         }
                     });
                 }
-            }, [dashboardData, selectedDate, loading]);
+            }, [dashboardData, selectedDate, loading, activeTab]);
 
             // 비교 차트 생성/업데이트
             useEffect(() => {
@@ -6926,17 +6926,25 @@
                     chartInstances.current.compare = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: ['재원생수', '등록수', '퇴원수'],
+                            labels: [`A (${dateA})`, `B (${dateB})`],
                             datasets: [
                                 {
-                                    label: `A (${dateA})`,
-                                    data: [totalsA.students, totalsA.registrations, totalsA.withdrawals],
-                                    backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                                    label: '재원생수',
+                                    data: [totalsA.students, totalsB.students],
+                                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                                    yAxisID: 'y'
                                 },
                                 {
-                                    label: `B (${dateB})`,
-                                    data: [totalsB.students, totalsB.registrations, totalsB.withdrawals],
-                                    backgroundColor: 'rgba(239, 68, 68, 0.8)'
+                                    label: '등록수',
+                                    data: [totalsA.registrations, totalsB.registrations],
+                                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                                    yAxisID: 'y1'
+                                },
+                                {
+                                    label: '퇴원수',
+                                    data: [totalsA.withdrawals, totalsB.withdrawals],
+                                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                                    yAxisID: 'y1'
                                 }
                             ]
                         },
@@ -6951,7 +6959,41 @@
                             },
                             scales: {
                                 y: {
-                                    beginAtZero: true
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '재원생수',
+                                        color: 'rgb(59, 130, 246)',
+                                        font: {
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgb(59, 130, 246)'
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '등록수 / 퇴원수',
+                                        color: 'rgb(34, 197, 94)',
+                                        font: {
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgb(34, 197, 94)'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false
+                                    }
                                 }
                             }
                         }
