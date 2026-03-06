@@ -6577,19 +6577,13 @@
             const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'compare'
             const [selectedDate, setSelectedDate] = useState(getYesterdayStr()); // 전일 날짜
             const [dateA, setDateA] = useState(getYesterdayStr()); // 비교 날짜 A
-            const [dateB, setDateB] = useState(() => {
-                // 7일 전 날짜
-                const date = new Date();
-                date.setDate(date.getDate() - 8);
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            }); // 비교 날짜 B
+            const [dateB, setDateB] = useState(getYesterdayStr()); // 비교 날짜 B
             const chartRefs = {
                 trend: React.useRef(null),
                 branch: React.useRef(null),
-                compare: React.useRef(null)
+                compare: React.useRef(null),
+                periodTrend: React.useRef(null),
+                netChange: React.useRef(null)
             };
             const chartInstances = React.useRef({});
 
@@ -6999,6 +6993,282 @@
                         }
                     });
                 }
+
+                // 기간 추세선 그래프 (B 날짜부터 A 날짜까지)
+                if (chartRefs.periodTrend.current && activeTab === 'compare') {
+                    if (chartInstances.current.periodTrend) {
+                        chartInstances.current.periodTrend.destroy();
+                    }
+
+                    // A 날짜부터 B 날짜까지의 모든 날짜 생성
+                    const startDate = new Date(dateA);
+                    const endDate = new Date(dateB);
+                    const dateList = [];
+                    const currentDate = new Date(startDate);
+
+                    while (currentDate <= endDate) {
+                        const year = currentDate.getFullYear();
+                        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(currentDate.getDate()).padStart(2, '0');
+                        dateList.push(`${year}-${month}-${day}`);
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+
+                    // 각 날짜별 데이터 수집
+                    const studentsData = [];
+                    const registrationsData = [];
+                    const withdrawalsData = [];
+
+                    dateList.forEach(date => {
+                        const dateTotals = calculateDateTotals(date);
+                        studentsData.push(dateTotals.students);
+                        registrationsData.push(dateTotals.registrations);
+                        withdrawalsData.push(dateTotals.withdrawals);
+                    });
+
+                    const ctx = chartRefs.periodTrend.current.getContext('2d');
+                    chartInstances.current.periodTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dateList,
+                            datasets: [
+                                {
+                                    label: '재원생수',
+                                    data: studentsData,
+                                    borderColor: 'rgba(59, 130, 246, 1)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: '등록수',
+                                    data: registrationsData,
+                                    borderColor: 'rgba(34, 197, 94, 1)',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    yAxisID: 'y1'
+                                },
+                                {
+                                    label: '퇴원수',
+                                    data: withdrawalsData,
+                                    borderColor: 'rgba(239, 68, 68, 1)',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                },
+                                tooltip: {
+                                    mode: 'index',
+                                    intersect: false
+                                }
+                            },
+                            interaction: {
+                                mode: 'nearest',
+                                axis: 'x',
+                                intersect: false
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    title: {
+                                        display: true,
+                                        text: '날짜'
+                                    },
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                        autoSkip: true,
+                                        maxTicksLimit: 15
+                                    }
+                                },
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '재원생수',
+                                        color: 'rgb(59, 130, 246)',
+                                        font: {
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgb(59, 130, 246)'
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '등록수 / 퇴원수',
+                                        color: 'rgb(34, 197, 94)',
+                                        font: {
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgb(34, 197, 94)'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // 순증감 추세 그래프 (B 날짜 기준 0으로 시작)
+                if (chartRefs.netChange.current && activeTab === 'compare') {
+                    if (chartInstances.current.netChange) {
+                        chartInstances.current.netChange.destroy();
+                    }
+
+                    // A 날짜부터 B 날짜까지의 모든 날짜 생성
+                    const startDate = new Date(dateA);
+                    const endDate = new Date(dateB);
+                    const dateList = [];
+                    const currentDate = new Date(startDate);
+
+                    while (currentDate <= endDate) {
+                        const year = currentDate.getFullYear();
+                        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(currentDate.getDate()).padStart(2, '0');
+                        dateList.push(`${year}-${month}-${day}`);
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+
+                    // 각 날짜별 순증감 계산 (A 날짜 재원생수 기준)
+                    const netChangeData = [];
+                    const baseTotals = calculateDateTotals(dateA);
+                    const baseStudents = baseTotals.students;
+
+                    dateList.forEach(date => {
+                        const dateTotals = calculateDateTotals(date);
+                        const netChange = dateTotals.students - baseStudents;
+                        netChangeData.push(netChange);
+                    });
+
+                    const ctx = chartRefs.netChange.current.getContext('2d');
+                    chartInstances.current.netChange = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dateList,
+                            datasets: [
+                                {
+                                    label: '누적 순증감',
+                                    data: netChangeData,
+                                    borderColor: 'rgba(16, 185, 129, 1)',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    borderWidth: 3,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 3,
+                                    pointHoverRadius: 6,
+                                    pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 2
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                },
+                                tooltip: {
+                                    mode: 'index',
+                                    intersect: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            const value = context.parsed.y;
+                                            label += (value > 0 ? '+' : '') + value.toLocaleString() + '명';
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            interaction: {
+                                mode: 'nearest',
+                                axis: 'x',
+                                intersect: false
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    title: {
+                                        display: true,
+                                        text: '날짜'
+                                    },
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                        autoSkip: true,
+                                        maxTicksLimit: 15
+                                    }
+                                },
+                                y: {
+                                    display: true,
+                                    title: {
+                                        display: true,
+                                        text: '누적 순증감 (명)',
+                                        color: 'rgb(16, 185, 129)',
+                                        font: {
+                                            weight: 'bold'
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgb(16, 185, 129)',
+                                        callback: function(value) {
+                                            return (value > 0 ? '+' : '') + value.toLocaleString();
+                                        }
+                                    },
+                                    grid: {
+                                        color: function(context) {
+                                            if (context.tick.value === 0) {
+                                                return 'rgba(0, 0, 0, 0.3)';
+                                            }
+                                            return 'rgba(0, 0, 0, 0.05)';
+                                        },
+                                        lineWidth: function(context) {
+                                            if (context.tick.value === 0) {
+                                                return 2;
+                                            }
+                                            return 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             }, [dashboardData, dateA, dateB, loading, activeTab]);
 
             // 선택한 날짜의 합계 계산
@@ -7376,9 +7646,9 @@
                                             <label style={{
                                                 fontSize: '14px',
                                                 fontWeight: '600',
-                                                color: '#3b82f6',
+                                                color: '#ef4444',
                                                 minWidth: '60px'
-                                            }}>A 날짜</label>
+                                            }}>A 날짜(기준)</label>
                                             <input
                                                 type="date"
                                                 value={dateA}
@@ -7386,7 +7656,7 @@
                                                 max={getYesterdayStr()}
                                                 style={{
                                                     padding: '10px 14px',
-                                                    border: '2px solid #3b82f6',
+                                                    border: '2px solid #ef4444',
                                                     borderRadius: '6px',
                                                     fontSize: '14px',
                                                     fontWeight: '500',
@@ -7403,9 +7673,9 @@
                                             <label style={{
                                                 fontSize: '14px',
                                                 fontWeight: '600',
-                                                color: '#ef4444',
+                                                color: '#3b82f6',
                                                 minWidth: '60px'
-                                            }}>B 날짜</label>
+                                            }}>B 날짜(비교)</label>
                                             <input
                                                 type="date"
                                                 value={dateB}
@@ -7413,7 +7683,7 @@
                                                 max={getYesterdayStr()}
                                                 style={{
                                                     padding: '10px 14px',
-                                                    border: '2px solid #ef4444',
+                                                    border: '2px solid #3b82f6',
                                                     borderRadius: '6px',
                                                     fontSize: '14px',
                                                     fontWeight: '500',
@@ -7448,8 +7718,8 @@
                                                 const day = String(yesterdayDate.getDate()).padStart(2, '0');
                                                 const lastYear = `${year}-${month}-${day}`;
 
-                                                setDateA(yesterday);
-                                                setDateB(lastYear);
+                                                setDateB(yesterday);
+                                                setDateA(lastYear);
                                             }}
                                             style={{
                                                 padding: '8px 16px',
@@ -7483,8 +7753,8 @@
                                                 const day = String(date7DaysAgo.getDate()).padStart(2, '0');
                                                 const weekAgo = `${year}-${month}-${day}`;
 
-                                                setDateA(yesterday);
-                                                setDateB(weekAgo);
+                                                setDateB(yesterday);
+                                                setDateA(weekAgo);
                                             }}
                                             style={{
                                                 padding: '8px 16px',
@@ -7518,8 +7788,8 @@
                                                 const day = String(date30DaysAgo.getDate()).padStart(2, '0');
                                                 const monthAgo = `${year}-${month}-${day}`;
 
-                                                setDateA(yesterday);
-                                                setDateB(monthAgo);
+                                                setDateB(yesterday);
+                                                setDateA(monthAgo);
                                             }}
                                             style={{
                                                 padding: '8px 16px',
@@ -7553,7 +7823,7 @@
                                         borderRadius: '4px',
                                         borderLeft: '3px solid #3b82f6'
                                     }}>
-                                        💡 A 날짜와 B 날짜의 재원생수, 등록수, 퇴원수를 비교합니다
+                                        💡 B 날짜와 A 날짜의 재원생수, 등록수, 퇴원수를 비교합니다
                                     </div>
                                 </div>
                             </div>
@@ -7562,14 +7832,14 @@
                                 const totalsA = calculateDateTotals(dateA);
                                 const totalsB = calculateDateTotals(dateB);
                                 const diffValue = {
-                                    students: totalsA.students - totalsB.students,
-                                    registrations: totalsA.registrations - totalsB.registrations,
-                                    withdrawals: totalsA.withdrawals - totalsB.withdrawals
+                                    students: totalsB.students - totalsA.students,
+                                    registrations: totalsB.registrations - totalsA.registrations,
+                                    withdrawals: totalsB.withdrawals - totalsA.withdrawals
                                 };
                                 const diffPercent = {
-                                    students: totalsB.students > 0 ? ((totalsA.students - totalsB.students) / totalsB.students * 100) : 0,
-                                    registrations: totalsB.registrations > 0 ? ((totalsA.registrations - totalsB.registrations) / totalsB.registrations * 100) : 0,
-                                    withdrawals: totalsB.withdrawals > 0 ? ((totalsA.withdrawals - totalsB.withdrawals) / totalsB.withdrawals * 100) : 0
+                                    students: totalsA.students > 0 ? ((totalsB.students - totalsA.students) / totalsA.students * 100) : 0,
+                                    registrations: totalsA.registrations > 0 ? ((totalsB.registrations - totalsA.registrations) / totalsA.registrations * 100) : 0,
+                                    withdrawals: totalsA.withdrawals > 0 ? ((totalsB.withdrawals - totalsA.withdrawals) / totalsA.withdrawals * 100) : 0
                                 };
 
                                 return (
@@ -7748,6 +8018,55 @@
                                             </div>
                                         </div>
 
+                                        {/* 기간 추세선 그래프와 순증감 추세 그래프 */}
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '1fr 1fr',
+                                            gap: '20px',
+                                            marginBottom: '20px'
+                                        }}>
+                                            {/* 기간 추세선 그래프 */}
+                                            <div style={{
+                                                background: 'white',
+                                                padding: '20px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #e5e7eb'
+                                            }}>
+                                                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
+                                                    기간 추세 분석 ({dateA} ~ {dateB})
+                                                </h3>
+                                                <div style={{ height: '400px' }}>
+                                                    <canvas ref={chartRefs.periodTrend}></canvas>
+                                                </div>
+                                            </div>
+
+                                            {/* 순증감 추세 그래프 */}
+                                            <div style={{
+                                                background: 'white',
+                                                padding: '20px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #e5e7eb'
+                                            }}>
+                                                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>
+                                                    누적 순증감 추세 (A 날짜 기준)
+                                                </h3>
+                                                <div style={{ height: '350px' }}>
+                                                    <canvas ref={chartRefs.netChange}></canvas>
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '13px',
+                                                    color: '#666',
+                                                    marginTop: '12px',
+                                                    padding: '10px 15px',
+                                                    background: '#f9fafb',
+                                                    borderRadius: '4px',
+                                                    borderLeft: '3px solid #10b981'
+                                                }}>
+                                                    💡 A 날짜의 재원생수를 기준(0)으로 하여 각 날짜의 재원생수 변화량을 표시합니다
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* 지점별 비교 테이블 */}
                                         {(() => {
                                             // 담당자별 지점 매핑
@@ -7822,9 +8141,9 @@
                                                     dataA,
                                                     dataB,
                                                     diff: {
-                                                        students: dataA.students - dataB.students,
-                                                        registrations: dataA.registrations - dataB.registrations,
-                                                        withdrawals: dataA.withdrawals - dataB.withdrawals
+                                                        students: dataB.students - dataA.students,
+                                                        registrations: dataB.registrations - dataA.registrations,
+                                                        withdrawals: dataB.withdrawals - dataA.withdrawals
                                                     }
                                                 };
                                             });
@@ -7885,14 +8204,14 @@
                                                                         textAlign: 'center',
                                                                         border: '1px solid #e5e7eb',
                                                                         fontWeight: '600',
-                                                                        background: '#dbeafe'
+                                                                        background: '#fee2e2'
                                                                     }}>A ({dateA})</th>
                                                                     <th colSpan="3" style={{
                                                                         padding: '12px',
                                                                         textAlign: 'center',
                                                                         border: '1px solid #e5e7eb',
                                                                         fontWeight: '600',
-                                                                        background: '#fee2e2'
+                                                                        background: '#dbeafe'
                                                                     }}>B ({dateB})</th>
                                                                     <th colSpan="3" style={{
                                                                         padding: '12px',
@@ -7900,7 +8219,7 @@
                                                                         border: '1px solid #e5e7eb',
                                                                         fontWeight: '600',
                                                                         background: '#fef3c7'
-                                                                    }}>차이 (A - B)</th>
+                                                                    }}>차이 (B - A)</th>
                                                                 </tr>
                                                                 <tr style={{ background: '#f9fafb' }}>
                                                                     <th style={{ padding: '8px', textAlign: 'center', border: '1px solid #e5e7eb', fontSize: '13px' }}>재원생수</th>
@@ -7929,19 +8248,19 @@
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#eff6ff'
+                                                                            background: '#fef2f2'
                                                                         }}>{branch.dataA.students.toLocaleString()}</td>
                                                                         <td style={{
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#eff6ff'
+                                                                            background: '#fef2f2'
                                                                         }}>{branch.dataA.registrations.toLocaleString()}</td>
                                                                         <td style={{
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#eff6ff'
+                                                                            background: '#fef2f2'
                                                                         }}>{branch.dataA.withdrawals.toLocaleString()}</td>
 
                                                                         {/* B 날짜 */}
@@ -7949,19 +8268,19 @@
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#fef2f2'
+                                                                            background: '#eff6ff'
                                                                         }}>{branch.dataB.students.toLocaleString()}</td>
                                                                         <td style={{
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#fef2f2'
+                                                                            background: '#eff6ff'
                                                                         }}>{branch.dataB.registrations.toLocaleString()}</td>
                                                                         <td style={{
                                                                             padding: '10px',
                                                                             textAlign: 'center',
                                                                             border: '1px solid #e5e7eb',
-                                                                            background: '#fef2f2'
+                                                                            background: '#eff6ff'
                                                                         }}>{branch.dataB.withdrawals.toLocaleString()}</td>
 
                                                                         {/* 차이 */}
@@ -8050,24 +8369,13 @@
             // A 기간
             const [startDateA, setStartDateA] = useState(() => {
                 const date = new Date();
-                date.setDate(date.getDate() - 7);
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            });
-            const [endDateA, setEndDateA] = useState(getYesterdayStr());
-
-            // B 기간
-            const [startDateB, setStartDateB] = useState(() => {
-                const date = new Date();
                 date.setDate(date.getDate() - 14);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
             });
-            const [endDateB, setEndDateB] = useState(() => {
+            const [endDateA, setEndDateA] = useState(() => {
                 const date = new Date();
                 date.setDate(date.getDate() - 8);
                 const year = date.getFullYear();
@@ -8075,6 +8383,17 @@
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
             });
+
+            // B 기간
+            const [startDateB, setStartDateB] = useState(() => {
+                const date = new Date();
+                date.setDate(date.getDate() - 7);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            });
+            const [endDateB, setEndDateB] = useState(getYesterdayStr());
 
             const chartRef = React.useRef(null);
             const chartInstance = React.useRef(null);
@@ -9061,22 +9380,22 @@
                                             minWidth: '300px',
                                             maxWidth: '450px',
                                             padding: '20px',
-                                            background: '#eff6ff',
+                                            background: '#fef2f2',
                                             borderRadius: '10px',
-                                            border: '2px solid #3b82f6',
-                                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.1)'
+                                            border: '2px solid #ef4444',
+                                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.1)'
                                         }}>
                                             <div style={{
                                                 fontSize: '13px',
                                                 fontWeight: '700',
-                                                color: '#3b82f6',
+                                                color: '#ef4444',
                                                 marginBottom: '12px',
                                                 textAlign: 'center',
                                                 letterSpacing: '0.5px'
-                                            }}>A 기간</div>
+                                            }}>A 기간 (비교)</div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <label style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '50px' }}>시작일</label>
+                                                    <label style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', minWidth: '50px' }}>시작일</label>
                                                     <input
                                                         type="date"
                                                         value={startDateA}
@@ -9085,7 +9404,7 @@
                                                         style={{
                                                             flex: 1,
                                                             padding: '10px 12px',
-                                                            border: '1px solid #93c5fd',
+                                                            border: '1px solid #fca5a5',
                                                             borderRadius: '6px',
                                                             fontSize: '13px',
                                                             fontWeight: '500',
@@ -9094,7 +9413,7 @@
                                                     />
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <label style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '50px' }}>종료일</label>
+                                                    <label style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', minWidth: '50px' }}>종료일</label>
                                                     <input
                                                         type="date"
                                                         value={endDateA}
@@ -9103,7 +9422,7 @@
                                                         style={{
                                                             flex: 1,
                                                             padding: '10px 12px',
-                                                            border: '1px solid #93c5fd',
+                                                            border: '1px solid #fca5a5',
                                                             borderRadius: '6px',
                                                             fontSize: '13px',
                                                             fontWeight: '500',
@@ -9126,22 +9445,22 @@
                                             minWidth: '300px',
                                             maxWidth: '450px',
                                             padding: '20px',
-                                            background: '#fef2f2',
+                                            background: '#eff6ff',
                                             borderRadius: '10px',
-                                            border: '2px solid #ef4444',
-                                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.1)'
+                                            border: '2px solid #3b82f6',
+                                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.1)'
                                         }}>
                                             <div style={{
                                                 fontSize: '13px',
                                                 fontWeight: '700',
-                                                color: '#ef4444',
+                                                color: '#3b82f6',
                                                 marginBottom: '12px',
                                                 textAlign: 'center',
                                                 letterSpacing: '0.5px'
-                                            }}>B 기간</div>
+                                            }}>B 기간 (기준)</div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <label style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', minWidth: '50px' }}>시작일</label>
+                                                    <label style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '50px' }}>시작일</label>
                                                     <input
                                                         type="date"
                                                         value={startDateB}
@@ -9150,7 +9469,7 @@
                                                         style={{
                                                             flex: 1,
                                                             padding: '10px 12px',
-                                                            border: '1px solid #fca5a5',
+                                                            border: '1px solid #93c5fd',
                                                             borderRadius: '6px',
                                                             fontSize: '13px',
                                                             fontWeight: '500',
@@ -9159,7 +9478,7 @@
                                                     />
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <label style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', minWidth: '50px' }}>종료일</label>
+                                                    <label style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '50px' }}>종료일</label>
                                                     <input
                                                         type="date"
                                                         value={endDateB}
@@ -9168,7 +9487,7 @@
                                                         style={{
                                                             flex: 1,
                                                             padding: '10px 12px',
-                                                            border: '1px solid #fca5a5',
+                                                            border: '1px solid #93c5fd',
                                                             borderRadius: '6px',
                                                             fontSize: '13px',
                                                             fontWeight: '500',
@@ -9199,20 +9518,22 @@
                                         <button
                                             onClick={() => {
                                                 // 최근 7일 vs 그 전 7일
-                                                const end1 = new Date();
-                                                end1.setDate(end1.getDate() - 1);
-                                                const start1 = new Date(end1);
-                                                start1.setDate(start1.getDate() - 6);
+                                                // B 기간(기준/최신): 어제부터 7일간
+                                                const endB = new Date();
+                                                endB.setDate(endB.getDate() - 1);
+                                                const startB = new Date(endB);
+                                                startB.setDate(startB.getDate() - 6);
 
-                                                const end2 = new Date(start1);
-                                                end2.setDate(end2.getDate() - 1);
-                                                const start2 = new Date(end2);
-                                                start2.setDate(start2.getDate() - 6);
+                                                // A 기간(비교/과거): 8일 전부터 7일간
+                                                const endA = new Date(startB);
+                                                endA.setDate(endA.getDate() - 1);
+                                                const startA = new Date(endA);
+                                                startA.setDate(startA.getDate() - 6);
 
-                                                setStartDateA(formatDateHelper(start1));
-                                                setEndDateA(formatDateHelper(end1));
-                                                setStartDateB(formatDateHelper(start2));
-                                                setEndDateB(formatDateHelper(end2));
+                                                setStartDateB(formatDateHelper(startB));
+                                                setEndDateB(formatDateHelper(endB));
+                                                setStartDateA(formatDateHelper(startA));
+                                                setEndDateA(formatDateHelper(endA));
                                             }}
                                             style={{
                                                 padding: '10px 18px',
@@ -9244,19 +9565,20 @@
                                         <button
                                             onClick={() => {
                                                 // 이번 달 vs 지난 달
-                                                const today = new Date();
-                                                const end1 = new Date();
-                                                end1.setDate(end1.getDate() - 1);
-                                                const start1 = new Date(end1.getFullYear(), end1.getMonth(), 1);
+                                                // B 기간(기준/최신): 이번 달 1일 ~ 어제
+                                                const endB = new Date();
+                                                endB.setDate(endB.getDate() - 1);
+                                                const startB = new Date(endB.getFullYear(), endB.getMonth(), 1);
 
-                                                const end2 = new Date(start1);
-                                                end2.setDate(end2.getDate() - 1);
-                                                const start2 = new Date(end2.getFullYear(), end2.getMonth(), 1);
+                                                // A 기간(비교/과거): 지난 달 전체
+                                                const endA = new Date(startB);
+                                                endA.setDate(endA.getDate() - 1);
+                                                const startA = new Date(endA.getFullYear(), endA.getMonth(), 1);
 
-                                                setStartDateA(formatDateHelper(start1));
-                                                setEndDateA(formatDateHelper(end1));
-                                                setStartDateB(formatDateHelper(start2));
-                                                setEndDateB(formatDateHelper(end2));
+                                                setStartDateB(formatDateHelper(startB));
+                                                setEndDateB(formatDateHelper(endB));
+                                                setStartDateA(formatDateHelper(startA));
+                                                setEndDateA(formatDateHelper(endA));
                                             }}
                                             style={{
                                                 padding: '10px 18px',
@@ -9288,20 +9610,21 @@
                                         <button
                                             onClick={() => {
                                                 // 올해 vs 작년 동기간
-                                                const today = new Date();
-                                                const end1 = new Date();
-                                                end1.setDate(end1.getDate() - 1);
-                                                const start1 = new Date(end1.getFullYear(), 0, 1);
+                                                // B 기간(기준/최신): 올해 1월 1일 ~ 어제
+                                                const endB = new Date();
+                                                endB.setDate(endB.getDate() - 1);
+                                                const startB = new Date(endB.getFullYear(), 0, 1);
 
-                                                const end2 = new Date(end1);
-                                                end2.setFullYear(end2.getFullYear() - 1);
-                                                const start2 = new Date(start1);
-                                                start2.setFullYear(start2.getFullYear() - 1);
+                                                // A 기간(비교/과거): 작년 1월 1일 ~ 작년 같은 날
+                                                const endA = new Date(endB);
+                                                endA.setFullYear(endA.getFullYear() - 1);
+                                                const startA = new Date(startB);
+                                                startA.setFullYear(startA.getFullYear() - 1);
 
-                                                setStartDateA(formatDateHelper(start1));
-                                                setEndDateA(formatDateHelper(end1));
-                                                setStartDateB(formatDateHelper(start2));
-                                                setEndDateB(formatDateHelper(end2));
+                                                setStartDateB(formatDateHelper(startB));
+                                                setEndDateB(formatDateHelper(endB));
+                                                setStartDateA(formatDateHelper(startA));
+                                                setEndDateA(formatDateHelper(endA));
                                             }}
                                             style={{
                                                 padding: '10px 18px',
@@ -9423,12 +9746,12 @@
                                     registrations: Object.values(managerDataB).reduce((sum, data) => sum + data.registrations, 0),
                                     withdrawals: Object.values(managerDataB).reduce((sum, data) => sum + data.withdrawals, 0)
                                 };
-                                const totalDiffStudents = totalDataA.students - totalDataB.students;
-                                const totalDiffRegistrations = totalDataA.registrations - totalDataB.registrations;
-                                const totalDiffWithdrawals = totalDataA.withdrawals - totalDataB.withdrawals;
-                                const totalDiffPercentStudents = totalDataB.students > 0 ? ((totalDiffStudents / totalDataB.students) * 100) : 0;
-                                const totalDiffPercentRegistrations = totalDataB.registrations > 0 ? ((totalDiffRegistrations / totalDataB.registrations) * 100) : 0;
-                                const totalDiffPercentWithdrawals = totalDataB.withdrawals > 0 ? ((totalDiffWithdrawals / totalDataB.withdrawals) * 100) : 0;
+                                const totalDiffStudents = totalDataB.students - totalDataA.students;
+                                const totalDiffRegistrations = totalDataB.registrations - totalDataA.registrations;
+                                const totalDiffWithdrawals = totalDataB.withdrawals - totalDataA.withdrawals;
+                                const totalDiffPercentStudents = totalDataA.students > 0 ? ((totalDiffStudents / totalDataA.students) * 100) : 0;
+                                const totalDiffPercentRegistrations = totalDataA.registrations > 0 ? ((totalDiffRegistrations / totalDataA.registrations) * 100) : 0;
+                                const totalDiffPercentWithdrawals = totalDataA.withdrawals > 0 ? ((totalDiffWithdrawals / totalDataA.withdrawals) * 100) : 0;
 
                                 return (
                                     <>
@@ -9704,63 +10027,6 @@
                                             <div style={{
                                                 marginBottom: '14px',
                                                 padding: '14px',
-                                                background: '#eff6ff',
-                                                borderRadius: '8px',
-                                                border: '1px solid #3b82f6'
-                                            }}>
-                                                <div style={{
-                                                    fontSize: '11px',
-                                                    color: '#3b82f6',
-                                                    marginBottom: '10px',
-                                                    fontWeight: '700',
-                                                    textAlign: 'center'
-                                                }}>
-                                                    A 기간 ({startDateA} ~ {endDateA})
-                                                </div>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                                                    <div style={{
-                                                        textAlign: 'center',
-                                                        padding: '10px',
-                                                        background: 'white',
-                                                        borderRadius: '6px',
-                                                        border: '1px solid #93c5fd'
-                                                    }}>
-                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
-                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
-                                                            {totalDataA.students.toLocaleString()}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{
-                                                        textAlign: 'center',
-                                                        padding: '10px',
-                                                        background: 'white',
-                                                        borderRadius: '6px',
-                                                        border: '1px solid #93c5fd'
-                                                    }}>
-                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
-                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
-                                                            {totalDataA.registrations.toLocaleString()}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{
-                                                        textAlign: 'center',
-                                                        padding: '10px',
-                                                        background: 'white',
-                                                        borderRadius: '6px',
-                                                        border: '1px solid #93c5fd'
-                                                    }}>
-                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
-                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
-                                                            {totalDataA.withdrawals.toLocaleString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* B 기간 데이터 */}
-                                            <div style={{
-                                                marginBottom: '14px',
-                                                padding: '14px',
                                                 background: '#fef2f2',
                                                 borderRadius: '8px',
                                                 border: '1px solid #ef4444'
@@ -9772,7 +10038,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    B 기간 ({startDateB} ~ {endDateB})
+                                                    A 기간 (비교) ({startDateA} ~ {endDateA})
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
@@ -9784,7 +10050,7 @@
                                                     }}>
                                                         <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
                                                         <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
-                                                            {totalDataB.students.toLocaleString()}
+                                                            {totalDataA.students.toLocaleString()}
                                                         </div>
                                                     </div>
                                                     <div style={{
@@ -9796,7 +10062,7 @@
                                                     }}>
                                                         <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
                                                         <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
-                                                            {totalDataB.registrations.toLocaleString()}
+                                                            {totalDataA.registrations.toLocaleString()}
                                                         </div>
                                                     </div>
                                                     <div style={{
@@ -9808,6 +10074,63 @@
                                                     }}>
                                                         <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
                                                         <div style={{ fontSize: '22px', fontWeight: '700', color: '#dc2626' }}>
+                                                            {totalDataA.withdrawals.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* B 기간 데이터 */}
+                                            <div style={{
+                                                marginBottom: '14px',
+                                                padding: '14px',
+                                                background: '#eff6ff',
+                                                borderRadius: '8px',
+                                                border: '1px solid #3b82f6'
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '11px',
+                                                    color: '#3b82f6',
+                                                    marginBottom: '10px',
+                                                    fontWeight: '700',
+                                                    textAlign: 'center'
+                                                }}>
+                                                    B 기간 (기준) ({startDateB} ~ {endDateB})
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>재원생수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
+                                                            {totalDataB.students.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>등록수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
+                                                            {totalDataB.registrations.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        textAlign: 'center',
+                                                        padding: '10px',
+                                                        background: 'white',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #93c5fd'
+                                                    }}>
+                                                        <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>퇴원수</div>
+                                                        <div style={{ fontSize: '22px', fontWeight: '700', color: '#2563eb' }}>
                                                             {totalDataB.withdrawals.toLocaleString()}
                                                         </div>
                                                     </div>
@@ -9828,7 +10151,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    변화량 (A - B)
+                                                    변화량 (B - A)
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
