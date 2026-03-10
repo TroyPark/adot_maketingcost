@@ -11530,7 +11530,9 @@
             const [teams, setTeams] = useState([]);
             const [selectedBranch, setSelectedBranch] = useState('all');
             const [selectedTeam, setSelectedTeam] = useState('all');
+            const [selectedManager, setSelectedManager] = useState('all'); // 담당자 필터
             const [branchManagerMap, setBranchManagerMap] = useState({}); // 지점-담당자 매핑
+            const [managers, setManagers] = useState([]); // 담당자 목록
             const [showDetailModal, setShowDetailModal] = useState(false);
             const [selectedInquiry, setSelectedInquiry] = useState(null);
             const [replyText, setReplyText] = useState('');
@@ -11600,6 +11602,10 @@
                             }
                         });
                         setBranchManagerMap(mapping);
+
+                        // 담당자 목록 추출
+                        const managerSet = new Set(Object.values(mapping));
+                        setManagers([...managerSet].sort());
                     }, (error) => {
                         console.error('지점-담당자 매핑 로드 오류:', error);
                     });
@@ -11611,6 +11617,7 @@
             const filteredInquiries = inquiries.filter(inquiry => {
                 if (selectedBranch !== 'all' && inquiry.branchName !== selectedBranch) return false;
                 if (selectedTeam !== 'all' && inquiry.team !== selectedTeam) return false;
+                if (selectedManager !== 'all' && branchManagerMap[inquiry.branchName] !== selectedManager) return false;
                 return true;
             });
             
@@ -11623,7 +11630,7 @@
             // 필터 변경 시 페이지 리셋
             useEffect(() => {
                 setCurrentPage(1);
-            }, [selectedBranch, selectedTeam]);
+            }, [selectedBranch, selectedTeam, selectedManager]);
 
             // 팀별 통계 계산 (지점 팀: 1팀, 2팀, 3팀, 4팀)
             const BRANCH_TEAMS = ['1팀', '2팀', '3팀', '4팀'];
@@ -11865,6 +11872,7 @@
             const handleResetFilters = () => {
                 setSelectedBranch('all');
                 setSelectedTeam('all');
+                setSelectedManager('all');
                 setSelectedInquiries([]);
             };
 
@@ -12013,8 +12021,32 @@
                                 </select>
                             </div>
 
+                            {/* 담당자 필터 */}
+                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>담당자:</label>
+                                <select
+                                    value={selectedManager}
+                                    onChange={(e) => {
+                                        setSelectedManager(e.target.value);
+                                        setSelectedInquiries([]);
+                                    }}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '2px solid #e0e0e0',
+                                        fontSize: '14px',
+                                        minWidth: '150px'
+                                    }}
+                                >
+                                    <option value="all">전체 담당자</option>
+                                    {managers.map(manager => (
+                                        <option key={manager} value={manager}>{manager}</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             {/* 필터 초기화 */}
-                            {(selectedBranch !== 'all' || selectedTeam !== 'all') && (
+                            {(selectedBranch !== 'all' || selectedTeam !== 'all' || selectedManager !== 'all') && (
                                 <button
                                     onClick={handleResetFilters}
                                     style={{
