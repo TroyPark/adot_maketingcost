@@ -8362,6 +8362,9 @@
             const [users, setUsers] = useState([]);
             const [startDate, setStartDate] = useState(get30DaysAgoStr());
             const [endDate, setEndDate] = useState(getYesterdayStr());
+            // 실제 조회에 사용할 날짜 (담당자별 현황 탭)
+            const [queryStartDate, setQueryStartDate] = useState(get30DaysAgoStr());
+            const [queryEndDate, setQueryEndDate] = useState(getYesterdayStr());
             const [selectedManager, setSelectedManager] = useState(null);
             const [selectedManagerCompare, setSelectedManagerCompare] = useState(null);
             const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'compare'
@@ -8422,7 +8425,28 @@
             });
             const [queryEndDateB, setQueryEndDateB] = useState(getYesterdayStr());
 
-            // 조회 버튼 클릭 핸들러
+            // 담당자별 현황 탭 조회 버튼 클릭 핸들러
+            const handleQueryOverview = () => {
+                // 날짜 유효성 검사
+                if (!startDate || !endDate) {
+                    alert('모든 날짜를 입력해주세요.');
+                    return;
+                }
+                const yesterday = getYesterdayStr();
+                if (startDate > yesterday || endDate > yesterday) {
+                    alert('어제 이전의 날짜만 선택할 수 있습니다.');
+                    return;
+                }
+                if (startDate > endDate) {
+                    alert('시작일이 종료일보다 늦습니다.');
+                    return;
+                }
+                // 조회용 state 업데이트
+                setQueryStartDate(startDate);
+                setQueryEndDate(endDate);
+            };
+
+            // 기간 비교 탭 조회 버튼 클릭 핸들러
             const handleQueryPeriodCompare = () => {
                 // 날짜 유효성 검사
                 if (!startDateA || !endDateA || !startDateB || !endDateB) {
@@ -8623,13 +8647,13 @@
 
                     branches.forEach(branchName => {
                         // 재원생수: 종료일 데이터
-                        if (dashboardData.students[branchName] && dashboardData.students[branchName][endDate]) {
-                            managerMap[manager].students += Number(dashboardData.students[branchName][endDate]) || 0;
+                        if (dashboardData.students[branchName] && dashboardData.students[branchName][queryEndDate]) {
+                            managerMap[manager].students += Number(dashboardData.students[branchName][queryEndDate]) || 0;
                         }
 
                         // 등록수/퇴원수: 선택한 기간의 합계
-                        const start = new Date(startDate);
-                        const end = new Date(endDate);
+                        const start = new Date(queryStartDate);
+                        const end = new Date(queryEndDate);
 
                         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                             const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -8722,7 +8746,7 @@
                         }
                     });
                 }
-            }, [dashboardData, users, startDate, endDate, loading, activeTab]);
+            }, [dashboardData, users, queryStartDate, queryEndDate, loading, activeTab]);
 
             // 담당자의 지점별 상세 데이터 계산
             const calculateBranchDetails = (branches) => {
@@ -8738,13 +8762,13 @@
                     };
 
                     // 재원생수: 종료일 데이터
-                    if (dashboardData.students[branchName] && dashboardData.students[branchName][endDate]) {
-                        detail.students = Number(dashboardData.students[branchName][endDate]) || 0;
+                    if (dashboardData.students[branchName] && dashboardData.students[branchName][queryEndDate]) {
+                        detail.students = Number(dashboardData.students[branchName][queryEndDate]) || 0;
                     }
 
                     // 등록수/퇴원수: 선택한 기간의 일별 데이터
-                    const start = new Date(startDate);
-                    const end = new Date(endDate);
+                    const start = new Date(queryStartDate);
+                    const end = new Date(queryEndDate);
 
                     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -8844,7 +8868,8 @@
                             display: 'flex',
                             alignItems: 'center',
                             gap: '15px',
-                            marginBottom: '15px'
+                            marginBottom: '15px',
+                            flexWrap: 'wrap'
                         }}>
                             <label style={{ fontSize: '14px', fontWeight: '600', minWidth: '70px' }}>조회 기간:</label>
                             <input
@@ -8872,10 +8897,34 @@
                                     fontSize: '14px'
                                 }}
                             />
+                            <button
+                                onClick={handleQueryOverview}
+                                style={{
+                                    padding: '9px 20px',
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                                    transition: 'all 0.3s'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                                }}
+                            >
+                                📊 조회하기
+                            </button>
                             <div style={{
                                 display: 'flex',
                                 gap: '8px',
-                                marginLeft: '15px',
                                 flexWrap: 'wrap'
                             }}>
                                 <button
@@ -9025,7 +9074,7 @@
                             </div>
                         </div>
                         <div style={{ fontSize: '13px', color: '#666', paddingLeft: '85px' }}>
-                            * 재원생수는 종료일({endDate}) 데이터, 등록수/퇴원수는 선택 기간의 합계
+                            * 재원생수는 종료일({queryEndDate}) 데이터, 등록수/퇴원수는 선택 기간의 합계
                         </div>
                     </div>
 
