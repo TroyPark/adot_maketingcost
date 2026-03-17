@@ -10776,7 +10776,7 @@
                                                             B 기간 ({startDateB} ~ {endDateB})
                                                         </th>
                                                         <th colSpan="3" style={{ padding: '12px', textAlign: 'center', fontWeight: '600', background: '#4b5563' }}>
-                                                            차이 (A - B)
+                                                            차이 (B - A)
                                                         </th>
                                                     </tr>
                                                     <tr style={{ background: '#f3f4f6', fontWeight: '600' }}>
@@ -10794,9 +10794,9 @@
                                                 </thead>
                                                 <tbody>
                                                     {branchDetails.map(({ branchName, detailA, detailB }) => {
-                                                        const diffStudents = detailA.students - detailB.students;
-                                                        const diffRegistrations = detailA.registrations - detailB.registrations;
-                                                        const diffWithdrawals = detailA.withdrawals - detailB.withdrawals;
+                                                        const diffStudents = detailB.students - detailA.students;
+                                                        const diffRegistrations = detailB.registrations - detailA.registrations;
+                                                        const diffWithdrawals = detailB.withdrawals - detailA.withdrawals;
 
                                                         return (
                                                             <tr key={branchName} style={{ borderBottom: '1px solid #e5e7eb' }}>
@@ -10880,26 +10880,26 @@
                                                         <td style={{
                                                             padding: '12px',
                                                             textAlign: 'center',
-                                                            color: (selectedManagerCompare.dataA.students - selectedManagerCompare.dataB.students) >= 0 ? '#16a34a' : '#dc2626'
+                                                            color: (selectedManagerCompare.dataB.students - selectedManagerCompare.dataA.students) >= 0 ? '#16a34a' : '#dc2626'
                                                         }}>
-                                                            {(selectedManagerCompare.dataA.students - selectedManagerCompare.dataB.students) > 0 ? '+' : ''}
-                                                            {(selectedManagerCompare.dataA.students - selectedManagerCompare.dataB.students).toLocaleString()}
+                                                            {(selectedManagerCompare.dataB.students - selectedManagerCompare.dataA.students) > 0 ? '+' : ''}
+                                                            {(selectedManagerCompare.dataB.students - selectedManagerCompare.dataA.students).toLocaleString()}
                                                         </td>
                                                         <td style={{
                                                             padding: '12px',
                                                             textAlign: 'center',
-                                                            color: (selectedManagerCompare.dataA.registrations - selectedManagerCompare.dataB.registrations) >= 0 ? '#16a34a' : '#dc2626'
+                                                            color: (selectedManagerCompare.dataB.registrations - selectedManagerCompare.dataA.registrations) >= 0 ? '#16a34a' : '#dc2626'
                                                         }}>
-                                                            {(selectedManagerCompare.dataA.registrations - selectedManagerCompare.dataB.registrations) > 0 ? '+' : ''}
-                                                            {(selectedManagerCompare.dataA.registrations - selectedManagerCompare.dataB.registrations).toLocaleString()}
+                                                            {(selectedManagerCompare.dataB.registrations - selectedManagerCompare.dataA.registrations) > 0 ? '+' : ''}
+                                                            {(selectedManagerCompare.dataB.registrations - selectedManagerCompare.dataA.registrations).toLocaleString()}
                                                         </td>
                                                         <td style={{
                                                             padding: '12px',
                                                             textAlign: 'center',
-                                                            color: (selectedManagerCompare.dataA.withdrawals - selectedManagerCompare.dataB.withdrawals) >= 0 ? '#dc2626' : '#16a34a'
+                                                            color: (selectedManagerCompare.dataB.withdrawals - selectedManagerCompare.dataA.withdrawals) >= 0 ? '#dc2626' : '#16a34a'
                                                         }}>
-                                                            {(selectedManagerCompare.dataA.withdrawals - selectedManagerCompare.dataB.withdrawals) > 0 ? '+' : ''}
-                                                            {(selectedManagerCompare.dataA.withdrawals - selectedManagerCompare.dataB.withdrawals).toLocaleString()}
+                                                            {(selectedManagerCompare.dataB.withdrawals - selectedManagerCompare.dataA.withdrawals) > 0 ? '+' : ''}
+                                                            {(selectedManagerCompare.dataB.withdrawals - selectedManagerCompare.dataA.withdrawals).toLocaleString()}
                                                         </td>
                                                     </tr>
                                                 </tbody>
