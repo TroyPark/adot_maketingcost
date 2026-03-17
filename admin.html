@@ -8752,18 +8752,31 @@
             const calculateBranchDetails = (branches) => {
                 const branchDetails = [];
 
+                // 조회 시작일 전날 계산
+                const beforeStartDate = new Date(queryStartDate);
+                beforeStartDate.setDate(beforeStartDate.getDate() - 1);
+                const beforeStartDateStr = `${beforeStartDate.getFullYear()}-${String(beforeStartDate.getMonth() + 1).padStart(2, '0')}-${String(beforeStartDate.getDate()).padStart(2, '0')}`;
+
                 branches.forEach(branchName => {
                     const detail = {
                         branchName: branchName,
                         students: 0,
+                        studentsBefore: 0,
                         registrations: 0,
                         withdrawals: 0,
+                        netChange: 0,
+                        netChangeRate: 0,
                         dailyData: []
                     };
 
                     // 재원생수: 종료일 데이터
                     if (dashboardData.students[branchName] && dashboardData.students[branchName][queryEndDate]) {
                         detail.students = Number(dashboardData.students[branchName][queryEndDate]) || 0;
+                    }
+
+                    // 이전 재원생수: 시작일 전날 데이터
+                    if (dashboardData.students[branchName] && dashboardData.students[branchName][beforeStartDateStr]) {
+                        detail.studentsBefore = Number(dashboardData.students[branchName][beforeStartDateStr]) || 0;
                     }
 
                     // 등록수/퇴원수: 선택한 기간의 일별 데이터
@@ -8788,7 +8801,25 @@
                         detail.withdrawals += dayWithdrawals;
                     }
 
+                    // 순증감 계산
+                    detail.netChange = detail.students - detail.studentsBefore;
+
+                    // 순증감율 계산 (이전 재원생수가 0이면 계산 불가)
+                    if (detail.studentsBefore > 0) {
+                        detail.netChangeRate = (detail.netChange / detail.studentsBefore) * 100;
+                    } else {
+                        detail.netChangeRate = 0;
+                    }
+
                     branchDetails.push(detail);
+                });
+
+                // 순증감 기준으로 내림차순 정렬
+                branchDetails.sort((a, b) => b.netChange - a.netChange);
+
+                // 순위 추가
+                branchDetails.forEach((detail, index) => {
+                    detail.rank = index + 1;
                 });
 
                 return branchDetails;
@@ -10946,29 +10977,57 @@
                                     <table style={{
                                         width: '100%',
                                         borderCollapse: 'collapse',
-                                        fontSize: '14px'
+                                        fontSize: '13px'
                                     }}>
                                         <thead>
                                             <tr style={{ background: '#001236', color: 'white' }}>
                                                 <th style={{
-                                                    padding: '12px',
+                                                    padding: '10px 8px',
                                                     textAlign: 'center',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
+                                                }}>순위</th>
+                                                <th style={{
+                                                    padding: '10px 8px',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
                                                 }}>지점명</th>
                                                 <th style={{
-                                                    padding: '12px',
+                                                    padding: '10px 8px',
                                                     textAlign: 'center',
-                                                    fontWeight: '600'
-                                                }}>재원생수</th>
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
+                                                }}>이전<br/>재원생수</th>
                                                 <th style={{
-                                                    padding: '12px',
+                                                    padding: '10px 8px',
                                                     textAlign: 'center',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
+                                                }}>현재<br/>재원생수</th>
+                                                <th style={{
+                                                    padding: '10px 8px',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
+                                                }}>순증감</th>
+                                                <th style={{
+                                                    padding: '10px 8px',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
+                                                }}>순증감율</th>
+                                                <th style={{
+                                                    padding: '10px 8px',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
                                                 }}>등록수</th>
                                                 <th style={{
-                                                    padding: '12px',
+                                                    padding: '10px 8px',
                                                     textAlign: 'center',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    fontSize: '12px'
                                                 }}>퇴원수</th>
                                             </tr>
                                         </thead>
@@ -10976,52 +11035,124 @@
                                             {calculateBranchDetails(selectedManager.data.branches).map(branch => (
                                                 <tr key={branch.branchName} style={{ borderBottom: '1px solid #e5e7eb' }}>
                                                     <td style={{
-                                                        padding: '12px',
+                                                        padding: '10px 8px',
                                                         textAlign: 'center',
-                                                        fontWeight: '500'
+                                                        fontWeight: '700',
+                                                        color: branch.rank <= 3 ? '#f59e0b' : '#6b7280',
+                                                        fontSize: '13px'
+                                                    }}>{branch.rank}</td>
+                                                    <td style={{
+                                                        padding: '10px 8px',
+                                                        textAlign: 'center',
+                                                        fontWeight: '500',
+                                                        fontSize: '13px'
                                                     }}>{branch.branchName}</td>
                                                     <td style={{
-                                                        padding: '12px',
+                                                        padding: '10px 8px',
+                                                        textAlign: 'center',
+                                                        color: '#6b7280',
+                                                        fontWeight: '500',
+                                                        fontSize: '13px'
+                                                    }}>{branch.studentsBefore.toLocaleString()}</td>
+                                                    <td style={{
+                                                        padding: '10px 8px',
                                                         textAlign: 'center',
                                                         color: '#3b82f6',
-                                                        fontWeight: '600'
+                                                        fontWeight: '600',
+                                                        fontSize: '13px'
                                                     }}>{branch.students.toLocaleString()}</td>
                                                     <td style={{
-                                                        padding: '12px',
+                                                        padding: '10px 8px',
+                                                        textAlign: 'center',
+                                                        color: branch.netChange > 0 ? '#22c55e' : branch.netChange < 0 ? '#ef4444' : '#6b7280',
+                                                        fontWeight: '700',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        {branch.netChange > 0 ? '+' : ''}{branch.netChange.toLocaleString()}
+                                                    </td>
+                                                    <td style={{
+                                                        padding: '10px 8px',
+                                                        textAlign: 'center',
+                                                        color: branch.netChangeRate > 0 ? '#22c55e' : branch.netChangeRate < 0 ? '#ef4444' : '#6b7280',
+                                                        fontWeight: '700',
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        {branch.netChangeRate > 0 ? '+' : ''}{branch.netChangeRate.toFixed(1)}%
+                                                    </td>
+                                                    <td style={{
+                                                        padding: '10px 8px',
                                                         textAlign: 'center',
                                                         color: '#22c55e',
-                                                        fontWeight: '600'
+                                                        fontWeight: '600',
+                                                        fontSize: '13px'
                                                     }}>{branch.registrations.toLocaleString()}</td>
                                                     <td style={{
-                                                        padding: '12px',
+                                                        padding: '10px 8px',
                                                         textAlign: 'center',
                                                         color: '#ef4444',
-                                                        fontWeight: '600'
+                                                        fontWeight: '600',
+                                                        fontSize: '13px'
                                                     }}>{branch.withdrawals.toLocaleString()}</td>
                                                 </tr>
                                             ))}
                                             {/* 합계 행 */}
-                                            <tr style={{ background: '#f9fafb', fontWeight: '700' }}>
-                                                <td style={{
-                                                    padding: '12px',
-                                                    textAlign: 'center'
-                                                }}>합계</td>
-                                                <td style={{
-                                                    padding: '12px',
-                                                    textAlign: 'center',
-                                                    color: '#3b82f6'
-                                                }}>{selectedManager.data.students.toLocaleString()}</td>
-                                                <td style={{
-                                                    padding: '12px',
-                                                    textAlign: 'center',
-                                                    color: '#22c55e'
-                                                }}>{selectedManager.data.registrations.toLocaleString()}</td>
-                                                <td style={{
-                                                    padding: '12px',
-                                                    textAlign: 'center',
-                                                    color: '#ef4444'
-                                                }}>{selectedManager.data.withdrawals.toLocaleString()}</td>
-                                            </tr>
+                                            {(() => {
+                                                const branchDetails = calculateBranchDetails(selectedManager.data.branches);
+                                                const totalStudentsBefore = branchDetails.reduce((sum, b) => sum + b.studentsBefore, 0);
+                                                const totalStudents = selectedManager.data.students;
+                                                const totalNetChange = totalStudents - totalStudentsBefore;
+                                                const totalNetChangeRate = totalStudentsBefore > 0 ? (totalNetChange / totalStudentsBefore) * 100 : 0;
+
+                                                return (
+                                                    <tr style={{ background: '#f9fafb', fontWeight: '700' }}>
+                                                        <td colSpan="2" style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            fontSize: '13px'
+                                                        }}>합계</td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: '#6b7280',
+                                                            fontSize: '13px'
+                                                        }}>{totalStudentsBefore.toLocaleString()}</td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: '#3b82f6',
+                                                            fontSize: '13px'
+                                                        }}>{totalStudents.toLocaleString()}</td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: totalNetChange > 0 ? '#22c55e' : totalNetChange < 0 ? '#ef4444' : '#6b7280',
+                                                            fontSize: '13px'
+                                                        }}>
+                                                            {totalNetChange > 0 ? '+' : ''}{totalNetChange.toLocaleString()}
+                                                        </td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: totalNetChangeRate > 0 ? '#22c55e' : totalNetChangeRate < 0 ? '#ef4444' : '#6b7280',
+                                                            fontSize: '13px'
+                                                        }}>
+                                                            {totalNetChangeRate > 0 ? '+' : ''}{totalNetChangeRate.toFixed(1)}%
+                                                        </td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: '#22c55e',
+                                                            fontSize: '13px'
+                                                        }}>{selectedManager.data.registrations.toLocaleString()}</td>
+                                                        <td style={{
+                                                            padding: '12px',
+                                                            textAlign: 'center',
+                                                            color: '#ef4444',
+                                                            fontSize: '13px'
+                                                        }}>{selectedManager.data.withdrawals.toLocaleString()}</td>
+                                                    </tr>
+                                                );
+                                            })()}
                                         </tbody>
                                     </table>
                                 </div>
