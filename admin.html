@@ -8395,6 +8395,60 @@
             });
             const [endDateB, setEndDateB] = useState(getYesterdayStr());
 
+            // 실제 조회에 사용할 날짜 (조회 버튼을 눌렀을 때 업데이트됨)
+            const [queryStartDateA, setQueryStartDateA] = useState(() => {
+                const date = new Date();
+                date.setDate(date.getDate() - 14);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            });
+            const [queryEndDateA, setQueryEndDateA] = useState(() => {
+                const date = new Date();
+                date.setDate(date.getDate() - 8);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            });
+            const [queryStartDateB, setQueryStartDateB] = useState(() => {
+                const date = new Date();
+                date.setDate(date.getDate() - 7);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            });
+            const [queryEndDateB, setQueryEndDateB] = useState(getYesterdayStr());
+
+            // 조회 버튼 클릭 핸들러
+            const handleQueryPeriodCompare = () => {
+                // 날짜 유효성 검사
+                if (!startDateA || !endDateA || !startDateB || !endDateB) {
+                    alert('모든 날짜를 입력해주세요.');
+                    return;
+                }
+                const yesterday = getYesterdayStr();
+                if (startDateA > yesterday || endDateA > yesterday || startDateB > yesterday || endDateB > yesterday) {
+                    alert('어제 이전의 날짜만 선택할 수 있습니다.');
+                    return;
+                }
+                if (startDateA > endDateA) {
+                    alert('A 기간의 시작일이 종료일보다 늦습니다.');
+                    return;
+                }
+                if (startDateB > endDateB) {
+                    alert('B 기간의 시작일이 종료일보다 늦습니다.');
+                    return;
+                }
+                // 조회용 state 업데이트
+                setQueryStartDateA(startDateA);
+                setQueryEndDateA(endDateA);
+                setQueryStartDateB(startDateB);
+                setQueryEndDateB(endDateB);
+            };
+
             const chartRef = React.useRef(null);
             const chartInstance = React.useRef(null);
 
@@ -9724,8 +9778,8 @@
                                     return managerMap;
                                 };
 
-                                const managerDataA = calculateManagerDataForPeriod(startDateA, endDateA);
-                                const managerDataB = calculateManagerDataForPeriod(startDateB, endDateB);
+                                const managerDataA = calculateManagerDataForPeriod(queryStartDateA, queryEndDateA);
+                                const managerDataB = calculateManagerDataForPeriod(queryStartDateB, queryEndDateB);
 
                                 // 담당자 목록 (합집합)
                                 const allManagers = new Set([...Object.keys(managerDataA), ...Object.keys(managerDataB)]);
@@ -9799,7 +9853,6 @@
                                                                 type="date"
                                                                 value={startDateA}
                                                                 onChange={(e) => setStartDateA(e.target.value)}
-                                                                max={getYesterdayStr()}
                                                                 style={{
                                                                     flex: 1,
                                                                     padding: '8px 10px',
@@ -9816,7 +9869,6 @@
                                                                 type="date"
                                                                 value={endDateA}
                                                                 onChange={(e) => setEndDateA(e.target.value)}
-                                                                max={getYesterdayStr()}
                                                                 style={{
                                                                     flex: 1,
                                                                     padding: '8px 10px',
@@ -9852,7 +9904,6 @@
                                                                 type="date"
                                                                 value={startDateB}
                                                                 onChange={(e) => setStartDateB(e.target.value)}
-                                                                max={getYesterdayStr()}
                                                                 style={{
                                                                     flex: 1,
                                                                     padding: '8px 10px',
@@ -9869,7 +9920,6 @@
                                                                 type="date"
                                                                 value={endDateB}
                                                                 onChange={(e) => setEndDateB(e.target.value)}
-                                                                max={getYesterdayStr()}
                                                                 style={{
                                                                     flex: 1,
                                                                     padding: '8px 10px',
@@ -9904,10 +9954,19 @@
                                                                 endA.setDate(endA.getDate() - 1);
                                                                 const startA = new Date(endA);
                                                                 startA.setDate(startA.getDate() - 6);
-                                                                setStartDateA(formatDateHelper(startA));
-                                                                setEndDateA(formatDateHelper(endA));
-                                                                setStartDateB(formatDateHelper(startB));
-                                                                setEndDateB(formatDateHelper(endB));
+                                                                const startAStr = formatDateHelper(startA);
+                                                                const endAStr = formatDateHelper(endA);
+                                                                const startBStr = formatDateHelper(startB);
+                                                                const endBStr = formatDateHelper(endB);
+                                                                setStartDateA(startAStr);
+                                                                setEndDateA(endAStr);
+                                                                setStartDateB(startBStr);
+                                                                setEndDateB(endBStr);
+                                                                // 즉시 조회
+                                                                setQueryStartDateA(startAStr);
+                                                                setQueryEndDateA(endAStr);
+                                                                setQueryStartDateB(startBStr);
+                                                                setQueryEndDateB(endBStr);
                                                             }}
                                                             style={{
                                                                 padding: '8px 12px',
@@ -9943,10 +10002,19 @@
                                                                 endA.setDate(endA.getDate() - 1);
                                                                 const startA = new Date(endA);
                                                                 startA.setDate(startA.getDate() - 29);
-                                                                setStartDateA(formatDateHelper(startA));
-                                                                setEndDateA(formatDateHelper(endA));
-                                                                setStartDateB(formatDateHelper(startB));
-                                                                setEndDateB(formatDateHelper(endB));
+                                                                const startAStr = formatDateHelper(startA);
+                                                                const endAStr = formatDateHelper(endA);
+                                                                const startBStr = formatDateHelper(startB);
+                                                                const endBStr = formatDateHelper(endB);
+                                                                setStartDateA(startAStr);
+                                                                setEndDateA(endAStr);
+                                                                setStartDateB(startBStr);
+                                                                setEndDateB(endBStr);
+                                                                // 즉시 조회
+                                                                setQueryStartDateA(startAStr);
+                                                                setQueryEndDateA(endAStr);
+                                                                setQueryStartDateB(startBStr);
+                                                                setQueryEndDateB(endBStr);
                                                             }}
                                                             style={{
                                                                 padding: '8px 12px',
@@ -9980,10 +10048,19 @@
                                                                 // A 기간(비교/과거): 지난 달 전체
                                                                 const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
                                                                 const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                                                                setStartDateA(formatDateHelper(firstDayLastMonth));
-                                                                setEndDateA(formatDateHelper(lastDayLastMonth));
-                                                                setStartDateB(formatDateHelper(firstDayThisMonth));
-                                                                setEndDateB(formatDateHelper(yesterday));
+                                                                const startAStr = formatDateHelper(firstDayLastMonth);
+                                                                const endAStr = formatDateHelper(lastDayLastMonth);
+                                                                const startBStr = formatDateHelper(firstDayThisMonth);
+                                                                const endBStr = formatDateHelper(yesterday);
+                                                                setStartDateA(startAStr);
+                                                                setEndDateA(endAStr);
+                                                                setStartDateB(startBStr);
+                                                                setEndDateB(endBStr);
+                                                                // 즉시 조회
+                                                                setQueryStartDateA(startAStr);
+                                                                setQueryEndDateA(endAStr);
+                                                                setQueryStartDateB(startBStr);
+                                                                setQueryEndDateB(endBStr);
                                                             }}
                                                             style={{
                                                                 padding: '8px 12px',
@@ -10006,6 +10083,40 @@
                                                             }}
                                                         >
                                                             이번 달 vs 지난 달
+                                                        </button>
+                                                    </div>
+
+                                                    {/* 조회 버튼 */}
+                                                    <div style={{
+                                                        marginTop: '14px',
+                                                        paddingTop: '14px',
+                                                        borderTop: '1px solid #e5e7eb'
+                                                    }}>
+                                                        <button
+                                                            onClick={handleQueryPeriodCompare}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '12px',
+                                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '8px',
+                                                                fontSize: '13px',
+                                                                fontWeight: '700',
+                                                                cursor: 'pointer',
+                                                                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseOver={(e) => {
+                                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+                                                            }}
+                                                            onMouseOut={(e) => {
+                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                                                            }}
+                                                        >
+                                                            📊 조회하기
                                                         </button>
                                                     </div>
                                                 </div>
@@ -10044,7 +10155,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    A 기간 (비교) ({startDateA} ~ {endDateA})
+                                                    A 기간 (비교) ({queryStartDateA} ~ {queryEndDateA})
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
@@ -10101,7 +10212,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    B 기간 (기준) ({startDateB} ~ {endDateB})
+                                                    B 기간 (기준) ({queryStartDateB} ~ {queryEndDateB})
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
