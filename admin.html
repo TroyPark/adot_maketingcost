@@ -8620,6 +8620,11 @@
             const calculateManagerData = () => {
                 const managerMap = {};
 
+                // 조회 시작일 전날 계산
+                const beforeStartDate = new Date(queryStartDate);
+                beforeStartDate.setDate(beforeStartDate.getDate() - 1);
+                const beforeStartDateStr = `${beforeStartDate.getFullYear()}-${String(beforeStartDate.getMonth() + 1).padStart(2, '0')}-${String(beforeStartDate.getDate()).padStart(2, '0')}`;
+
                 // 담당자별로 지점 그룹화
                 users.forEach(user => {
                     const manager = user.manager;
@@ -8630,8 +8635,11 @@
                             managerMap[manager] = {
                                 branches: [],
                                 students: 0,
+                                studentsBefore: 0,
                                 registrations: 0,
-                                withdrawals: 0
+                                withdrawals: 0,
+                                netChange: 0,
+                                netChangeRate: 0
                             };
                         }
 
@@ -8651,6 +8659,11 @@
                             managerMap[manager].students += Number(dashboardData.students[branchName][queryEndDate]) || 0;
                         }
 
+                        // 이전 재원생수: 시작일 전날 데이터
+                        if (dashboardData.students[branchName] && dashboardData.students[branchName][beforeStartDateStr]) {
+                            managerMap[manager].studentsBefore += Number(dashboardData.students[branchName][beforeStartDateStr]) || 0;
+                        }
+
                         // 등록수/퇴원수: 선택한 기간의 합계
                         const start = new Date(queryStartDate);
                         const end = new Date(queryEndDate);
@@ -8667,6 +8680,16 @@
                             }
                         }
                     });
+
+                    // 순증감 계산
+                    managerMap[manager].netChange = managerMap[manager].students - managerMap[manager].studentsBefore;
+
+                    // 순증감율 계산 (이전 재원생수가 0이면 계산 불가)
+                    if (managerMap[manager].studentsBefore > 0) {
+                        managerMap[manager].netChangeRate = (managerMap[manager].netChange / managerMap[manager].studentsBefore) * 100;
+                    } else {
+                        managerMap[manager].netChangeRate = 0;
+                    }
                 });
 
                 return managerMap;
@@ -8830,7 +8853,7 @@
             }
 
             const managerData = calculateManagerData();
-            const sortedManagers = Object.entries(managerData).sort((a, b) => b[1].students - a[1].students);
+            const sortedManagers = Object.entries(managerData).sort((a, b) => b[1].netChangeRate - a[1].netChangeRate);
 
             return (
                 <div>
@@ -9181,8 +9204,29 @@
                                             textAlign: 'center',
                                             fontWeight: '700',
                                             borderRight: '1px solid rgba(255,255,255,0.1)',
+                                            background: 'rgba(147, 197, 253, 0.15)'
+                                        }}>이전<br/>재원생수</th>
+                                        <th style={{
+                                            padding: '14px 16px',
+                                            textAlign: 'center',
+                                            fontWeight: '700',
+                                            borderRight: '1px solid rgba(255,255,255,0.1)',
                                             background: 'rgba(59, 130, 246, 0.15)'
-                                        }}>재원생수</th>
+                                        }}>현재<br/>재원생수</th>
+                                        <th style={{
+                                            padding: '14px 16px',
+                                            textAlign: 'center',
+                                            fontWeight: '700',
+                                            borderRight: '1px solid rgba(255,255,255,0.1)',
+                                            background: 'rgba(59, 130, 246, 0.15)'
+                                        }}>순증감</th>
+                                        <th style={{
+                                            padding: '14px 16px',
+                                            textAlign: 'center',
+                                            fontWeight: '700',
+                                            borderRight: '1px solid rgba(255,255,255,0.1)',
+                                            background: 'rgba(59, 130, 246, 0.15)'
+                                        }}>순증감율</th>
                                         <th style={{
                                             padding: '14px 16px',
                                             textAlign: 'center',
@@ -9223,7 +9267,7 @@
                                                 color: '#001236',
                                                 borderBottom: '1px solid #e5e7eb'
                                             }}>
-                                                👤 {manager}
+                                                {index + 1}위 👤 {manager}
                                             </td>
                                             <td style={{
                                                 padding: '14px 16px',
@@ -9237,6 +9281,17 @@
                                             <td style={{
                                                 padding: '14px 16px',
                                                 textAlign: 'center',
+                                                color: '#3b82f6',
+                                                fontWeight: '700',
+                                                fontSize: '15px',
+                                                background: index % 2 === 0 ? '#eff6ff' : '#dbeafe',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            }}>
+                                                {data.studentsBefore.toLocaleString()}
+                                            </td>
+                                            <td style={{
+                                                padding: '14px 16px',
+                                                textAlign: 'center',
                                                 color: '#2563eb',
                                                 fontWeight: '700',
                                                 fontSize: '15px',
@@ -9244,6 +9299,28 @@
                                                 borderBottom: '1px solid #e5e7eb'
                                             }}>
                                                 {data.students.toLocaleString()}
+                                            </td>
+                                            <td style={{
+                                                padding: '14px 16px',
+                                                textAlign: 'center',
+                                                color: data.netChange >= 0 ? '#1e40af' : '#6b7280',
+                                                fontWeight: '700',
+                                                fontSize: '15px',
+                                                background: index % 2 === 0 ? '#eff6ff' : '#dbeafe',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            }}>
+                                                {data.netChange >= 0 ? '+' : ''}{data.netChange.toLocaleString()}
+                                            </td>
+                                            <td style={{
+                                                padding: '14px 16px',
+                                                textAlign: 'center',
+                                                color: data.netChangeRate >= 0 ? '#1e40af' : '#6b7280',
+                                                fontWeight: '700',
+                                                fontSize: '15px',
+                                                background: index % 2 === 0 ? '#eff6ff' : '#dbeafe',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            }}>
+                                                {data.netChangeRate >= 0 ? '+' : ''}{data.netChangeRate.toFixed(2)}%
                                             </td>
                                             <td style={{
                                                 padding: '14px 16px',
@@ -9293,10 +9370,50 @@
                                         <td style={{
                                             padding: '16px',
                                             textAlign: 'center',
+                                            color: '#3b82f6',
+                                            borderTop: '2px solid #9ca3af'
+                                        }}>
+                                            {sortedManagers.reduce((sum, [, data]) => sum + data.studentsBefore, 0).toLocaleString()}
+                                        </td>
+                                        <td style={{
+                                            padding: '16px',
+                                            textAlign: 'center',
                                             color: '#1e40af',
                                             borderTop: '2px solid #9ca3af'
                                         }}>
                                             {sortedManagers.reduce((sum, [, data]) => sum + data.students, 0).toLocaleString()}
+                                        </td>
+                                        <td style={{
+                                            padding: '16px',
+                                            textAlign: 'center',
+                                            color: (() => {
+                                                const totalNetChange = sortedManagers.reduce((sum, [, data]) => sum + data.netChange, 0);
+                                                return totalNetChange >= 0 ? '#1e40af' : '#6b7280';
+                                            })(),
+                                            borderTop: '2px solid #9ca3af'
+                                        }}>
+                                            {(() => {
+                                                const totalNetChange = sortedManagers.reduce((sum, [, data]) => sum + data.netChange, 0);
+                                                return (totalNetChange >= 0 ? '+' : '') + totalNetChange.toLocaleString();
+                                            })()}
+                                        </td>
+                                        <td style={{
+                                            padding: '16px',
+                                            textAlign: 'center',
+                                            color: (() => {
+                                                const totalStudentsBefore = sortedManagers.reduce((sum, [, data]) => sum + data.studentsBefore, 0);
+                                                const totalNetChange = sortedManagers.reduce((sum, [, data]) => sum + data.netChange, 0);
+                                                const totalNetChangeRate = totalStudentsBefore > 0 ? (totalNetChange / totalStudentsBefore) * 100 : 0;
+                                                return totalNetChangeRate >= 0 ? '#1e40af' : '#6b7280';
+                                            })(),
+                                            borderTop: '2px solid #9ca3af'
+                                        }}>
+                                            {(() => {
+                                                const totalStudentsBefore = sortedManagers.reduce((sum, [, data]) => sum + data.studentsBefore, 0);
+                                                const totalNetChange = sortedManagers.reduce((sum, [, data]) => sum + data.netChange, 0);
+                                                const totalNetChangeRate = totalStudentsBefore > 0 ? (totalNetChange / totalStudentsBefore) * 100 : 0;
+                                                return (totalNetChangeRate >= 0 ? '+' : '') + totalNetChangeRate.toFixed(2) + '%';
+                                            })()}
                                         </td>
                                         <td style={{
                                             padding: '16px',
@@ -9526,7 +9643,7 @@
                                                 marginBottom: '12px',
                                                 textAlign: 'center',
                                                 letterSpacing: '0.5px'
-                                            }}>A 기간 (비교)</div>
+                                            }}>A 기간 (과거)</div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <label style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', minWidth: '50px' }}>시작일</label>
@@ -9591,7 +9708,7 @@
                                                 marginBottom: '12px',
                                                 textAlign: 'center',
                                                 letterSpacing: '0.5px'
-                                            }}>B 기간 (기준)</div>
+                                            }}>B 기간 (최근)</div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <label style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', minWidth: '50px' }}>시작일</label>
@@ -9925,7 +10042,7 @@
                                                         color: '#ef4444',
                                                         marginBottom: '10px',
                                                         textAlign: 'center'
-                                                    }}>A 기간 (비교)</div>
+                                                    }}>A 기간 (과거)</div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <label style={{ fontSize: '11px', color: '#ef4444', fontWeight: '600', minWidth: '45px' }}>시작일</label>
@@ -9976,7 +10093,7 @@
                                                         color: '#3b82f6',
                                                         marginBottom: '10px',
                                                         textAlign: 'center'
-                                                    }}>B 기간 (기준)</div>
+                                                    }}>B 기간 (최근)</div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <label style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600', minWidth: '45px' }}>시작일</label>
@@ -10235,7 +10352,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    A 기간 (비교) ({queryStartDateA} ~ {queryEndDateA})
+                                                    A 기간 (과거) ({queryStartDateA} ~ {queryEndDateA})
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
@@ -10292,7 +10409,7 @@
                                                     fontWeight: '700',
                                                     textAlign: 'center'
                                                 }}>
-                                                    B 기간 (기준) ({queryStartDateB} ~ {queryEndDateB})
+                                                    B 기간 (최근) ({queryStartDateB} ~ {queryEndDateB})
                                                 </div>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                                                     <div style={{
@@ -10555,7 +10672,7 @@
                                                                 letterSpacing: '0.5px',
                                                                 textTransform: 'uppercase'
                                                             }}>
-                                                                📊 B 기간 (기준) ({startDateB} ~ {endDateB})
+                                                                📊 B 기간 (최근) ({startDateB} ~ {endDateB})
                                                             </div>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                                                                 <div style={{
@@ -10731,7 +10848,7 @@
                                 <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                                     <div style={{ marginBottom: '20px', padding: '15px', background: '#f9fafb', borderRadius: '8px', display: 'flex', gap: '20px', justifyContent: 'center' }}>
                                         <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', marginBottom: '4px' }}>📊 A 기간</div>
+                                            <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', marginBottom: '4px' }}>📊 A 기간 (과거)</div>
                                             <div style={{ fontSize: '14px', color: '#666' }}>{startDateA} ~ {endDateA}</div>
                                         </div>
                                         <div style={{ fontSize: '20px', color: '#d1d5db', fontWeight: '700' }}>VS</div>
