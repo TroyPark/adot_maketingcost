@@ -12284,6 +12284,58 @@
                 setSelectedInquiries([]);
             };
 
+            // 엑셀 다운로드
+            const handleExcelDownload = () => {
+                try {
+                    // 엑셀 데이터 준비
+                    const excelData = filteredInquiries.map((inquiry, index) => ({
+                        '번호': index + 1,
+                        '지점명': inquiry.branchName || '-',
+                        '팀': inquiry.team || '-',
+                        '담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '제목': inquiry.title || '-',
+                        '내용': inquiry.content || '-',
+                        '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
+                        '답변': inquiry.reply || '-',
+                        '작성일': formatDateLocal(inquiry.createdAt),
+                        '답변일': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'
+                    }));
+
+                    // 워크시트 생성
+                    const ws = XLSX.utils.json_to_sheet(excelData);
+
+                    // 컬럼 너비 설정
+                    const colWidths = [
+                        { wch: 8 },  // 번호
+                        { wch: 20 }, // 지점명
+                        { wch: 10 }, // 팀
+                        { wch: 15 }, // 담당자
+                        { wch: 30 }, // 제목
+                        { wch: 50 }, // 내용
+                        { wch: 12 }, // 상태
+                        { wch: 50 }, // 답변
+                        { wch: 18 }, // 작성일
+                        { wch: 18 }  // 답변일
+                    ];
+                    ws['!cols'] = colWidths;
+
+                    // 워크북 생성
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, '지점 문의 목록');
+
+                    // 파일명 생성 (현재 날짜 포함)
+                    const today = new Date();
+                    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+                    const filename = `지점_문의_창구_${dateStr}.xlsx`;
+
+                    // 다운로드
+                    XLSX.writeFile(wb, filename);
+                } catch (error) {
+                    console.error('엑셀 다운로드 오류:', error);
+                    alert('엑셀 다운로드에 실패했습니다.');
+                }
+            };
+
             if (loading) {
                 return (
                     <div className="loading-spinner">
@@ -12363,11 +12415,39 @@
                                     <span style={{fontSize: '14px', color: '#e94560'}}>{selectedInquiries.length}개 선택됨</span>
                                 )}
                             </div>
-                            {selectedInquiries.length > 0 && (
-                                <button className="btn btn-danger btn-sm" onClick={openDeleteModal}>
-                                    선택 삭제 ({selectedInquiries.length})
+                            <div style={{display: 'flex', gap: '10px'}}>
+                                <button
+                                    onClick={handleExcelDownload}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                                        transition: 'all 0.3s ease',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)';
+                                    }}
+                                >
+                                    📊 엑셀 다운로드
                                 </button>
-                            )}
+                                {selectedInquiries.length > 0 && (
+                                    <button className="btn btn-danger btn-sm" onClick={openDeleteModal}>
+                                        선택 삭제 ({selectedInquiries.length})
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* 필터 영역 */}
@@ -13280,6 +13360,62 @@
                 }
             };
 
+            // 엑셀 다운로드
+            const handleAbpExcelDownload = () => {
+                try {
+                    // 엑셀 데이터 준비
+                    const excelData = filteredInquiries.map((inquiry, index) => ({
+                        '번호': index + 1,
+                        '대상 부서': getTeamName(inquiry.targetTeam),
+                        '작성자': inquiry.authorName || '-',
+                        '지점명': inquiry.branchName || '-',
+                        '팀': inquiry.team || '-',
+                        '문의 내용': inquiry.content || '-',
+                        '원본 문의 제목': inquiry.originalInquiry?.title || '-',
+                        '원본 문의 내용': inquiry.originalInquiry?.content || '-',
+                        '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
+                        '답변': inquiry.reply || '-',
+                        '작성일': formatDateLocal(inquiry.createdAt),
+                        '답변일': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'
+                    }));
+
+                    // 워크시트 생성
+                    const ws = XLSX.utils.json_to_sheet(excelData);
+
+                    // 컬럼 너비 설정
+                    const colWidths = [
+                        { wch: 8 },  // 번호
+                        { wch: 20 }, // 대상 부서
+                        { wch: 15 }, // 작성자
+                        { wch: 20 }, // 지점명
+                        { wch: 10 }, // 팀
+                        { wch: 50 }, // 문의 내용
+                        { wch: 30 }, // 원본 문의 제목
+                        { wch: 50 }, // 원본 문의 내용
+                        { wch: 12 }, // 상태
+                        { wch: 50 }, // 답변
+                        { wch: 18 }, // 작성일
+                        { wch: 18 }  // 답변일
+                    ];
+                    ws['!cols'] = colWidths;
+
+                    // 워크북 생성
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, '기획본부 문의 목록');
+
+                    // 파일명 생성 (현재 날짜 포함)
+                    const today = new Date();
+                    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+                    const filename = `기획본부_소통_창구_${dateStr}.xlsx`;
+
+                    // 다운로드
+                    XLSX.writeFile(wb, filename);
+                } catch (error) {
+                    console.error('엑셀 다운로드 오류:', error);
+                    alert('엑셀 다운로드에 실패했습니다.');
+                }
+            };
+
             if (loading) {
                 return (
                     <div className="loading-spinner">
@@ -13360,13 +13496,39 @@
                                 )}
                             </div>
                             <div style={{display: 'flex', gap: '10px'}}>
+                                <button
+                                    onClick={handleAbpExcelDownload}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                                        transition: 'all 0.3s ease',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)';
+                                    }}
+                                >
+                                    📊 엑셀 다운로드
+                                </button>
                                 {selectedAbpInquiries.length > 0 && (
                                     <button className="btn btn-danger btn-sm" onClick={openAbpDeleteModal}>
                                         선택 삭제 ({selectedAbpInquiries.length})
                                     </button>
                                 )}
-                                <button 
-                                    className="btn btn-sm" 
+                                <button
+                                    className="btn btn-sm"
                                     onClick={openNewInquiryModal}
                                     style={{background: '#10b981'}}
                                 >
