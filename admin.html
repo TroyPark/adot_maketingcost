@@ -5308,7 +5308,15 @@
                 startDate: '',
                 endDate: ''
             });
-            
+
+            // Round 수정 관련 상태
+            const [editingRound, setEditingRound] = useState(null);
+            const [editFormData, setEditFormData] = useState({
+                name: '',
+                startDate: '',
+                endDate: ''
+            });
+
             // 지점별 비용 배정 관련 상태
             const [selectedRoundId, setSelectedRoundId] = useState('');
             const [branchBudgets, setBranchBudgets] = useState({});
@@ -5562,13 +5570,56 @@
             // Round 삭제
             const handleDeleteRound = async (roundId) => {
                 if (!confirm('이 Round를 삭제하시겠습니까?')) return;
-                
+
                 try {
                     await db.collection('rounds').doc(roundId).delete();
                     alert('Round가 삭제되었습니다.');
                 } catch (error) {
                     console.error('Round 삭제 오류:', error);
                     alert('Round 삭제에 실패했습니다.');
+                }
+            };
+
+            // Round 수정 모드 시작
+            const handleEditRound = (round) => {
+                setEditingRound(round.id);
+                setEditFormData({
+                    name: round.name,
+                    startDate: round.startDate,
+                    endDate: round.endDate
+                });
+            };
+
+            // Round 수정 취소
+            const handleCancelEdit = () => {
+                setEditingRound(null);
+                setEditFormData({
+                    name: '',
+                    startDate: '',
+                    endDate: ''
+                });
+            };
+
+            // Round 수정 저장
+            const handleUpdateRound = async (roundId) => {
+                if (!editFormData.name || !editFormData.startDate || !editFormData.endDate) {
+                    alert('모든 필드를 입력해주세요.');
+                    return;
+                }
+
+                try {
+                    await db.collection('rounds').doc(roundId).update({
+                        name: editFormData.name,
+                        startDate: editFormData.startDate,
+                        endDate: editFormData.endDate,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    alert('Round가 수정되었습니다.');
+                    handleCancelEdit();
+                } catch (error) {
+                    console.error('Round 수정 오류:', error);
+                    alert('Round 수정에 실패했습니다.');
                 }
             };
 
@@ -5654,18 +5705,85 @@
                                     ) : (
                                         rounds.map(round => (
                                             <div key={round.id} className="round-card">
-                                                <div className="round-card-header">
-                                                    <h4 className="round-card-title">{round.name}</h4>
-                                                    <button 
-                                                        className="btn btn-sm btn-danger"
-                                                        onClick={() => handleDeleteRound(round.id)}
-                                                    >
-                                                        삭제
-                                                    </button>
-                                                </div>
-                                                <p style={{color: '#666', fontSize: '14px'}}>
-                                                    {round.startDate} ~ {round.endDate}
-                                                </p>
+                                                {editingRound === round.id ? (
+                                                    // 수정 모드
+                                                    <>
+                                                        <div className="round-card-header">
+                                                            <h4 className="round-card-title">Round 수정</h4>
+                                                        </div>
+                                                        <div className="form-group" style={{marginBottom: '16px'}}>
+                                                            <label>Round 이름</label>
+                                                            <input
+                                                                type="text"
+                                                                value={editFormData.name}
+                                                                onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                                                                placeholder="예: 2025년 1Round"
+                                                            />
+                                                        </div>
+                                                        <div className="round-date-inputs">
+                                                            <div className="form-group">
+                                                                <label>시작일</label>
+                                                                <input
+                                                                    type="date"
+                                                                    value={editFormData.startDate}
+                                                                    onChange={(e) => setEditFormData({...editFormData, startDate: e.target.value})}
+                                                                />
+                                                            </div>
+                                                            <div className="form-group">
+                                                                <label>종료일</label>
+                                                                <input
+                                                                    type="date"
+                                                                    value={editFormData.endDate}
+                                                                    onChange={(e) => setEditFormData({...editFormData, endDate: e.target.value})}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div style={{display: 'flex', gap: '8px', marginTop: '16px'}}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-primary"
+                                                                onClick={() => handleUpdateRound(round.id)}
+                                                            >
+                                                                저장
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm"
+                                                                onClick={handleCancelEdit}
+                                                                style={{
+                                                                    backgroundColor: '#6c757d',
+                                                                    color: 'white'
+                                                                }}
+                                                            >
+                                                                취소
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    // 일반 보기 모드
+                                                    <>
+                                                        <div className="round-card-header">
+                                                            <h4 className="round-card-title">{round.name}</h4>
+                                                            <div style={{display: 'flex', gap: '8px'}}>
+                                                                <button
+                                                                    className="btn btn-sm btn-primary"
+                                                                    onClick={() => handleEditRound(round)}
+                                                                >
+                                                                    수정
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-sm btn-danger"
+                                                                    onClick={() => handleDeleteRound(round.id)}
+                                                                >
+                                                                    삭제
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <p style={{color: '#666', fontSize: '14px'}}>
+                                                            {round.startDate} ~ {round.endDate}
+                                                        </p>
+                                                    </>
+                                                )}
                                             </div>
                                         ))
                                     )}
@@ -11726,7 +11844,8 @@
         // 설정 페이지
         function SettingsPage() {
             const [user, setUser] = useState(null);
-            
+            const [activeTab, setActiveTab] = useState('account');
+
             // 비밀번호 변경 관련 상태
             const [uniquePassword, setUniquePassword] = useState('');
             const [newPassword, setNewPassword] = useState('');
@@ -11734,12 +11853,37 @@
             const [isChangingPassword, setIsChangingPassword] = useState(false);
             const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
 
+            // 사용자 메뉴 관리 관련 상태
+            const [menuConfig, setMenuConfig] = useState([
+                { id: 'inquiry', name: '지점 문의 창구', visible: true },
+                { id: 'cost', name: '마케팅 비용', visible: true },
+                { id: 'toolkit', name: '마케팅 툴킷 신청', visible: true },
+                { id: 'settings', name: '설정', visible: true }
+            ]);
+            const [isSavingMenu, setIsSavingMenu] = useState(false);
+
             useEffect(() => {
                 const currentUser = auth.currentUser;
                 if (currentUser) {
                     setUser(currentUser);
                 }
+
+                // 사용자 메뉴 설정 로드
+                loadMenuConfig();
             }, []);
+
+            // 메뉴 설정 로드
+            const loadMenuConfig = async () => {
+                try {
+                    const doc = await db.collection('sidebarConfig').doc('user').get();
+                    if (doc.exists) {
+                        const savedMenus = doc.data().menus;
+                        setMenuConfig(savedMenus);
+                    }
+                } catch (error) {
+                    console.error('메뉴 설정 로드 오류:', error);
+                }
+            };
 
             // 비밀번호 변경 처리 (고유 비밀번호로 인증)
             const handlePasswordChange = async (e) => {
@@ -11804,16 +11948,68 @@
                 }
             };
 
+            // 메뉴 가시성 토글
+            const handleMenuToggle = (menuId) => {
+                setMenuConfig(prevConfig =>
+                    prevConfig.map(menu =>
+                        menu.id === menuId ? { ...menu, visible: !menu.visible } : menu
+                    )
+                );
+            };
+
+            // 메뉴 설정 저장
+            const handleSaveMenuConfig = async () => {
+                setIsSavingMenu(true);
+                try {
+                    await db.collection('sidebarConfig').doc('user').set({
+                        menus: menuConfig,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    alert('사용자 메뉴 설정이 저장되었습니다.');
+                } catch (error) {
+                    console.error('메뉴 설정 저장 오류:', error);
+                    alert('메뉴 설정 저장에 실패했습니다.');
+                } finally {
+                    setIsSavingMenu(false);
+                }
+            };
+
             return (
                 <div>
                     <div className="page-header">
                         <h2 className="page-title">설정</h2>
-                        <p className="page-subtitle">계정 설정을 관리합니다</p>
+                        <p className="page-subtitle">계정 및 시스템 설정을 관리합니다</p>
                     </div>
 
                     <div className="content-area">
-                        {/* 계정 정보 */}
-                        <div className="settings-section">
+                        {/* 탭 버튼 */}
+                        <div className="tab-buttons">
+                            <button
+                                className={`tab-button ${activeTab === 'account' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('account')}
+                            >
+                                계정 정보
+                            </button>
+                            <button
+                                className={`tab-button ${activeTab === 'password' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('password')}
+                            >
+                                비밀번호 변경
+                            </button>
+                            <button
+                                className={`tab-button ${activeTab === 'menu' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('menu')}
+                            >
+                                사용자 메뉴 관리
+                            </button>
+                        </div>
+
+                        {/* 탭 컨텐츠 */}
+                        <div className="tab-content">
+                            {activeTab === 'account' && (
+                                <div>
+                                    {/* 계정 정보 */}
+                                    <div className="settings-section" style={{borderBottom: 'none', paddingBottom: 0, marginBottom: 0}}>
                             <h3 className="section-title">계정 정보</h3>
                             <div style={{
                                 background: '#f8f9fa',
@@ -11841,80 +12037,202 @@
                                 </div>
                             </div>
                         </div>
-
-                        {/* 비밀번호 변경 */}
-                        <div className="settings-section" style={{borderBottom: 'none', paddingBottom: 0}}>
-                            <h3 className="section-title">비밀번호 변경</h3>
-                            <p style={{color: '#666', fontSize: '14px', marginBottom: '20px'}}>
-                                비밀번호 변경을 위해 고유 비밀번호 인증이 필요합니다.
-                            </p>
-                            
-                            <form onSubmit={handlePasswordChange}>
-                                <div style={{maxWidth: '400px'}}>
-                                    <div className="form-group">
-                                        <label style={{color: '#e94560'}}>고유 비밀번호 *</label>
-                                        <input
-                                            type="password"
-                                            value={uniquePassword}
-                                            onChange={(e) => setUniquePassword(e.target.value)}
-                                            placeholder="고유 비밀번호를 입력하세요"
-                                            disabled={isChangingPassword}
-                                        />
-                                        <p style={{fontSize: '12px', color: '#999', marginTop: '4px'}}>
-                                            Round 관리에 사용되는 고유 비밀번호입니다
-                                        </p>
-                                    </div>
-                                    
-                                    <div style={{
-                                        borderTop: '1px solid #eee',
-                                        marginTop: '20px',
-                                        paddingTop: '20px'
-                                    }}>
-                                        <div className="form-group">
-                                            <label>새 비밀번호 *</label>
-                                            <input
-                                                type="password"
-                                                value={newPassword}
-                                                onChange={(e) => setNewPassword(e.target.value)}
-                                                placeholder="새 비밀번호 (6자 이상)"
-                                                disabled={isChangingPassword}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>새 비밀번호 확인 *</label>
-                                            <input
-                                                type="password"
-                                                value={confirmPassword}
-                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                placeholder="새 비밀번호 다시 입력"
-                                                disabled={isChangingPassword}
-                                            />
-                                        </div>
-                                    </div>
-                                    
-                                    {passwordMessage.text && (
-                                        <div style={{
-                                            padding: '12px 16px',
-                                            borderRadius: '8px',
-                                            marginBottom: '15px',
-                                            background: passwordMessage.type === 'success' ? '#d4edda' : '#f8d7da',
-                                            color: passwordMessage.type === 'success' ? '#155724' : '#721c24',
-                                            fontSize: '14px'
-                                        }}>
-                                            {passwordMessage.text}
-                                        </div>
-                                    )}
-                                    
-                                    <button 
-                                        type="submit" 
-                                        className="btn"
-                                        disabled={isChangingPassword}
-                                        style={{marginTop: '10px'}}
-                                    >
-                                        {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
-                                    </button>
                                 </div>
-                            </form>
+                            )}
+
+                            {activeTab === 'password' && (
+                                <div>
+                                    {/* 비밀번호 변경 */}
+                                    <div className="settings-section" style={{borderBottom: 'none', paddingBottom: 0, marginBottom: 0}}>
+                                        <h3 className="section-title">비밀번호 변경</h3>
+                                        <p style={{color: '#666', fontSize: '14px', marginBottom: '20px'}}>
+                                            비밀번호 변경을 위해 고유 비밀번호 인증이 필요합니다.
+                                        </p>
+
+                                        <form onSubmit={handlePasswordChange}>
+                                            <div style={{maxWidth: '400px'}}>
+                                                <div className="form-group">
+                                                    <label style={{color: '#e94560'}}>고유 비밀번호 *</label>
+                                                    <input
+                                                        type="password"
+                                                        value={uniquePassword}
+                                                        onChange={(e) => setUniquePassword(e.target.value)}
+                                                        placeholder="고유 비밀번호를 입력하세요"
+                                                        disabled={isChangingPassword}
+                                                    />
+                                                    <p style={{fontSize: '12px', color: '#999', marginTop: '4px'}}>
+                                                        Round 관리에 사용되는 고유 비밀번호입니다
+                                                    </p>
+                                                </div>
+
+                                                <div style={{
+                                                    borderTop: '1px solid #eee',
+                                                    marginTop: '20px',
+                                                    paddingTop: '20px'
+                                                }}>
+                                                    <div className="form-group">
+                                                        <label>새 비밀번호 *</label>
+                                                        <input
+                                                            type="password"
+                                                            value={newPassword}
+                                                            onChange={(e) => setNewPassword(e.target.value)}
+                                                            placeholder="새 비밀번호 (6자 이상)"
+                                                            disabled={isChangingPassword}
+                                                        />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>새 비밀번호 확인 *</label>
+                                                        <input
+                                                            type="password"
+                                                            value={confirmPassword}
+                                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                                            placeholder="새 비밀번호 다시 입력"
+                                                            disabled={isChangingPassword}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {passwordMessage.text && (
+                                                    <div style={{
+                                                        padding: '12px 16px',
+                                                        borderRadius: '8px',
+                                                        marginBottom: '15px',
+                                                        background: passwordMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+                                                        color: passwordMessage.type === 'success' ? '#155724' : '#721c24',
+                                                        fontSize: '14px'
+                                                    }}>
+                                                        {passwordMessage.text}
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    type="submit"
+                                                    className="btn"
+                                                    disabled={isChangingPassword}
+                                                    style={{marginTop: '10px'}}
+                                                >
+                                                    {isChangingPassword ? '변경 중...' : '비밀번호 변경'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'menu' && (
+                                <div>
+                                    {/* 사용자 메뉴 관리 */}
+                                    <div className="settings-section" style={{borderBottom: 'none', paddingBottom: 0, marginBottom: 0}}>
+                                        <h3 className="section-title">사용자 메뉴 가시성 관리</h3>
+                                        <p style={{color: '#666', fontSize: '14px', marginBottom: '20px'}}>
+                                            user.html의 사이드바에 표시될 메뉴를 선택하세요. 토글을 끄면 해당 메뉴가 사용자 화면에서 숨겨집니다.
+                                        </p>
+
+                                        <div style={{
+                                            background: 'white',
+                                            border: '1px solid #e0e0e0',
+                                            borderRadius: '10px',
+                                            padding: '20px'
+                                        }}>
+                                            {menuConfig.map(menu => (
+                                                <div key={menu.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '16px',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    transition: 'background 0.2s'
+                                                }}>
+                                                    <div>
+                                                        <h4 style={{
+                                                            margin: '0 0 4px 0',
+                                                            color: '#001236',
+                                                            fontSize: '15px',
+                                                            fontWeight: '600'
+                                                        }}>
+                                                            {menu.name}
+                                                        </h4>
+                                                        <p style={{
+                                                            margin: 0,
+                                                            color: '#999',
+                                                            fontSize: '13px'
+                                                        }}>
+                                                            ID: {menu.id}
+                                                        </p>
+                                                    </div>
+                                                    <label style={{
+                                                        position: 'relative',
+                                                        display: 'inline-block',
+                                                        width: '50px',
+                                                        height: '24px',
+                                                        cursor: 'pointer'
+                                                    }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={menu.visible}
+                                                            onChange={() => handleMenuToggle(menu.id)}
+                                                            style={{opacity: 0, width: 0, height: 0}}
+                                                        />
+                                                        <span style={{
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            left: 0,
+                                                            right: 0,
+                                                            bottom: 0,
+                                                            backgroundColor: menu.visible ? '#4CAF50' : '#ccc',
+                                                            borderRadius: '24px',
+                                                            transition: 'background-color 0.3s',
+                                                            '::before': {
+                                                                content: '""',
+                                                                position: 'absolute',
+                                                                height: '18px',
+                                                                width: '18px',
+                                                                left: menu.visible ? '28px' : '3px',
+                                                                bottom: '3px',
+                                                                backgroundColor: 'white',
+                                                                borderRadius: '50%',
+                                                                transition: 'left 0.3s'
+                                                            }
+                                                        }}>
+                                                            <span style={{
+                                                                position: 'absolute',
+                                                                height: '18px',
+                                                                width: '18px',
+                                                                left: menu.visible ? '28px' : '3px',
+                                                                bottom: '3px',
+                                                                backgroundColor: 'white',
+                                                                borderRadius: '50%',
+                                                                transition: 'left 0.3s'
+                                                            }} />
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            className="btn"
+                                            onClick={handleSaveMenuConfig}
+                                            disabled={isSavingMenu}
+                                            style={{marginTop: '20px'}}
+                                        >
+                                            {isSavingMenu ? '저장 중...' : '설정 저장'}
+                                        </button>
+
+                                        <div style={{
+                                            marginTop: '20px',
+                                            padding: '15px',
+                                            background: '#fff3cd',
+                                            borderLeft: '4px solid #ffc107',
+                                            borderRadius: '4px'
+                                        }}>
+                                            <p style={{margin: 0, color: '#856404', fontSize: '13px'}}>
+                                                <strong>💡 안내:</strong> 설정 변경 후 사용자가 user.html 페이지를 새로고침하면 변경사항이 반영됩니다.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -14183,7 +14501,7 @@
         }
 
         // 사이드바 컴포넌트
-        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess, onDataAccess, onUsersAccess }) {
+        function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess, onDataAccess, onUsersAccess, onSettingsAccess }) {
             const menuItems = [
                 {
                     category: '대시보드',
@@ -14227,6 +14545,8 @@
                     onDataAccess();
                 } else if (itemId === 'users') {
                     onUsersAccess();
+                } else if (itemId === 'settings') {
+                    onSettingsAccess();
                 } else {
                     setCurrentPage(itemId);
                 }
@@ -14287,7 +14607,7 @@
             const [roundPassword, setRoundPassword] = useState('');
             const [roundAccessGranted, setRoundAccessGranted] = useState(false);
             const [isVerifying, setIsVerifying] = useState(false);
-            
+
             // 툴킷 관리 접근 관련 상태
             const [showToolkitPasswordModal, setShowToolkitPasswordModal] = useState(false);
             const [toolkitPassword, setToolkitPassword] = useState('');
@@ -14296,6 +14616,12 @@
 
             // 데이터 관리 접근 관련 상태
             const [showDataPasswordModal, setShowDataPasswordModal] = useState(false);
+
+            // 설정 접근 관련 상태
+            const [showSettingsPasswordModal, setShowSettingsPasswordModal] = useState(false);
+            const [settingsPassword, setSettingsPassword] = useState('');
+            const [settingsAccessGranted, setSettingsAccessGranted] = useState(false);
+            const [isVerifyingSettings, setIsVerifyingSettings] = useState(false);
             const [dataPassword, setDataPassword] = useState('');
             const [dataAccessGranted, setDataAccessGranted] = useState(false);
             const [isVerifyingData, setIsVerifyingData] = useState(false);
@@ -14515,6 +14841,50 @@
                 }
             };
 
+            // 설정 페이지 접근 시도
+            const handleSettingsAccess = () => {
+                if (settingsAccessGranted) {
+                    setCurrentPage('settings');
+                } else {
+                    setSettingsPassword('');
+                    setShowSettingsPasswordModal(true);
+                }
+            };
+
+            // 설정 비밀번호 확인 (Round 비밀번호와 동일)
+            const handleSettingsPasswordSubmit = async (e) => {
+                e.preventDefault();
+                setIsVerifyingSettings(true);
+
+                try {
+                    // Firestore에서 비밀번호 가져오기
+                    const doc = await db.collection('settings').doc('roundPassword').get();
+
+                    if (!doc.exists) {
+                        alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
+                        setIsVerifyingSettings(false);
+                        return;
+                    }
+
+                    const storedPassword = doc.data().password;
+
+                    if (settingsPassword === storedPassword) {
+                        setSettingsAccessGranted(true);
+                        setShowSettingsPasswordModal(false);
+                        setCurrentPage('settings');
+                        setSettingsPassword('');
+                    } else {
+                        alert('비밀번호가 올바르지 않습니다.');
+                        setSettingsPassword('');
+                    }
+                } catch (error) {
+                    console.error('비밀번호 확인 오류:', error);
+                    alert('비밀번호 확인에 실패했습니다.');
+                } finally {
+                    setIsVerifyingSettings(false);
+                }
+            };
+
             const handleLogout = async () => {
                 if (confirm('로그아웃 하시겠습니까?')) {
                     const result = await logout();
@@ -14568,6 +14938,7 @@
                         onToolkitAccess={handleToolkitAccess}
                         onDataAccess={handleDataAccess}
                         onUsersAccess={handleUsersAccess}
+                        onSettingsAccess={handleSettingsAccess}
                     />
                     <main className="main-content">
                         {renderPage()}
@@ -14766,6 +15137,56 @@
                                             disabled={isVerifyingUsers}
                                         >
                                             {isVerifyingUsers ? '확인 중...' : '확인'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 설정 비밀번호 모달 */}
+                    {showSettingsPasswordModal && (
+                        <div className="modal-overlay" onClick={() => setShowSettingsPasswordModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+                                <div className="modal-header">
+                                    <h3>⚙️ 설정 접근 인증</h3>
+                                    <button className="modal-close" onClick={() => setShowSettingsPasswordModal(false)}>×</button>
+                                </div>
+                                <form onSubmit={handleSettingsPasswordSubmit}>
+                                    <div className="modal-body">
+                                        <p style={{marginBottom: '10px', color: '#666'}}>
+                                            설정에 접근하려면 고유 비밀번호를 입력하세요.
+                                        </p>
+                                        <p style={{marginBottom: '15px', fontSize: '13px', color: '#888'}}>
+                                            담당자 : 박영주 / 010-4037-0928
+                                        </p>
+                                        <div className="form-group">
+                                            <label>비밀번호</label>
+                                            <input
+                                                type="password"
+                                                value={settingsPassword}
+                                                onChange={(e) => setSettingsPassword(e.target.value)}
+                                                placeholder="고유 비밀번호를 입력하세요"
+                                                required
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => setShowSettingsPasswordModal(false)}
+                                            disabled={isVerifyingSettings}
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-sm"
+                                            disabled={isVerifyingSettings}
+                                        >
+                                            {isVerifyingSettings ? '확인 중...' : '확인'}
                                         </button>
                                     </div>
                                 </form>
