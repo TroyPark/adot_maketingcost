@@ -14,6 +14,8 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -224,6 +226,62 @@
         .stat-card .value {
             font-size: 32px;
             font-weight: 700;
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        /* 탭 스타일 */
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 24px;
+        }
+
+        .tab-button {
+            padding: 14px 24px;
+            background: none;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button:hover {
+            color: #001236;
+        }
+
+        .tab-button.active {
+            color: #f07c00;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #f07c00;
+            border-radius: 2px 2px 0 0;
+        }
+
+        .tab-content {
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* 차트 컨테이너 */
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
         }
 
         .btn {
@@ -929,6 +987,14 @@
 
         // 아이콘 컴포넌트
         const Icons = {
+            Dashboard: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                </svg>
+            ),
             Cost: () => (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -2885,6 +2951,906 @@
             );
         }
 
+        // 대시보드 페이지 (지점별)
+        function DashboardPage({ userInfo }) {
+            // 전일 날짜를 기본값으로 계산
+            const getYesterdayStr = () => {
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const year = yesterday.getFullYear();
+                const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                const day = String(yesterday.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const [loading, setLoading] = useState(true);
+            const [dashboardData, setDashboardData] = useState({
+                students: {},
+                registrations: {},
+                withdrawals: {}
+            });
+            const [activeTab, setActiveTab] = useState('overview');
+            const [selectedDate, setSelectedDate] = useState(getYesterdayStr());
+            const [dateA, setDateA] = useState(getYesterdayStr());
+            const [dateB, setDateB] = useState(getYesterdayStr());
+            const chartRefs = {
+                trend: React.useRef(null),
+                compare: React.useRef(null)
+            };
+            const chartInstances = React.useRef({});
+
+            const branchName = userInfo?.branchName;
+
+            // 데이터 로드
+            useEffect(() => {
+                if (!branchName) {
+                    setLoading(false);
+                    return;
+                }
+
+                const loadDashboardData = async () => {
+                    try {
+                        const dataTypes = ['studentCount', 'registrationCount', 'withdrawalCount'];
+                        const dataKeys = ['students', 'registrations', 'withdrawals'];
+
+                        // 모든 데이터를 한 번에 수집
+                        const allData = {
+                            students: {},
+                            registrations: {},
+                            withdrawals: {}
+                        };
+
+                        for (let i = 0; i < dataTypes.length; i++) {
+                            const baseDocId = dataTypes[i];
+                            const dataKey = dataKeys[i];
+                            const loadedData = {};
+
+                            // 모든 월별 문서 가져오기
+                            const snapshot = await db.collection('dashboardData')
+                                .where(firebase.firestore.FieldPath.documentId(), '>=', baseDocId)
+                                .where(firebase.firestore.FieldPath.documentId(), '<=', baseDocId + '\uf8ff')
+                                .get();
+
+                            snapshot.docs.forEach(doc => {
+                                const monthData = doc.data().branches || {};
+                                // 자신의 지점 데이터만 필터링
+                                if (monthData[branchName]) {
+                                    if (!loadedData[branchName]) {
+                                        loadedData[branchName] = {};
+                                    }
+                                    Object.assign(loadedData[branchName], monthData[branchName]);
+                                }
+                            });
+
+                            // allData 객체에 수집
+                            allData[dataKey] = loadedData;
+                        }
+
+                        // 모든 데이터를 한 번에 업데이트
+                        setDashboardData(allData);
+                        setLoading(false);
+                    } catch (error) {
+                        console.error('대시보드 데이터 로드 오류:', error);
+                        setLoading(false);
+                    }
+                };
+
+                loadDashboardData();
+
+                // 컴포넌트 언마운트 시 차트 정리
+                return () => {
+                    Object.values(chartInstances.current).forEach(chart => {
+                        if (chart) chart.destroy();
+                    });
+                };
+            }, [branchName]);
+
+            // 차트 생성/업데이트 (종합 탭)
+            useEffect(() => {
+                if (loading || !branchName || activeTab !== 'overview') return;
+                if (!dashboardData.students[branchName]) return;
+
+                // 선택한 날짜 기준으로 최근 30일 계산
+                const endDate = new Date(selectedDate);
+                const startDate = new Date(selectedDate);
+                startDate.setDate(endDate.getDate() - 29);
+
+                // 날짜별 데이터 계산
+                const dateMap = {};
+
+                ['students', 'registrations', 'withdrawals'].forEach(type => {
+                    if (dashboardData[type][branchName]) {
+                        Object.keys(dashboardData[type][branchName]).forEach(date => {
+                            const dateObj = new Date(date);
+                            if (dateObj >= startDate && dateObj <= endDate) {
+                                if (!dateMap[date]) {
+                                    dateMap[date] = { students: 0, registrations: 0, withdrawals: 0 };
+                                }
+                                const value = Number(dashboardData[type][branchName][date]) || 0;
+                                dateMap[date][type] = value;
+                            }
+                        });
+                    }
+                });
+
+                const sortedDates = Object.keys(dateMap).sort();
+
+                // 추세 차트 생성
+                if (chartRefs.trend.current) {
+                    if (chartInstances.current.trend) {
+                        chartInstances.current.trend.destroy();
+                    }
+
+                    const ctx = chartRefs.trend.current.getContext('2d');
+                    chartInstances.current.trend = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: sortedDates,
+                            datasets: [
+                                {
+                                    label: '재원생수',
+                                    data: sortedDates.map(date => dateMap[date].students),
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    tension: 0.4,
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: '등록수',
+                                    data: sortedDates.map(date => dateMap[date].registrations),
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                    tension: 0.4,
+                                    yAxisID: 'y1'
+                                },
+                                {
+                                    label: '퇴원수',
+                                    data: sortedDates.map(date => dateMap[date].withdrawals),
+                                    borderColor: 'rgb(239, 68, 68)',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    tension: 0.4,
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '재원생수',
+                                        color: 'rgb(59, 130, 246)',
+                                        font: { weight: 'bold' }
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    grid: { drawOnChartArea: false },
+                                    title: {
+                                        display: true,
+                                        text: '등록/퇴원수',
+                                        color: 'rgb(34, 197, 94)',
+                                        font: { weight: 'bold' }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [loading, dashboardData, branchName, selectedDate, activeTab]);
+
+            // 비교 차트 생성/업데이트
+            useEffect(() => {
+                if (loading || !branchName || activeTab !== 'compare') return;
+                if (!dashboardData.students[branchName]) return;
+
+                // 날짜 A, B의 데이터 가져오기
+                const dataA = {
+                    students: Number(dashboardData.students[branchName]?.[dateA]) || 0,
+                    registrations: Number(dashboardData.registrations[branchName]?.[dateA]) || 0,
+                    withdrawals: Number(dashboardData.withdrawals[branchName]?.[dateA]) || 0
+                };
+
+                const dataB = {
+                    students: Number(dashboardData.students[branchName]?.[dateB]) || 0,
+                    registrations: Number(dashboardData.registrations[branchName]?.[dateB]) || 0,
+                    withdrawals: Number(dashboardData.withdrawals[branchName]?.[dateB]) || 0
+                };
+
+                // 비교 차트 생성
+                if (chartRefs.compare.current) {
+                    if (chartInstances.current.compare) {
+                        chartInstances.current.compare.destroy();
+                    }
+
+                    const ctx = chartRefs.compare.current.getContext('2d');
+                    chartInstances.current.compare = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: [dateA, dateB],
+                            datasets: [
+                                {
+                                    label: '재원생수',
+                                    data: [dataA.students, dataB.students],
+                                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: '등록수',
+                                    data: [dataA.registrations, dataB.registrations],
+                                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y1'
+                                },
+                                {
+                                    label: '퇴원수',
+                                    data: [dataA.withdrawals, dataB.withdrawals],
+                                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                                    borderColor: 'rgb(239, 68, 68)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: '재원생수',
+                                        color: 'rgb(59, 130, 246)',
+                                        font: { weight: 'bold' }
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    beginAtZero: true,
+                                    grid: { drawOnChartArea: false },
+                                    title: {
+                                        display: true,
+                                        text: '등록/퇴원수',
+                                        color: 'rgb(34, 197, 94)',
+                                        font: { weight: 'bold' }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [loading, dashboardData, branchName, dateA, dateB, activeTab]);
+
+            // 선택 날짜의 데이터 가져오기
+            const getSelectedDateData = () => {
+                if (!branchName || !dashboardData.students[branchName]) {
+                    return { students: 0, registrations: 0, withdrawals: 0 };
+                }
+
+                return {
+                    students: Number(dashboardData.students[branchName]?.[selectedDate]) || 0,
+                    registrations: Number(dashboardData.registrations[branchName]?.[selectedDate]) || 0,
+                    withdrawals: Number(dashboardData.withdrawals[branchName]?.[selectedDate]) || 0
+                };
+            };
+
+            if (loading) {
+                return <div className="loading">로딩 중...</div>;
+            }
+
+            if (!branchName) {
+                return (
+                    <div>
+                        <div className="page-header">
+                            <h2 className="page-title">대시보드</h2>
+                        </div>
+                        <div className="content-area">
+                            <p style={{color: '#666'}}>지점 정보가 설정되지 않았습니다. 설정 페이지에서 지점명을 등록해주세요.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const selectedData = getSelectedDateData();
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">대시보드 - {branchName}</h2>
+                        <p className="page-subtitle">우리 지점의 재원생 현황을 확인합니다</p>
+                    </div>
+
+                    <div className="content-area">
+                        {/* 탭 버튼 */}
+                        <div className="tab-buttons">
+                            <button
+                                className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('overview')}
+                            >
+                                종합
+                            </button>
+                            <button
+                                className={`tab-button ${activeTab === 'compare' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('compare')}
+                            >
+                                기간 비교
+                            </button>
+                        </div>
+
+                        {/* 탭 컨텐츠 */}
+                        <div className="tab-content">
+                            {activeTab === 'overview' && (
+                                <div>
+                                    {/* 날짜 선택 */}
+                                    <div style={{marginBottom: '20px'}}>
+                                        <div style={{display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
+                                            <label style={{fontWeight: '600'}}>기준 날짜:</label>
+                                            <input
+                                                type="date"
+                                                value={selectedDate}
+                                                onChange={(e) => setSelectedDate(e.target.value)}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    borderRadius: '6px',
+                                                    border: '2px solid #e0e0e0',
+                                                    fontSize: '14px'
+                                                }}
+                                            />
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '8px',
+                                                marginLeft: '15px',
+                                                flexWrap: 'wrap'
+                                            }}>
+                                                <button
+                                                    onClick={() => setSelectedDate(getYesterdayStr())}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: '#f3f4f6',
+                                                        color: '#374151',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.target.style.background = '#e5e7eb';
+                                                        e.target.style.borderColor = '#9ca3af';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.target.style.background = '#f3f4f6';
+                                                        e.target.style.borderColor = '#d1d5db';
+                                                    }}
+                                                >
+                                                    어제
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const date = new Date();
+                                                        date.setDate(date.getDate() - 8);
+                                                        const year = date.getFullYear();
+                                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(date.getDate()).padStart(2, '0');
+                                                        setSelectedDate(`${year}-${month}-${day}`);
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: '#f3f4f6',
+                                                        color: '#374151',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.target.style.background = '#e5e7eb';
+                                                        e.target.style.borderColor = '#9ca3af';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.target.style.background = '#f3f4f6';
+                                                        e.target.style.borderColor = '#d1d5db';
+                                                    }}
+                                                >
+                                                    7일 전
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const date = new Date();
+                                                        date.setDate(date.getDate() - 1);
+                                                        const prevMonth = new Date(date);
+                                                        prevMonth.setMonth(prevMonth.getMonth() - 1);
+                                                        const year = prevMonth.getFullYear();
+                                                        const month = String(prevMonth.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(prevMonth.getDate()).padStart(2, '0');
+                                                        setSelectedDate(`${year}-${month}-${day}`);
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: '#f3f4f6',
+                                                        color: '#374151',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.target.style.background = '#e5e7eb';
+                                                        e.target.style.borderColor = '#9ca3af';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.target.style.background = '#f3f4f6';
+                                                        e.target.style.borderColor = '#d1d5db';
+                                                    }}
+                                                >
+                                                    전 월 동일
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const date = new Date();
+                                                        date.setDate(date.getDate() - 1);
+                                                        const prevYear = new Date(date);
+                                                        prevYear.setFullYear(prevYear.getFullYear() - 1);
+                                                        const year = prevYear.getFullYear();
+                                                        const month = String(prevYear.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(prevYear.getDate()).padStart(2, '0');
+                                                        setSelectedDate(`${year}-${month}-${day}`);
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 14px',
+                                                        background: '#f3f4f6',
+                                                        color: '#374151',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.target.style.background = '#e5e7eb';
+                                                        e.target.style.borderColor = '#9ca3af';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.target.style.background = '#f3f4f6';
+                                                        e.target.style.borderColor = '#d1d5db';
+                                                    }}
+                                                >
+                                                    전 년 동일
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div style={{fontSize: '13px', color: '#666', paddingLeft: '85px', marginTop: '8px'}}>
+                                            * 선택한 날짜의 데이터와 최근 30일 추세를 표시합니다
+                                        </div>
+                                    </div>
+
+                                    {/* 통계 카드 */}
+                                    <div className="stats-grid" style={{marginBottom: '30px'}}>
+                                        <div className="stat-card">
+                                            <h3>재원생수</h3>
+                                            <div className="value" style={{color: '#3b82f6'}}>{selectedData.students.toLocaleString()}</div>
+                                            <p className="label">{selectedDate}</p>
+                                        </div>
+                                        <div className="stat-card">
+                                            <h3>등록수</h3>
+                                            <div className="value" style={{color: '#22c55e'}}>{selectedData.registrations.toLocaleString()}</div>
+                                            <p className="label">{selectedDate}</p>
+                                        </div>
+                                        <div className="stat-card">
+                                            <h3>퇴원수</h3>
+                                            <div className="value" style={{color: '#ef4444'}}>{selectedData.withdrawals.toLocaleString()}</div>
+                                            <p className="label">{selectedDate}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* 추세 차트 */}
+                                    <div className="chart-container" style={{marginBottom: '30px'}}>
+                                        <h3 style={{marginBottom: '20px', color: '#001236'}}>최근 30일 추세</h3>
+                                        <div style={{height: '400px', position: 'relative'}}>
+                                            <canvas ref={chartRefs.trend}></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'compare' && (
+                                <div>
+                                    {/* 날짜 선택 */}
+                                    <div style={{marginBottom: '30px'}}>
+                                        <div style={{display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px'}}>
+                                            <div>
+                                                <label style={{display: 'block', marginBottom: '8px', fontWeight: '600'}}>기간 A:</label>
+                                                <input
+                                                    type="date"
+                                                    value={dateA}
+                                                    onChange={(e) => setDateA(e.target.value)}
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '2px solid #e0e0e0',
+                                                        fontSize: '14px'
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{display: 'block', marginBottom: '8px', fontWeight: '600'}}>기간 B:</label>
+                                                <input
+                                                    type="date"
+                                                    value={dateB}
+                                                    onChange={(e) => setDateB(e.target.value)}
+                                                    style={{
+                                                        padding: '8px 12px',
+                                                        borderRadius: '6px',
+                                                        border: '2px solid #e0e0e0',
+                                                        fontSize: '14px'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div style={{marginBottom: '15px'}}>
+                                            <div style={{fontSize: '13px', fontWeight: '600', color: '#666', marginBottom: '8px'}}>
+                                                빠른 비교
+                                            </div>
+                                            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                                                <button
+                                                    onClick={() => {
+                                                        const yesterday = getYesterdayStr();
+                                                        const lastYear = new Date(yesterday);
+                                                        lastYear.setFullYear(lastYear.getFullYear() - 1);
+                                                        const year = lastYear.getFullYear();
+                                                        const month = String(lastYear.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(lastYear.getDate()).padStart(2, '0');
+                                                        const lastYearDate = `${year}-${month}-${day}`;
+
+                                                        setDateA(lastYearDate);
+                                                        setDateB(yesterday);
+                                                    }}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #3b82f6',
+                                                        background: 'white',
+                                                        color: '#3b82f6',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '500',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.currentTarget.style.background = '#3b82f6';
+                                                        e.currentTarget.style.color = 'white';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.currentTarget.style.background = 'white';
+                                                        e.currentTarget.style.color = '#3b82f6';
+                                                    }}
+                                                >
+                                                    📊 전년 동기 대비
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const yesterday = getYesterdayStr();
+                                                        const date7DaysAgo = new Date(yesterday);
+                                                        date7DaysAgo.setDate(date7DaysAgo.getDate() - 7);
+                                                        const year = date7DaysAgo.getFullYear();
+                                                        const month = String(date7DaysAgo.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(date7DaysAgo.getDate()).padStart(2, '0');
+                                                        const weekAgo = `${year}-${month}-${day}`;
+
+                                                        setDateA(weekAgo);
+                                                        setDateB(yesterday);
+                                                    }}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #10b981',
+                                                        background: 'white',
+                                                        color: '#10b981',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '500',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.currentTarget.style.background = '#10b981';
+                                                        e.currentTarget.style.color = 'white';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.currentTarget.style.background = 'white';
+                                                        e.currentTarget.style.color = '#10b981';
+                                                    }}
+                                                >
+                                                    📅 주간 비교 (7일 전)
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const yesterday = getYesterdayStr();
+                                                        const date30DaysAgo = new Date(yesterday);
+                                                        date30DaysAgo.setDate(date30DaysAgo.getDate() - 30);
+                                                        const year = date30DaysAgo.getFullYear();
+                                                        const month = String(date30DaysAgo.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(date30DaysAgo.getDate()).padStart(2, '0');
+                                                        const monthAgo = `${year}-${month}-${day}`;
+
+                                                        setDateA(monthAgo);
+                                                        setDateB(yesterday);
+                                                    }}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        border: '1px solid #f59e0b',
+                                                        background: 'white',
+                                                        color: '#f59e0b',
+                                                        borderRadius: '6px',
+                                                        fontSize: '13px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '500',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.currentTarget.style.background = '#f59e0b';
+                                                        e.currentTarget.style.color = 'white';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.currentTarget.style.background = 'white';
+                                                        e.currentTarget.style.color = '#f59e0b';
+                                                    }}
+                                                >
+                                                    📆 월간 비교 (30일 전)
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            fontSize: '13px',
+                                            color: '#666',
+                                            padding: '10px 15px',
+                                            background: '#f9fafb',
+                                            borderRadius: '4px',
+                                            borderLeft: '3px solid #3b82f6'
+                                        }}>
+                                            💡 B 날짜와 A 날짜의 재원생수, 등록수, 퇴원수를 비교합니다
+                                        </div>
+                                    </div>
+
+                                    {(() => {
+                                        // 날짜 A, B의 데이터 가져오기
+                                        const dataA = {
+                                            students: Number(dashboardData.students[branchName]?.[dateA]) || 0,
+                                            registrations: Number(dashboardData.registrations[branchName]?.[dateA]) || 0,
+                                            withdrawals: Number(dashboardData.withdrawals[branchName]?.[dateA]) || 0
+                                        };
+
+                                        const dataB = {
+                                            students: Number(dashboardData.students[branchName]?.[dateB]) || 0,
+                                            registrations: Number(dashboardData.registrations[branchName]?.[dateB]) || 0,
+                                            withdrawals: Number(dashboardData.withdrawals[branchName]?.[dateB]) || 0
+                                        };
+
+                                        const diffValue = {
+                                            students: dataB.students - dataA.students,
+                                            registrations: dataB.registrations - dataA.registrations,
+                                            withdrawals: dataB.withdrawals - dataA.withdrawals
+                                        };
+
+                                        const diffPercent = {
+                                            students: dataA.students > 0 ? ((dataB.students - dataA.students) / dataA.students * 100) : 0,
+                                            registrations: dataA.registrations > 0 ? ((dataB.registrations - dataA.registrations) / dataA.registrations * 100) : 0,
+                                            withdrawals: dataA.withdrawals > 0 ? ((dataB.withdrawals - dataA.withdrawals) / dataA.withdrawals * 100) : 0
+                                        };
+
+                                        return (
+                                            <>
+                                                {/* 비교 결과 카드 */}
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                                    gap: '20px',
+                                                    marginBottom: '20px'
+                                                }}>
+                                                    {/* 재원생수 비교 */}
+                                                    <div style={{
+                                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                        padding: '25px',
+                                                        borderRadius: '12px',
+                                                        color: 'white',
+                                                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                                                    }}>
+                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                            재원생수 비교
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataA.students.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataB.students.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{
+                                                            marginTop: '20px',
+                                                            paddingTop: '18px',
+                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
+                                                            <div style={{
+                                                                fontSize: '24px',
+                                                                fontWeight: '700'
+                                                            }}>
+                                                                {diffValue.students > 0 ? '+' : ''}{diffValue.students.toLocaleString()}
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '16px',
+                                                                fontWeight: '600',
+                                                                opacity: '0.95',
+                                                                marginTop: '6px'
+                                                            }}>
+                                                                ({diffPercent.students > 0 ? '+' : ''}{diffPercent.students.toFixed(1)}%)
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 등록수 비교 */}
+                                                    <div style={{
+                                                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                                        padding: '25px',
+                                                        borderRadius: '12px',
+                                                        color: 'white',
+                                                        boxShadow: '0 4px 12px rgba(240, 147, 251, 0.3)'
+                                                    }}>
+                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                            등록수 비교
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataA.registrations.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataB.registrations.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{
+                                                            marginTop: '20px',
+                                                            paddingTop: '18px',
+                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
+                                                            <div style={{
+                                                                fontSize: '24px',
+                                                                fontWeight: '700'
+                                                            }}>
+                                                                {diffValue.registrations > 0 ? '+' : ''}{diffValue.registrations.toLocaleString()}
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '16px',
+                                                                fontWeight: '600',
+                                                                opacity: '0.95',
+                                                                marginTop: '6px'
+                                                            }}>
+                                                                ({diffPercent.registrations > 0 ? '+' : ''}{diffPercent.registrations.toFixed(1)}%)
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 퇴원수 비교 */}
+                                                    <div style={{
+                                                        background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                                                        padding: '25px',
+                                                        borderRadius: '12px',
+                                                        color: 'white',
+                                                        boxShadow: '0 4px 12px rgba(250, 112, 154, 0.3)'
+                                                    }}>
+                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                            퇴원수 비교
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataA.withdrawals.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div>
+                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
+                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                    {dataB.withdrawals.toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{
+                                                            marginTop: '20px',
+                                                            paddingTop: '18px',
+                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
+                                                            <div style={{
+                                                                fontSize: '24px',
+                                                                fontWeight: '700'
+                                                            }}>
+                                                                {diffValue.withdrawals > 0 ? '+' : ''}{diffValue.withdrawals.toLocaleString()}
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '16px',
+                                                                fontWeight: '600',
+                                                                opacity: '0.95',
+                                                                marginTop: '6px'
+                                                            }}>
+                                                                ({diffPercent.withdrawals > 0 ? '+' : ''}{diffPercent.withdrawals.toFixed(1)}%)
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+
+                                    {/* 비교 차트 */}
+                                    <div className="chart-container">
+                                        <h3 style={{marginBottom: '20px', color: '#001236'}}>기간 비교</h3>
+                                        <div style={{height: '400px', position: 'relative'}}>
+                                            <canvas ref={chartRefs.compare}></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         // 설정 페이지
         function SettingsPage({ user, userInfo, setUserInfo, isEmailVerified, setIsEmailVerified, needsReauth, setNeedsReauth }) {
             const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -4101,6 +5067,7 @@
         function Sidebar({ currentPage, setCurrentPage, user, userInfo, onLogout, onCostAccess, onToolkitAccess }) {
             const [visibleMenus, setVisibleMenus] = useState([]);
             const allMenuItems = [
+                { id: 'dashboard', name: '대시보드', icon: Icons.Dashboard },
                 { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
                 { id: 'cost', name: '마케팅 비용', icon: Icons.Cost, requiresPassword: true },
                 { id: 'toolkit', name: '마케팅 툴킷 신청', icon: Icons.Toolkit, requiresPassword: true },
@@ -4195,7 +5162,7 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('inquiry');
+            const [currentPage, setCurrentPage] = useState('dashboard');
             const [user, setUser] = useState(null);
             const [userInfo, setUserInfo] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -4386,6 +5353,8 @@
 
             const renderPage = () => {
                 switch (currentPage) {
+                    case 'dashboard':
+                        return <DashboardPage userInfo={userInfo} />;
                     case 'cost':
                         return <MarketingCostPage user={user} userInfo={userInfo} />;
                     case 'inquiry':
@@ -4395,7 +5364,7 @@
                     case 'settings':
                         return <SettingsPage user={user} userInfo={userInfo} setUserInfo={setUserInfo} isEmailVerified={isEmailVerified} setIsEmailVerified={setIsEmailVerified} needsReauth={needsReauth} setNeedsReauth={setNeedsReauth} />;
                     default:
-                        return <MarketingCostPage user={user} userInfo={userInfo} />;
+                        return <DashboardPage userInfo={userInfo} />;
                 }
             };
 
