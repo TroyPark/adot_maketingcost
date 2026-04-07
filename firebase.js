@@ -31,7 +31,7 @@ function getFirebaseErrorMessage(errorCode) {
         'auth/network-request-failed': '네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.',
         'auth/requires-recent-login': '보안을 위해 다시 로그인해주세요.'
     };
-    
+
     return errorMessages[errorCode] || '오류가 발생했습니다. 다시 시도해주세요.';
 }
 
@@ -42,7 +42,7 @@ async function loginWithEmail(email, password) {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
         console.log('✅ Firebase Auth 로그인 성공:', user.email);
-        
+
         // ===== 보안: 승인된 계정만 로그인 허용 (관리자/ABP 계정 제외) =====
         // 관리자 및 ABP 계정은 자동 승인
         if (user.email !== 'admin@dshare.co.kr' && user.email !== 'abp@dshare.co.kr') {
@@ -58,10 +58,10 @@ async function loginWithEmail(email, password) {
             console.log('✅ 관리자/ABP 계정 - 자동 승인');
         }
         // ===== 보안 확인 끝 =====
-        
+
         // 마지막 로그인 시간 업데이트
         await updateLastLogin(user.uid);
-        
+
         console.log('🎉 로그인 완료:', user.email);
         return { success: true, user: user };
     } catch (error) {
@@ -75,44 +75,44 @@ async function loginWithEmail(email, password) {
 async function validateUserAccount(user) {
     try {
         const doc = await db.collection('users').doc(user.uid).get();
-        
+
         if (!doc.exists) {
             // ⚠️ 보안: Firestore에 사용자 정보가 없으면 미승인 계정
             console.error('🚨 미승인 계정 로그인 차단:', user.email);
-            return { 
-                success: false, 
-                message: '관리자가 승인하지 않은 계정입니다.\n계정 생성은 관리자에게 문의하세요.\n담당자: 학원사업마케팅팀 / 박영주' 
+            return {
+                success: false,
+                message: '관리자가 승인하지 않은 계정입니다.\n계정 생성은 관리자에게 문의하세요.\n담당자: 학원사업마케팅팀 / 박영주'
             };
         }
-        
+
         const userData = doc.data();
-        
+
         // 비활성화된 계정 확인
         if (userData.isActive === false) {
             console.error('🚨 비활성화된 계정 로그인 차단:', user.email);
-            return { 
-                success: false, 
-                message: '비활성화된 계정입니다.\n관리자에게 문의하세요.' 
+            return {
+                success: false,
+                message: '비활성화된 계정입니다.\n관리자에게 문의하세요.'
             };
         }
-        
+
         // ===== 보안: 이메일 불일치 감지 (이메일 변조 차단) =====
         if (userData.email !== user.email) {
             console.error('🚨 이메일 불일치 감지! Auth:', user.email, '/ Firestore:', userData.email);
             console.error('🚨 계정 변조 시도 차단 - uid:', user.uid);
-            return { 
-                success: false, 
-                message: '계정 정보가 변조되었습니다.\n보안을 위해 로그인이 차단되었습니다.\n관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928' 
+            return {
+                success: false,
+                message: '계정 정보가 변조되었습니다.\n보안을 위해 로그인이 차단되었습니다.\n관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928'
             };
         }
-        
+
         console.log('✅ 승인된 계정 로그인:', user.email);
         return { success: true };
     } catch (error) {
         console.error('사용자 정보 확인 오류:', error);
-        return { 
-            success: false, 
-            message: '사용자 정보를 확인할 수 없습니다.\n관리자에게 문의하세요.' 
+        return {
+            success: false,
+            message: '사용자 정보를 확인할 수 없습니다.\n관리자에게 문의하세요.'
         };
     }
 }
@@ -121,7 +121,7 @@ async function validateUserAccount(user) {
 async function ensureUserInFirestore(user) {
     try {
         const doc = await db.collection('users').doc(user.uid).get();
-        
+
         if (!doc.exists) {
             // 관리자 계정만 자동 생성 허용
             if (user.email === 'admin@dshare.co.kr' || user.email === 'abp@dshare.co.kr') {
@@ -179,43 +179,43 @@ function onAuthStateChange(callback) {
 // 페이지에서 호출하여 이메일 변경을 실시간으로 감지하고 차단
 async function monitorEmailChanges() {
     if (!auth.currentUser) return true;
-    
+
     const currentUser = auth.currentUser;
     const uid = currentUser.uid;
-    
+
     // 관리자 및 ABP 계정은 감시 제외
     if (currentUser.email === 'admin@dshare.co.kr' || currentUser.email === 'abp@dshare.co.kr') {
         return true;
     }
-    
+
     try {
         const doc = await db.collection('users').doc(uid).get();
-        
+
         if (doc.exists) {
             const userData = doc.data();
             const authEmail = currentUser.email;
             const firestoreEmail = userData.email;
-            
+
             // 이메일 불일치 감지
             if (authEmail !== firestoreEmail) {
                 console.error('🚨🚨🚨 실시간 이메일 변조 감지!');
                 console.error('Auth Email:', authEmail);
                 console.error('Firestore Email:', firestoreEmail);
                 console.error('계정을 강제 로그아웃합니다.');
-                
+
                 alert('⚠️ 계정 정보 변조가 감지되었습니다.\n보안을 위해 로그아웃됩니다.\n\n정상적인 접근을 원하시면 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928');
-                
+
                 await auth.signOut();
                 window.location.href = 'index.html';
                 return false;
             }
-            
+
             return true;
         }
     } catch (error) {
         console.error('이메일 검증 오류:', error);
     }
-    
+
     return true;
 }
 
@@ -223,7 +223,7 @@ async function monitorEmailChanges() {
 function startEmailMonitoring() {
     // 즉시 한 번 체크
     monitorEmailChanges();
-    
+
     // 30초마다 체크
     return setInterval(() => {
         monitorEmailChanges();
@@ -235,17 +235,17 @@ function startEmailMonitoring() {
 async function createUser(email, password, displayName = '', branchName = '') {
     console.error('🚨 보안: createUser 함수는 비활성화되었습니다. 관리자를 통해 계정을 생성하세요.');
     console.error('담당자: 학원사업마케팅팀 박영주');
-    return { 
-        success: false, 
-        message: '보안상 일반 회원가입은 차단되었습니다.\n관리자에게 계정 생성을 요청하세요.\n담당자: 박영주 / 010-4037-0928' 
+    return {
+        success: false,
+        message: '보안상 일반 회원가입은 차단되었습니다.\n관리자에게 계정 생성을 요청하세요.\n담당자: 박영주 / 010-4037-0928'
     };
-    
+
     // 아래 코드는 실행되지 않음 (보안상 주석 처리하지 않고 막음)
     /*
     try {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
-        
+
         // Firestore에 사용자 정보 저장
         await db.collection('users').doc(user.uid).set({
             uid: user.uid,
@@ -257,7 +257,7 @@ async function createUser(email, password, displayName = '', branchName = '') {
             lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
             isActive: true
         });
-        
+
         return { success: true, user: user };
     } catch (error) {
         console.error('회원가입 오류:', error);
@@ -291,34 +291,34 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
 
         if (result.data && result.data.success) {
             console.log('✅ 새 사용자 생성 완료 (Functions):', newUserEmail);
-            return { 
-                success: true, 
-                user: { 
-                    uid: result.data.uid, 
-                    email: result.data.email 
-                } 
+            return {
+                success: true,
+                user: {
+                    uid: result.data.uid,
+                    email: result.data.email
+                }
             };
         } else {
-            return { 
-                success: false, 
-                message: result.data?.message || '사용자 생성에 실패했습니다.' 
+            return {
+                success: false,
+                message: result.data?.message || '사용자 생성에 실패했습니다.'
             };
         }
     } catch (error) {
         console.error('❌ 관리자 사용자 생성 오류:', error);
-        
+
         let errorMessage = '사용자 생성에 실패했습니다.';
-        
+
         if (error.code === 'functions/not-found') {
             errorMessage = 'Firebase Functions가 배포되지 않았습니다. 관리자에게 문의하세요.';
         } else if (error.message) {
             errorMessage = error.message;
         }
-        
-        return { 
-            success: false, 
-            error: error.code, 
-            message: errorMessage 
+
+        return {
+            success: false,
+            error: error.code,
+            message: errorMessage
         };
     }
 }
@@ -345,14 +345,14 @@ async function getAllUsers() {
         snapshot.forEach(doc => {
             users.push({ id: doc.id, ...doc.data() });
         });
-        
+
         // 클라이언트에서 정렬 (createdAt 기준 내림차순)
         users.sort((a, b) => {
             const dateA = a.createdAt?.toDate?.() || new Date(0);
             const dateB = b.createdAt?.toDate?.() || new Date(0);
             return dateB - dateA;
         });
-        
+
         console.log('사용자 목록 조회 성공:', users.length + '명');
         return { success: true, users: users };
     } catch (error) {
@@ -445,12 +445,12 @@ function updateLastActivity() {
 // 자동 로그아웃 체크
 function checkAutoLogout() {
     if (!auth.currentUser) return true;
-    
+
     const lastActivity = localStorage.getItem('lastActivityTime');
-    
+
     if (lastActivity) {
         const timePassed = Date.now() - parseInt(lastActivity);
-        
+
         // 1일이 지났으면 자동 로그아웃
         if (timePassed > AUTO_LOGOUT_TIME) {
             console.log('자동 로그아웃: 24시간 동안 활동 없음');
@@ -465,7 +465,7 @@ function checkAutoLogout() {
         // 첫 로그인 또는 활동 시간 없음
         updateLastActivity();
     }
-    
+
     return true;
 }
 
@@ -502,31 +502,31 @@ function validateImageDimensions(file) {
     return new Promise((resolve) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
-        
+
         img.onload = () => {
             URL.revokeObjectURL(objectUrl);
-            
+
             if (img.width > MAX_IMAGE_WIDTH || img.height > MAX_IMAGE_HEIGHT) {
-                resolve({ 
-                    valid: false, 
+                resolve({
+                    valid: false,
                     message: `이미지 크기가 너무 큽니다. 최대 ${MAX_IMAGE_WIDTH} x ${MAX_IMAGE_HEIGHT} 픽셀까지 허용됩니다. (현재: ${img.width} x ${img.height})`,
                     width: img.width,
                     height: img.height
                 });
             } else {
-                resolve({ 
+                resolve({
                     valid: true,
                     width: img.width,
                     height: img.height
                 });
             }
         };
-        
+
         img.onerror = () => {
             URL.revokeObjectURL(objectUrl);
             resolve({ valid: false, message: '이미지 파일을 읽을 수 없습니다.' });
         };
-        
+
         img.src = objectUrl;
     });
 }
@@ -549,16 +549,16 @@ async function uploadImage(file, userId, costId) {
         const timestamp = Date.now();
         const fileName = `${timestamp}_${file.name}`;
         const filePath = `costs/${userId}/${costId}/${fileName}`;
-        
+
         // Storage에 업로드
         const storageRef = storage.ref(filePath);
         const uploadTask = await storageRef.put(file);
-        
+
         // 다운로드 URL 가져오기
         const downloadURL = await uploadTask.ref.getDownloadURL();
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             url: downloadURL,
             path: filePath,
             fileName: fileName
@@ -573,7 +573,7 @@ async function uploadImage(file, userId, costId) {
 async function uploadImages(files, userId, costId) {
     try {
         const uploadResults = [];
-        
+
         for (const file of files) {
             const result = await uploadImage(file, userId, costId);
             if (result.success) {
@@ -586,9 +586,9 @@ async function uploadImages(files, userId, costId) {
                 console.error('개별 이미지 업로드 실패:', file.name, result.message);
             }
         }
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             images: uploadResults,
             uploadedCount: uploadResults.length,
             totalCount: files.length
@@ -632,10 +632,10 @@ async function deleteCostImages(userId, costId) {
     try {
         const folderRef = storage.ref(`costs/${userId}/${costId}`);
         const listResult = await folderRef.listAll();
-        
+
         const deletePromises = listResult.items.map(item => item.delete());
         await Promise.all(deletePromises);
-        
+
         return { success: true };
     } catch (error) {
         console.error('비용 이미지 폴더 삭제 오류:', error);

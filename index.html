@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -43,6 +44,7 @@
                 opacity: 0;
                 transform: translateY(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -188,38 +190,37 @@
         }
     </style>
 </head>
+
 <body>
     <div class="login-container">
         <div class="login-header">
             <h1>로그인</h1>
-            <h2>지점 소통 및 지점 마케팅 관리 시스템</h2> 
+            <h2>지점 소통 및 지점 마케팅 관리 시스템</h2>
         </div>
 
         <form id="loginForm">
             <div class="form-group">
                 <label for="email">이메일</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
-                    placeholder="이메일을 입력하세요" 
-                    required 
-                    autocomplete="username"
-                >
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="이메일을 입력하세요"
+                    required
+                    autocomplete="username">
                 <div class="error-message" id="emailError"></div>
             </div>
 
             <div class="form-group">
                 <label for="password">비밀번호</label>
                 <div class="password-container">
-                    <input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        placeholder="비밀번호를 입력하세요" 
-                        required 
-                        autocomplete="current-password"
-                    >
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="비밀번호를 입력하세요"
+                        required
+                        autocomplete="current-password">
                     <button type="button" class="password-toggle" id="passwordToggle">
                         <span id="toggleText">보기</span>
                     </button>
@@ -240,7 +241,7 @@
 
     <!-- Firebase 설정 -->
     <script src="firebase.js"></script>
-    
+
     <script>
         // 비밀번호 보기/숨기기 토글
         const passwordToggle = document.getElementById('passwordToggle');
@@ -263,6 +264,10 @@
         const passwordError = document.getElementById('passwordError');
         const loginError = document.getElementById('loginError');
         const loginButton = document.querySelector('.login-button');
+
+        // 로그인 폼 처리 중에는 onAuthStateChanged가 먼저 리다이렉트하지 않도록 함.
+        // (Firestore 검증 전에 user.html로 나가면 모바일·느린망에서 세션/이동 타이밍 꼬임 방지)
+        let loginFormAttemptInProgress = false;
 
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -305,19 +310,28 @@
             loginButton.disabled = true;
             loginButton.textContent = '로그인 중...';
 
-            // Firebase 로그인
-            const result = await loginWithEmail(email, password);
-            
+            loginFormAttemptInProgress = true;
+            let result;
+            try {
+                // Firebase 로그인 (내부에서 Firestore 승인 검증 후에만 성공)
+                result = await loginWithEmail(email, password);
+            } catch (err) {
+                console.error(err);
+                result = { success: false, message: '로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.' };
+            } finally {
+                loginFormAttemptInProgress = false;
+            }
+
             if (result.success) {
                 console.log('로그인 성공:', result.user.email);
-                
+
                 // 이메일 확인 후 페이지 분기
                 if (result.user.email === 'admin@dshare.co.kr') {
-                    window.location.href = 'admin.html';
+                    window.location.replace('admin.html');
                 } else if (result.user.email === 'abp@dshare.co.kr') {
-                    window.location.href = 'abp.html';
+                    window.location.replace('abp.html');
                 } else {
-                    window.location.href = 'user.html';
+                    window.location.replace('user.html');
                 }
             } else {
                 loginError.textContent = result.message;
@@ -327,24 +341,25 @@
             }
         });
 
-        // 로그인 상태 확인 (이미 로그인되어 있으면 페이지 이동)
+        // 로그인 상태 확인 (이미 로그인되어 있으면 페이지 이동 — 폼 제출·검증 중이 아닐 때만)
         onAuthStateChange(function(user) {
+            if (loginFormAttemptInProgress) {
+                return;
+            }
             if (user) {
                 console.log('이미 로그인됨:', user.email);
-                
+
                 // 이메일 확인 후 페이지 분기
                 if (user.email === 'admin@dshare.co.kr') {
-                    window.location.href = 'admin.html';
+                    window.location.replace('admin.html');
                 } else if (user.email === 'abp@dshare.co.kr') {
-                    window.location.href = 'abp.html';
+                    window.location.replace('abp.html');
                 } else {
-                    window.location.href = 'user.html';
+                    window.location.replace('user.html');
                 }
             }
         });
-
     </script>
 </body>
+
 </html>
-
-
