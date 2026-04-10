@@ -11395,9 +11395,6 @@
             const [managers, setManagers] = useState([]); // 담당자 목록
             const [showDetailModal, setShowDetailModal] = useState(false);
             const [selectedInquiry, setSelectedInquiry] = useState(null);
-            const [replyText, setReplyText] = useState('');
-            const [replyAuthor, setReplyAuthor] = useState('');
-            const [isReplying, setIsReplying] = useState(false);
 
             // 기획본부 문의 관련 상태
             const [showAbpModal, setShowAbpModal] = useState(false);
@@ -11567,40 +11564,7 @@
             // 상세보기
             const openDetail = (inquiry) => {
                 setSelectedInquiry(inquiry);
-                setReplyText(inquiry.reply || '');
-                setReplyAuthor(inquiry.replyAuthor || '');
                 setShowDetailModal(true);
-            };
-
-            // 답변 저장 (유형 카테고리 담당 부서 → 지점 최종 답변)
-            const handleReply = async () => {
-                if (!replyText.trim()) {
-                    alert('답변 내용을 입력해주세요.');
-                    return;
-                }
-                if (!replyAuthor.trim()) {
-                    alert('답변 작성자 이름을 입력해주세요.');
-                    return;
-                }
-
-                setIsReplying(true);
-
-                try {
-                    await db.collection('inquiries').doc(selectedInquiry.id).update({
-                        reply: replyText.trim(),
-                        replyAuthor: replyAuthor.trim(),
-                        status: 'answered',
-                        repliedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    alert('답변이 저장되었습니다.');
-                    setShowDetailModal(false);
-                } catch (error) {
-                    console.error('답변 저장 오류:', error);
-                    alert('답변 저장에 실패했습니다.');
-                } finally {
-                    setIsReplying(false);
-                }
             };
 
             // 기획본부 문의 모달 열기
@@ -12301,18 +12265,7 @@
                                                 fontWeight: '600'
                                             }}>
                                                  {getAbpDeptLabel(selectedInquiry)}                                            </span>
-                                            {selectedInquiry.team && (
-                                                <span style={{
-                                                    background: '#e3f2fd',
-                                                    color: '#1976d2',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '11px',
-                                                    fontWeight: '500'
-                                                }} title="지점 내 팀">
-                                                    지점 {selectedInquiry.team}
-                                                </span>
-                                            )}
+
                                             {selectedInquiry.position && (
                                                 <span style={{
                                                     background: '#f3e5f5',
@@ -12350,7 +12303,7 @@
                                         </div>
                                     </div>
 
-                                    {/* 답변 작성 영역 */}
+                                    {/* 답변 표시 영역 (조회 전용) */}
                                     <div style={{
                                         borderTop: '1px solid #eee',
                                         paddingTop: '20px'
@@ -12361,16 +12314,6 @@
                                             gap: '8px',
                                             marginBottom: '12px'
                                         }}>
-                                            <span style={{
-                                                background: '#e94560',
-                                                color: 'white',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
-                                                최종 답변 (담당 부서)
-                                            </span>
                                             {selectedInquiry.replyAuthor && (
                                                 <span style={{fontSize: '13px', color: '#333', fontWeight: '600'}}>
                                                     {selectedInquiry.replyAuthor}
@@ -12382,68 +12325,30 @@
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="form-group">
-                                            <label>답변 작성자 <span style={{color: '#dc3545'}}>*</span></label>
-                                            <input
-                                                type="text"
-                                                value={replyAuthor}
-                                                onChange={(e) => setReplyAuthor(e.target.value)}
-                                                placeholder="답변을 남기는 관리자 이름"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '12px 16px',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #e0e0e0',
-                                                    fontSize: '14px'
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>답변 내용 <span style={{color: '#dc3545'}}>*</span></label>
-                                            <textarea
-                                                rows="5"
-                                                value={replyText}
-                                                onChange={(e) => setReplyText(e.target.value)}
-                                                placeholder="지점에 전달할 최종 답변을 입력하세요"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '12px 16px',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #e0e0e0',
-                                                    fontSize: '14px',
-                                                    resize: 'vertical'
-                                                }}
-                                            />
-                                        </div>
+                                        {selectedInquiry.reply ? (
+                                            <div style={{
+                                                background: '#f8f9fa',
+                                                padding: '16px',
+                                                borderRadius: '8px',
+                                                whiteSpace: 'pre-wrap',
+                                                lineHeight: '1.6',
+                                                color: '#333'
+                                            }}>
+                                                {selectedInquiry.reply}
+                                            </div>
+                                        ) : (
+                                            <div style={{textAlign: 'center', color: '#999', padding: '12px 0'}}>
+                                                아직 답변이 등록되지 않았습니다.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee'}}>
                                     <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => setShowDetailModal(false)}
-                                        disabled={isReplying}
                                     >
                                         닫기
-                                    </button>
-                                    {selectedInquiry.abpInquiryId ? (
-                                        <span style={{ fontSize: '13px', color: '#047857', fontWeight: '600' }}>
-                                            ✓ 기획본부 문의함에 유형 분류로 접수됨
-                                        </span>
-                                    ) : (
-                                        <button
-                                            className="btn btn-sm"
-                                            onClick={openAbpModal}
-                                            style={{background: '#10b981'}}
-                                        >
-                                            기획본부 문의하기
-                                        </button>
-                                    )}
-                                    <button
-                                        className="btn btn-sm"
-                                        onClick={handleReply}
-                                        disabled={isReplying}
-                                    >
-                                        {isReplying ? '저장 중...' : '답변 저장'}
                                     </button>
                                 </div>
                             </div>
@@ -12573,13 +12478,6 @@
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
-
-            // 원본 지점 문의 모달 상태
-            const [showOriginalModal, setShowOriginalModal] = useState(false);
-            const [originalInquiryData, setOriginalInquiryData] = useState(null);
-            const [originalReplyText, setOriginalReplyText] = useState('');
-            const [isLoadingOriginal, setIsLoadingOriginal] = useState(false);
-            const [isReplyingOriginal, setIsReplyingOriginal] = useState(false);
 
             // 새 문의 작성 모달 상태
             const [showNewInquiryModal, setShowNewInquiryModal] = useState(false);
@@ -12816,60 +12714,6 @@
             const openDetail = (inquiry) => {
                 setSelectedInquiry(inquiry);
                 setShowDetailModal(true);
-            };
-
-            // 원본 지점 문의 열기
-            const openOriginalInquiry = async (originalInquiryId) => {
-                if (!originalInquiryId) {
-                    alert('원본 문의 정보가 없습니다.');
-                    return;
-                }
-
-                setIsLoadingOriginal(true);
-
-                try {
-                    const doc = await db.collection('inquiries').doc(originalInquiryId).get();
-                    if (doc.exists) {
-                        const data = { id: doc.id, ...doc.data() };
-                        setOriginalInquiryData(data);
-                        setOriginalReplyText(data.reply || '');
-                        setShowOriginalModal(true);
-                    } else {
-                        alert('원본 문의를 찾을 수 없습니다.');
-                    }
-                } catch (error) {
-                    console.error('원본 문의 로드 오류:', error);
-                    alert('원본 문의를 불러오는데 실패했습니다.');
-                } finally {
-                    setIsLoadingOriginal(false);
-                }
-            };
-
-            // 원본 지점 문의에 답변 저장
-            const handleOriginalReply = async () => {
-                if (!originalReplyText.trim()) {
-                    alert('답변 내용을 입력해주세요.');
-                    return;
-                }
-
-                setIsReplyingOriginal(true);
-
-                try {
-                    await db.collection('inquiries').doc(originalInquiryData.id).update({
-                        reply: originalReplyText.trim(),
-                        status: 'answered',
-                        repliedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    alert('답변이 저장되었습니다.');
-                    setShowOriginalModal(false);
-                    setOriginalInquiryData(null);
-                } catch (error) {
-                    console.error('답변 저장 오류:', error);
-                    alert('답변 저장에 실패했습니다.');
-                } finally {
-                    setIsReplyingOriginal(false);
-                }
             };
 
             // 새 문의 저장
@@ -13386,7 +13230,7 @@
                         <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
                             <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '700px'}}>
                                 <div className="modal-header">
-                                    <h3>기획본부 문의 상세</h3>
+                                    <h3>{getTeamName(selectedInquiry.targetTeam)} 문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
                                 <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
@@ -13419,7 +13263,7 @@
                                             </span>
                                         </div>
 
-                                        {/* 원본 지점 문의 - 클릭 가능 */}
+                                        {/* 원본 지점 문의 (조회 전용) */}
                                         {selectedInquiry.originalInquiry && (
                                             <div
                                                 style={{
@@ -13428,33 +13272,9 @@
                                                     borderRadius: '8px',
                                                     padding: '16px',
                                                     marginBottom: '16px',
-                                                    cursor: 'pointer',
                                                     transition: 'all 0.2s ease'
                                                 }}
-                                                onClick={() => openOriginalInquiry(selectedInquiry.originalInquiryId)}
-                                                onMouseOver={(e) => {
-                                                    e.currentTarget.style.background = '#e0f2fe';
-                                                    e.currentTarget.style.borderColor = '#7dd3fc';
-                                                }}
-                                                onMouseOut={(e) => {
-                                                    e.currentTarget.style.background = '#f0f9ff';
-                                                    e.currentTarget.style.borderColor = '#bae6fd';
-                                                }}
                                             >
-                                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-                                                    <h5 style={{color: '#0369a1', fontSize: '13px', margin: 0}}>
-                                                        📋 원본 지점 문의
-                                                    </h5>
-                                                    <span style={{
-                                                        fontSize: '11px',
-                                                        color: '#0369a1',
-                                                        background: '#e0f2fe',
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px'
-                                                    }}>
-                                                        {isLoadingOriginal ? '로딩중...' : '클릭하여 답변하기 →'}
-                                                    </span>
-                                                </div>
                                                 <p style={{fontWeight: '600', marginBottom: '6px'}}>{selectedInquiry.originalInquiry.title}</p>
                                                 <p style={{fontSize: '14px', color: '#555', lineHeight: '1.5', margin: 0}}>
                                                     {selectedInquiry.originalInquiry.content?.substring(0, 150)}
@@ -13466,6 +13286,7 @@
                                         <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
                                             문의 작성자: {selectedInquiry.authorName || '-'}
                                         </div>
+
                                         <div style={{
                                             background: '#f8f9fa',
                                             padding: '16px',
@@ -13537,136 +13358,6 @@
                                         onClick={() => setShowDetailModal(false)}
                                     >
                                         닫기
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 원본 지점 문의 모달 (겹창) */}
-                    {showOriginalModal && originalInquiryData && (
-                        <div className="modal-overlay" style={{zIndex: 1100}} onClick={() => setShowOriginalModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '650px'}}>
-                                <div className="modal-header">
-                                    <h3 style={{color: '#0369a1'}}>📋 원본 지점 문의</h3>
-                                    <button className="modal-close" onClick={() => setShowOriginalModal(false)}>×</button>
-                                </div>
-                                <div style={{maxHeight: '60vh', overflowY: 'auto'}}>
-                                    {/* 문의 정보 */}
-                                    <div style={{marginBottom: '20px'}}>
-                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap'}}>
-                                            <span style={{
-                                                background: originalInquiryData.status === 'answered' ? '#e8f5e9' : '#fff3e0',
-                                                color: originalInquiryData.status === 'answered' ? '#388e3c' : '#f57c00',
-                                                padding: '4px 10px',
-                                                borderRadius: '20px',
-                                                fontSize: '12px',
-                                                fontWeight: '500'
-                                            }}>
-                                                {originalInquiryData.status === 'answered' ? '답변완료' : '대기중'}
-                                            </span>
-                                            <span style={{
-                                                background: '#f07c00',
-                                                color: 'white',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
-                                                {originalInquiryData.branchName}
-                                            </span>
-                                            <span style={{
-                                                background: '#d1fae5',
-                                                color: '#047857',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
-                                                 {getTeamName(selectedInquiry?.targetTeam)}
-                                            </span>
-                                        </div>
-
-                                        <h4 style={{fontSize: '18px', fontWeight: '600', color: '#1a1a2e', marginBottom: '15px'}}>
-                                            {originalInquiryData.title}
-                                        </h4>
-
-                                        <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
-                                            작성자: {originalInquiryData.position || originalInquiryData.userName || '-'}
-                                            {originalInquiryData.userEmail && ` (${originalInquiryData.userEmail})`}
-                                        </div>
-
-                                        <div style={{
-                                            background: '#f8f9fa',
-                                            padding: '16px',
-                                            borderRadius: '8px',
-                                            whiteSpace: 'pre-wrap',
-                                            lineHeight: '1.6',
-                                            color: '#333'
-                                        }}>
-                                            {originalInquiryData.content}
-                                        </div>
-                                    </div>
-
-                                    {/* 답변 작성 영역 */}
-                                    <div style={{
-                                        borderTop: '1px solid #eee',
-                                        paddingTop: '20px'
-                                    }}>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            marginBottom: '12px'
-                                        }}>
-                                            <span style={{
-                                                background: '#e94560',
-                                                color: 'white',
-                                                padding: '4px 10px',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
-                                                관리자 답변
-                                            </span>
-                                            {originalInquiryData.repliedAt && (
-                                                <span style={{fontSize: '13px', color: '#666'}}>
-                                                    {formatDateLocal(originalInquiryData.repliedAt)}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="form-group">
-                                            <textarea
-                                                rows="5"
-                                                value={originalReplyText}
-                                                onChange={(e) => setOriginalReplyText(e.target.value)}
-                                                placeholder="답변 내용을 입력하세요"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '12px 16px',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #e0e0e0',
-                                                    fontSize: '14px',
-                                                    resize: 'vertical'
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee'}}>
-                                    <button
-                                        className="btn btn-secondary btn-sm"
-                                        onClick={() => setShowOriginalModal(false)}
-                                        disabled={isReplyingOriginal}
-                                    >
-                                        닫기
-                                    </button>
-                                    <button
-                                        className="btn btn-sm"
-                                        onClick={handleOriginalReply}
-                                        disabled={isReplyingOriginal}
-                                    >
-                                        {isReplyingOriginal ? '저장 중...' : '답변 저장'}
                                     </button>
                                 </div>
                             </div>
