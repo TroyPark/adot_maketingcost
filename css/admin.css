@@ -315,6 +315,21 @@ body {
   background: #f8f9fa;
 }
 
+/* 테이블 내 깨짐 방지 유틸 */
+.nowrap {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1;
+}
+
 .data-table .actions {
   display: flex;
   gap: 8px;

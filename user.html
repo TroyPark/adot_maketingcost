@@ -1207,9 +1207,9 @@
                 // Firestore Timestamp 처리
                 const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
                 return date.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit'
                 });
             };
 
@@ -3495,6 +3495,36 @@
             const [showDetailModal, setShowDetailModal] = useState(false);
             const [showEditModal, setShowEditModal] = useState(false);
             const [selectedInquiry, setSelectedInquiry] = useState(null);
+            // 담당 부서 직접 지정 시 선택지 (minorId = Firestore abpInquiries.targetTeam)
+            const ABP_TEAM_CHOICES_FOR_MANUAL = [
+                { minorId: 'biz_plan', minorLabel: '사업기획팀' },
+                { minorId: 'biz_mk1', minorLabel: '사업마케팅1팀' },
+                { minorId: 'biz_mk2', minorLabel: '사업마케팅2팀' },
+                { minorId: 'sales_ops', minorLabel: '영업지원팀' },
+                { minorId: 'hrd_academy', minorLabel: '학원HRD팀' },
+                { minorId: 'eng_lab', minorLabel: '영어연구소' },
+                { minorId: 'content_prod', minorLabel: '콘텐츠제작팀' },
+                { minorId: 'it_dev', minorLabel: 'IT본부' },
+                { minorId: 'corp_admin', minorLabel: '경영지원팀' }
+            ];
+
+            // 대분류(+중분류) → 기획본부 팀 문의함 targetTeam (AGENT.md 기준)
+            const resolveAbpTargetTeamFromCategory = (majorId, minorId) => {
+                if (majorId === 'manual_team') return minorId || null;
+                const ROUTING = {
+                    marketing: 'biz_mk2',
+                    special_lecture_briefing: 'biz_plan',
+                    settlement_purchase_cost_facility: 'sales_ops',
+                    seminar_education_instructor: 'hrd_academy',
+                    content_mock_exam_fast_grading: 'eng_lab',
+                    lecture_youtube: 'content_prod',
+                    bug_feature_ai: 'it_dev',
+                    hr_admin: 'corp_admin',
+                    unset: 'biz_mk1'
+                };
+                return ROUTING[majorId] || null;
+            };
+
             // 문의 유형(대/중분류) - AGENT.md 기준
             const inquiryCategoryTree = [
                 {
@@ -3569,6 +3599,11 @@
                         { minorId: 'sexual_crime_branch_code', minorLabel: '성범죄 지점 코드' },
                         { minorId: 'worker_hiring_contract_conditions', minorLabel: '근로자 채용 / 계약 / 근로 조건' }
                     ]
+                },
+                {
+                    majorId: 'manual_team',
+                    majorLabel: '담당 부서 직접 지정',
+                    minors: ABP_TEAM_CHOICES_FOR_MANUAL
                 },
                 {
                     majorId: 'unset',
@@ -3683,7 +3718,7 @@
                 if (!timestamp) return '-';
                 const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
                 return date.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
+                    year: '2-digit',
                     month: '2-digit',
                     day: '2-digit',
                     hour: '2-digit',
@@ -3715,9 +3750,11 @@
                     alert('문의 유형(대분류)을 선택해주세요.');
                     return;
                 }
-                // '미정'은 중분류 없이도 제출 가능
+                // '미정'은 중분류 없이도 제출 가능 / '담당 부서 직접 지정'은 부서(중분류) 필수
                 if (formData.inquiryMajor !== 'unset' && !formData.inquiryMinor) {
-                    alert('문의 유형(중분류)을 선택해주세요.');
+                    alert(formData.inquiryMajor === 'manual_team'
+                        ? '담당 부서를 선택해주세요.'
+                        : '문의 유형(중분류)을 선택해주세요.');
                     return;
                 }
                 if (!formData.position) {
@@ -3733,7 +3770,18 @@
 
                 try {
                     const inquiryTypeLabels = getInquiryTypeLabels(formData.inquiryMajor, formData.inquiryMinor);
+                    const abpTargetTeam = resolveAbpTargetTeamFromCategory(
+                        formData.inquiryMajor,
+                        formData.inquiryMajor === 'unset' ? '' : formData.inquiryMinor
+                    );
+                    if (!abpTargetTeam) {
+                        alert('문의 유형에 맞는 기획본부 팀을 찾을 수 없습니다. 관리자에게 문의하세요.');
+                        setIsSubmitting(false);
+                        return;
+                    }
+
                     const inquiriesRef = db.collection('inquiries').doc();
+                    const abpRef = db.collection('abpInquiries').doc();
                     const inquiryId = inquiriesRef.id;
                     const attachments = await uploadInquiryAttachments({
                         files: attachedFiles,
@@ -3741,7 +3789,7 @@
                         inquiryId
                     });
 
-                    await inquiriesRef.set({
+                    const inquiryPayload = {
                         userId: user.uid,
                         userEmail: user.email,
                         userName: userInfo?.displayName || '',
@@ -3760,8 +3808,33 @@
                         status: 'pending',
                         reply: '',
                         repliedAt: null,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        abpTargetTeam,
+                        abpInquiryId: abpRef.id,
+                        abpRoutedBy: 'category'
+                    };
+
+                    const abpPayload = {
+                        originalInquiryId: inquiryId,
+                        originalInquiry: {
+                            title: formData.title.trim(),
+                            content: formData.content.trim()
+                        },
+                        branchName: userInfo?.branchName || '',
+                        team: userInfo?.team || '',
+                        position: formData.position,
+                        targetTeam: abpTargetTeam,
+                        content: formData.content.trim(),
+                        authorName: formData.inquirerName.trim(),
+                        status: 'pending',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        abpRoutedBy: 'category'
+                    };
+
+                    const batch = db.batch();
+                    batch.set(inquiriesRef, inquiryPayload);
+                    batch.set(abpRef, abpPayload);
+                    await batch.commit();
 
                     alert('문의가 등록되었습니다.');
                     setFormData({
@@ -3826,9 +3899,11 @@
                     alert('문의 유형(대분류)을 선택해주세요.');
                     return;
                 }
-                // '미정'은 중분류 없이도 제출 가능
+                // '미정'은 중분류 없이도 제출 가능 / '담당 부서 직접 지정'은 부서(중분류) 필수
                 if (editFormData.inquiryMajor !== 'unset' && !editFormData.inquiryMinor) {
-                    alert('문의 유형(중분류)을 선택해주세요.');
+                    alert(editFormData.inquiryMajor === 'manual_team'
+                        ? '담당 부서를 선택해주세요.'
+                        : '문의 유형(중분류)을 선택해주세요.');
                     return;
                 }
                 if (!editFormData.position) {
@@ -3844,6 +3919,16 @@
 
                 try {
                     const inquiryTypeLabels = getInquiryTypeLabels(editFormData.inquiryMajor, editFormData.inquiryMinor);
+                    const nextAbpTargetTeam = resolveAbpTargetTeamFromCategory(
+                        editFormData.inquiryMajor,
+                        editFormData.inquiryMajor === 'unset' ? '' : editFormData.inquiryMinor
+                    );
+                    if (!nextAbpTargetTeam) {
+                        alert('문의 유형에 맞는 기획본부 팀을 찾을 수 없습니다. 관리자에게 문의하세요.');
+                        setIsSubmitting(false);
+                        return;
+                    }
+
                     const existingAttachments = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments : [];
                     const totalAfter = existingAttachments.length + editAttachedFiles.length;
                     if (totalAfter > 5) {
@@ -3868,8 +3953,27 @@
                         title: editFormData.title.trim(),
                         content: editFormData.content.trim(),
                         position: editFormData.position,
+                        abpTargetTeam: nextAbpTargetTeam,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
+
+                    if (selectedInquiry.abpInquiryId) {
+                        try {
+                            await db.collection('abpInquiries').doc(selectedInquiry.abpInquiryId).update({
+                                targetTeam: nextAbpTargetTeam,
+                                content: editFormData.content.trim(),
+                                originalInquiry: {
+                                    title: editFormData.title.trim(),
+                                    content: editFormData.content.trim()
+                                },
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch (abpErr) {
+                            // 권한(규칙) 또는 문서 상태 문제로 ABP 연동 업데이트가 실패해도,
+                            // 지점 문의(inquiries) 수정은 성공 처리한다.
+                            console.warn('abpInquiries 연동 업데이트 실패(무시):', abpErr);
+                        }
+                    }
 
                     alert('문의가 수정되었습니다.');
                     setShowEditModal(false);
@@ -3909,6 +4013,13 @@
                         await Promise.all(deletes);
                     }
 
+                    if (selectedInquiry.abpInquiryId) {
+                        try {
+                            await db.collection('abpInquiries').doc(selectedInquiry.abpInquiryId).delete();
+                        } catch (abpErr) {
+                            console.warn('연동 기획본부 문의 삭제 실패:', abpErr);
+                        }
+                    }
                     await db.collection('inquiries').doc(selectedInquiry.id).delete();
                     alert('문의가 삭제되었습니다.');
                     setShowDetailModal(false);
@@ -4089,13 +4200,13 @@
                                         </div>
                                         {formData.inquiryMajor && formData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>{formData.inquiryMajor === 'manual_team' ? '담당 부서' : '문의 유형 (중분류)'} <span style={{color: '#dc3545'}}>*</span></label>
                                                 <select
                                                     value={formData.inquiryMinor}
                                                     onChange={(e) => setFormData({...formData, inquiryMinor: e.target.value})}
                                                     required
                                                 >
-                                                    <option value="">중분류를 선택하세요</option>
+                                                    <option value="">{formData.inquiryMajor === 'manual_team' ? '부서를 선택하세요' : '중분류를 선택하세요'}</option>
                                                     {getMinorOptions(formData.inquiryMajor).map(mi => (
                                                         <option key={mi.minorId} value={mi.minorId}>{mi.minorLabel}</option>
                                                     ))}
@@ -4418,13 +4529,13 @@
                                         </div>
                                         {editFormData.inquiryMajor && editFormData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>{editFormData.inquiryMajor === 'manual_team' ? '담당 부서' : '문의 유형 (중분류)'} <span style={{color: '#dc3545'}}>*</span></label>
                                                 <select
                                                     value={editFormData.inquiryMinor}
                                                     onChange={(e) => setEditFormData({...editFormData, inquiryMinor: e.target.value})}
                                                     required
                                                 >
-                                                    <option value="">중분류를 선택하세요</option>
+                                                    <option value="">{editFormData.inquiryMajor === 'manual_team' ? '부서를 선택하세요' : '중분류를 선택하세요'}</option>
                                                     {getMinorOptions(editFormData.inquiryMajor).map(mi => (
                                                         <option key={mi.minorId} value={mi.minorId}>{mi.minorLabel}</option>
                                                     ))}

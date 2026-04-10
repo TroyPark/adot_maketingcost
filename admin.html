@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,6 +25,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="css/admin.css">
 </head>
+
 <body>
     <div id="root">
         <div class="loading">로딩 중...</div>
@@ -31,15 +33,15 @@
 
     <!-- Firebase 설정 -->
     <script src="firebase.js"></script>
-    
+
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
         const ADMIN_EMAIL = 'admin@dshare.co.kr';
         const ABP_EMAIL = 'abp@dshare.co.kr';
-        
+
         // 보호된 계정 (삭제 불가)
         const PROTECTED_EMAILS = [ADMIN_EMAIL, ABP_EMAIL];
-        
+
         // 사용자 생성 중 플래그 (전역 - onAuthStateChanged 콜백에서 접근 가능하도록)
         let isCreatingUser = false;
 
@@ -108,7 +110,7 @@
             if (!timestamp) return '-';
             const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
             return date.toLocaleDateString('ko-KR', {
-                year: 'numeric',
+                year: '2-digit',
                 month: '2-digit',
                 day: '2-digit',
                 hour: '2-digit',
@@ -223,30 +225,30 @@
             // 수량에 따른 단가 계산
             const getPricePerUnit = (toolkit, totalQty) => {
                 if (!toolkit.priceRanges) return 0;
-                
+
                 const sortedRanges = [...toolkit.priceRanges].sort((a, b) => a.minQty - b.minQty);
-                
+
                 for (let i = sortedRanges.length - 1; i >= 0; i--) {
                     const range = sortedRanges[i];
                     if (totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty)) {
                         return Number(range.pricePerUnit || 0);
                     }
                 }
-                
+
                 return Number(sortedRanges[0]?.pricePerUnit || 0);
             };
 
             // 툴킷 생성
             const handleCreateToolkit = async (e) => {
                 e.preventDefault();
-                
+
                 if (!newToolkit.name.trim()) {
                     alert('툴킷 이름을 입력하세요.');
                     return;
                 }
 
                 // 가격 구간 유효성 검사
-                const validRanges = newToolkit.priceRanges.filter(range => 
+                const validRanges = newToolkit.priceRanges.filter(range =>
                     range.minQty !== '' && range.pricePerUnit !== ''
                 );
 
@@ -257,13 +259,13 @@
 
                 try {
                     let imageUrl = '';
-                    
+
                     // 이미지가 있으면 업로드
                     if (newToolkit.image) {
                         const timestamp = Date.now();
                         const fileName = `${timestamp}_${newToolkit.image.name}`;
                         const filePath = `toolkits/${fileName}`;
-                        
+
                         const storageRef = storage.ref(filePath);
                         const uploadTask = await storageRef.put(newToolkit.image);
                         imageUrl = await uploadTask.ref.getDownloadURL();
@@ -318,28 +320,28 @@
                     // 해당 툴킷의 모든 주문 삭제 및 연결된 비용 삭제
                     const ordersToDelete = orders.filter(order => order.toolkitId === toolkitId);
                     const batch = db.batch();
-                    
+
                     // 주문과 연결된 비용도 함께 삭제
                     for (const order of ordersToDelete) {
                         // 툴킷 주문 삭제
                         batch.delete(db.collection('toolkitOrders').doc(order.id));
-                        
+
                         // 연결된 비용 삭제
                         if (order.costId) {
                             batch.delete(db.collection('costs').doc(order.costId));
                         }
                     }
-                    
+
                     // 툴킷 이미지 삭제 (있는 경우)
                     const toolkitDoc = await db.collection('toolkits').doc(toolkitId).get();
                     if (toolkitDoc.exists && toolkitDoc.data().imageUrl) {
                         const imageRef = storage.refFromURL(toolkitDoc.data().imageUrl);
                         await imageRef.delete().catch(err => console.log('이미지 삭제 실패:', err));
                     }
-                    
+
                     // 툴킷 삭제
                     batch.delete(db.collection('toolkits').doc(toolkitId));
-                    
+
                     await batch.commit();
                     alert('툴킷과 관련된 모든 데이터가 삭제되었습니다.');
                     loadData();
@@ -393,10 +395,10 @@
                 // 이미지 크기(픽셀) 검증
                 const img = new Image();
                 const objectUrl = URL.createObjectURL(file);
-                
+
                 img.onload = () => {
                     URL.revokeObjectURL(objectUrl);
-                    
+
                     if (img.width !== 560 || img.height !== 700) {
                         alert(`이미지 크기가 올바르지 않습니다.\n필수: 560 x 700 픽셀\n현재: ${img.width} x ${img.height} 픽셀`);
                         e.target.value = '';
@@ -415,13 +417,13 @@
                     };
                     reader.readAsDataURL(file);
                 };
-                
+
                 img.onerror = () => {
                     URL.revokeObjectURL(objectUrl);
                     alert('이미지 파일을 읽을 수 없습니다.');
                     e.target.value = '';
                 };
-                
+
                 img.src = objectUrl;
             };
 
@@ -429,7 +431,7 @@
             const handleRemoveImage = () => {
                 setNewToolkit({...newToolkit, image: null, imagePreview: ''});
             };
-            
+
             // 툴킷 취합 완료
             const handleCompleteToolkit = async (toolkitId, toolkitName) => {
                 if (!confirm(`"${toolkitName}" 툴킷을 취합 완료 처리하시겠습니까?\n\n취합 완료된 툴킷은 사용자 페이지에서 더 이상 보이지 않으며,\n"취합 완료 툴킷" 탭으로 이동합니다.`)) {
@@ -441,7 +443,7 @@
                         isCompleted: true,
                         completedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    
+
                     alert('툴킷이 취합 완료 처리되었습니다.');
                     setToolkitSubTab('completed'); // 취합 완료 탭으로 전환
                     loadData();
@@ -465,13 +467,13 @@
             // 툴킷 수정 저장
             const handleUpdateToolkit = async (e) => {
                 e.preventDefault();
-                
+
                 if (!editingToolkit.name.trim()) {
                     alert('툴킷 이름을 입력하세요.');
                     return;
                 }
 
-                const validRanges = editingToolkit.priceRanges.filter(range => 
+                const validRanges = editingToolkit.priceRanges.filter(range =>
                     range.minQty !== '' && range.pricePerUnit !== ''
                 );
 
@@ -482,7 +484,7 @@
 
                 try {
                     let imageUrl = editingToolkit.oldImageUrl || '';
-                    
+
                     // 새 이미지가 있으면 업로드
                     if (editingToolkit.image) {
                         // 기존 이미지 삭제 (있으면)
@@ -499,7 +501,7 @@
                         const timestamp = Date.now();
                         const fileName = `${timestamp}_${editingToolkit.image.name}`;
                         const filePath = `toolkits/${fileName}`;
-                        
+
                         const storageRef = storage.ref(filePath);
                         const uploadTask = await storageRef.put(editingToolkit.image);
                         imageUrl = await uploadTask.ref.getDownloadURL();
@@ -573,10 +575,10 @@
 
                 const img = new Image();
                 const objectUrl = URL.createObjectURL(file);
-                
+
                 img.onload = () => {
                     URL.revokeObjectURL(objectUrl);
-                    
+
                     if (img.width !== 560 || img.height !== 700) {
                         alert(`이미지 크기가 올바르지 않습니다.\n필수: 560 x 700 픽셀\n현재: ${img.width} x ${img.height} 픽셀`);
                         e.target.value = '';
@@ -593,13 +595,13 @@
                     };
                     reader.readAsDataURL(file);
                 };
-                
+
                 img.onerror = () => {
                     URL.revokeObjectURL(objectUrl);
                     alert('이미지 파일을 읽을 수 없습니다.');
                     e.target.value = '';
                 };
-                
+
                 img.src = objectUrl;
             };
 
@@ -651,10 +653,10 @@
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
-                
+
                 const today = new Date();
                 const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-                
+
                 link.setAttribute('href', url);
                 link.setAttribute('download', `툴킷_주문현황_${dateStr}.csv`);
                 link.style.visibility = 'hidden';
@@ -725,14 +727,14 @@
                                     툴킷 목록
                                 </h3>
                                 <div style={{display: 'flex', gap: '10px'}}>
-                                    <button 
+                                    <button
                                         className="btn btn-sm"
                                         style={{background: '#10b981'}}
                                         onClick={() => setShowCreateModal(true)}
                                     >
                                         + 툴킷 생성
                                     </button>
-                                    <button 
+                                    <button
                                         className="btn btn-sm"
                                         onClick={loadData}
                                         style={{background: '#6c757d'}}
@@ -787,10 +789,10 @@
 
                     {/* 툴킷 목록 */}
                     {(() => {
-                        const filteredToolkits = toolkits.filter(toolkit => 
+                        const filteredToolkits = toolkits.filter(toolkit =>
                             toolkitSubTab === 'active' ? !toolkit.isCompleted : toolkit.isCompleted
                         );
-                        
+
                         if (filteredToolkits.length === 0) {
                             return (
                                 <div className="empty-state">
@@ -798,7 +800,7 @@
                                 </div>
                             );
                         }
-                        
+
                         return (
                             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px'}}>
                                 {filteredToolkits.map(toolkit => {
@@ -821,8 +823,8 @@
                                         <div style={{marginBottom: '15px', textAlign: 'center'}}>
                                             {toolkit.imageUrl ? (
                                                 <div style={{position: 'relative', display: 'inline-block'}}>
-                                                    <img 
-                                                        src={toolkit.imageUrl} 
+                                                    <img
+                                                        src={toolkit.imageUrl}
                                                         alt={toolkit.name}
                                                         style={{
                                                             width: '100%',
@@ -844,7 +846,7 @@
                                                         due.setHours(0, 0, 0, 0);
                                                         const diffTime = due - today;
                                                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                                        
+
                                                         return (
                                                             <div style={{
                                                                 position: 'absolute',
@@ -947,7 +949,7 @@
                                             <div style={{fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#001236'}}>📊 가격 구간</div>
                                             <div style={{fontSize: '11px', lineHeight: '1.7'}}>
                                                 {toolkit.priceRanges && toolkit.priceRanges.map((range, idx) => (
-                                                    <div 
+                                                    <div
                                                         key={idx}
                                                         style={{
                                                             color: totalQty >= range.minQty && (range.maxQty === null || totalQty <= range.maxQty) ? '#f07c00' : '#666',
@@ -971,7 +973,7 @@
                                         {/* 관리 버튼들 */}
                                         <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto'}}>
                                             {toolkit.isCompleted ? (
-                                                <button 
+                                                <button
                                                     className="btn btn-sm"
                                                     style={{
                                                         background: '#f59e0b',
@@ -998,7 +1000,7 @@
                                                     🔄 재활성화
                                                 </button>
                                             ) : (
-                                                <button 
+                                                <button
                                                     className="btn btn-sm"
                                                     style={{
                                                         background: '#6b7280',
@@ -1011,14 +1013,14 @@
                                                 </button>
                                             )}
                                             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
-                                                <button 
+                                                <button
                                                     className="btn btn-sm"
                                                     style={{background: '#f07c00', padding: '10px'}}
                                                     onClick={() => handleEditToolkit(toolkit)}
                                                 >
                                                     ✏️ 수정
                                                 </button>
-                                                <button 
+                                                <button
                                                     className="btn btn-sm btn-danger"
                                                     style={{padding: '10px'}}
                                                     onClick={() => handleDeleteToolkit(toolkit.id, toolkit.name)}
@@ -1100,8 +1102,8 @@
                                         <span style={{fontSize: '14px', color: '#666'}}>
                                             총 <strong style={{color: '#001236'}}>{filteredOrders.length}</strong>건
                                         </span>
-                                        <button 
-                                            className="btn btn-sm btn-success" 
+                                        <button
+                                            className="btn btn-sm btn-success"
                                             onClick={handleExportOrdersExcel}
                                             style={{whiteSpace: 'nowrap'}}
                                         >
@@ -1190,7 +1192,7 @@
                                     <div className="modal-body">
                                         <div className="form-group">
                                             <label>툴킷 이름 *</label>
-                                            <input 
+                                            <input
                                                 type="text"
                                                 value={newToolkit.name}
                                                 onChange={(e) => setNewToolkit({...newToolkit, name: e.target.value})}
@@ -1201,7 +1203,7 @@
 
                                         <div className="form-group">
                                             <label>설명</label>
-                                            <textarea 
+                                            <textarea
                                                 value={newToolkit.description}
                                                 onChange={(e) => setNewToolkit({...newToolkit, description: e.target.value})}
                                                 placeholder="툴킷에 대한 설명을 입력하세요"
@@ -1224,8 +1226,8 @@
                                             </p>
                                             {newToolkit.imagePreview ? (
                                                 <div style={{position: 'relative', display: 'inline-block'}}>
-                                                    <img 
-                                                        src={newToolkit.imagePreview} 
+                                                    <img
+                                                        src={newToolkit.imagePreview}
                                                         alt="미리보기"
                                                         style={{
                                                             maxWidth: '280px',
@@ -1234,7 +1236,7 @@
                                                             borderRadius: '8px'
                                                         }}
                                                     />
-                                                    <button 
+                                                    <button
                                                         type="button"
                                                         onClick={handleRemoveImage}
                                                         style={{
@@ -1258,7 +1260,7 @@
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <input 
+                                                <input
                                                     type="file"
                                                     accept="image/jpeg,image/png"
                                                     onChange={handleImageChange}
@@ -1269,7 +1271,7 @@
 
                                         <div className="form-group">
                                             <label>취합 완료일</label>
-                                            <input 
+                                            <input
                                                 type="date"
                                                 value={newToolkit.dueDate}
                                                 onChange={(e) => setNewToolkit({...newToolkit, dueDate: e.target.value})}
@@ -1282,7 +1284,7 @@
 
                                         <div className="form-group">
                                             <label>최소 주문 수량 (선택)</label>
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={newToolkit.minOrderQty}
                                                 onChange={(e) => setNewToolkit({...newToolkit, minOrderQty: e.target.value})}
@@ -1296,7 +1298,7 @@
 
                                         <div className="form-group">
                                             <label>주문 단위 (선택)</label>
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={newToolkit.orderUnit}
                                                 onChange={(e) => setNewToolkit({...newToolkit, orderUnit: e.target.value})}
@@ -1310,7 +1312,7 @@
 
                                         <div className="form-group">
                                             <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
-                                                <input 
+                                                <input
                                                     type="checkbox"
                                                     checked={newToolkit.showTotalOrders}
                                                     onChange={(e) => setNewToolkit({...newToolkit, showTotalOrders: e.target.checked})}
@@ -1326,7 +1328,7 @@
                                         <div className="form-group">
                                             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
                                                 <label style={{marginBottom: 0}}>가격 구간 설정</label>
-                                                <button 
+                                                <button
                                                     type="button"
                                                     className="btn btn-sm"
                                                     style={{background: '#10b981', padding: '6px 12px', fontSize: '12px'}}
@@ -1343,7 +1345,7 @@
                                                     <div key={idx} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', padding: '10px', background: '#f8f9fa', borderRadius: '4px', alignItems: 'end'}}>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최소 수량</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.minQty}
                                                                 onChange={(e) => handleRangeChange(idx, 'minQty', e.target.value)}
@@ -1355,7 +1357,7 @@
                                                         </div>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최대 수량 (선택)</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.maxQty}
                                                                 onChange={(e) => handleRangeChange(idx, 'maxQty', e.target.value)}
@@ -1366,7 +1368,7 @@
                                                         </div>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>개당 단가 (원)</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.pricePerUnit}
                                                                 onChange={(e) => handleRangeChange(idx, 'pricePerUnit', e.target.value)}
@@ -1375,7 +1377,7 @@
                                                                 style={{fontSize: '13px'}}
                                                             />
                                                         </div>
-                                                        <button 
+                                                        <button
                                                             type="button"
                                                             className="btn btn-sm btn-danger"
                                                             onClick={() => handleRemoveRange(idx)}
@@ -1413,7 +1415,7 @@
                                     <div className="modal-body">
                                         <div className="form-group">
                                             <label>툴킷 이름 *</label>
-                                            <input 
+                                            <input
                                                 type="text"
                                                 value={editingToolkit.name}
                                                 onChange={(e) => setEditingToolkit({...editingToolkit, name: e.target.value})}
@@ -1424,7 +1426,7 @@
 
                                         <div className="form-group">
                                             <label>설명</label>
-                                            <textarea 
+                                            <textarea
                                                 value={editingToolkit.description || ''}
                                                 onChange={(e) => setEditingToolkit({...editingToolkit, description: e.target.value})}
                                                 placeholder="툴킷에 대한 설명을 입력하세요"
@@ -1447,8 +1449,8 @@
                                             </p>
                                             {editingToolkit.imagePreview ? (
                                                 <div style={{position: 'relative', display: 'inline-block'}}>
-                                                    <img 
-                                                        src={editingToolkit.imagePreview} 
+                                                    <img
+                                                        src={editingToolkit.imagePreview}
                                                         alt="미리보기"
                                                         style={{
                                                             maxWidth: '280px',
@@ -1457,7 +1459,7 @@
                                                             borderRadius: '8px'
                                                         }}
                                                     />
-                                                    <button 
+                                                    <button
                                                         type="button"
                                                         onClick={handleEditRemoveImage}
                                                         style={{
@@ -1481,7 +1483,7 @@
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <input 
+                                                <input
                                                     type="file"
                                                     accept="image/jpeg,image/png"
                                                     onChange={handleEditImageChange}
@@ -1493,7 +1495,7 @@
                                         <div className="form-group">
                                             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
                                                 <label style={{marginBottom: 0}}>가격 구간 설정</label>
-                                                <button 
+                                                <button
                                                     type="button"
                                                     className="btn btn-sm"
                                                     style={{background: '#10b981', padding: '6px 12px', fontSize: '12px'}}
@@ -1510,7 +1512,7 @@
                                                     <div key={idx} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', padding: '10px', background: '#f8f9fa', borderRadius: '4px', alignItems: 'end'}}>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최소 수량</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.minQty}
                                                                 onChange={(e) => handleEditRangeChange(idx, 'minQty', e.target.value)}
@@ -1522,7 +1524,7 @@
                                                         </div>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>최대 수량 (선택)</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.maxQty || ''}
                                                                 onChange={(e) => handleEditRangeChange(idx, 'maxQty', e.target.value)}
@@ -1533,7 +1535,7 @@
                                                         </div>
                                                         <div>
                                                             <label style={{fontSize: '11px', display: 'block', marginBottom: '4px'}}>개당 단가 (원)</label>
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 value={range.pricePerUnit}
                                                                 onChange={(e) => handleEditRangeChange(idx, 'pricePerUnit', e.target.value)}
@@ -1542,7 +1544,7 @@
                                                                 style={{fontSize: '13px'}}
                                                             />
                                                         </div>
-                                                        <button 
+                                                        <button
                                                             type="button"
                                                             className="btn btn-sm btn-danger"
                                                             onClick={() => handleEditRemoveRange(idx)}
@@ -1557,7 +1559,7 @@
 
                                         <div className="form-group">
                                             <label>취합 완료일</label>
-                                            <input 
+                                            <input
                                                 type="date"
                                                 value={editingToolkit.dueDate || ''}
                                                 onChange={(e) => setEditingToolkit({...editingToolkit, dueDate: e.target.value})}
@@ -1570,7 +1572,7 @@
 
                                         <div className="form-group">
                                             <label>최소 주문 수량 (선택)</label>
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={editingToolkit.minOrderQty || ''}
                                                 onChange={(e) => setEditingToolkit({...editingToolkit, minOrderQty: e.target.value})}
@@ -1584,7 +1586,7 @@
 
                                         <div className="form-group">
                                             <label>주문 단위 (선택)</label>
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={editingToolkit.orderUnit || ''}
                                                 onChange={(e) => setEditingToolkit({...editingToolkit, orderUnit: e.target.value})}
@@ -1598,7 +1600,7 @@
 
                                         <div className="form-group">
                                             <label style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}>
-                                                <input 
+                                                <input
                                                     type="checkbox"
                                                     checked={editingToolkit.showTotalOrders !== false}
                                                     onChange={(e) => setEditingToolkit({...editingToolkit, showTotalOrders: e.target.checked})}
@@ -1638,7 +1640,7 @@
             const [managers, setManagers] = useState([]);
             const [selectedManager, setSelectedManager] = useState('all');
             const [branchManagerMap, setBranchManagerMap] = useState({}); // 지점-담당자 매핑
-            
+
             // 날짜 필터 상태
             const [startDate, setStartDate] = useState('');
             const [endDate, setEndDate] = useState('');
@@ -1653,12 +1655,12 @@
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
-            
+
             // 이미지 미리보기 모달 상태
             const [showImageModal, setShowImageModal] = useState(false);
             const [previewImages, setPreviewImages] = useState([]);
             const [currentImageIndex, setCurrentImageIndex] = useState(0);
-            
+
             // 상세보기 모달 상태
             const [detailCost, setDetailCost] = useState(null);
 
@@ -1713,9 +1715,9 @@
                 if (!dateValue) return '-';
                 const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
                 return date.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit'
                 });
             };
 
@@ -1723,7 +1725,11 @@
             const formatDateForExcel = (dateValue) => {
                 if (!dateValue) return '';
                 const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
-                return date.toLocaleDateString('ko-KR');
+                return date.toLocaleDateString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
             };
 
             // Firestore에서 모든 비용 로드
@@ -1821,14 +1827,14 @@
             // Round 기간 내 사용 비용 계산 (전체)
             const getRoundUsedAmount = () => {
                 if (!currentRound) return 0;
-                
+
                 return costs.filter(cost => {
                     const costDate = cost.date;
                     if (costDate < currentRound.startDate || costDate > currentRound.endDate) return false;
-                    
+
                     // 담당자 필터 적용
                     if (selectedManager !== 'all' && branchManagerMap[cost.branchName] !== selectedManager) return false;
-                    
+
                     return true;
                 }).reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
             };
@@ -1929,7 +1935,7 @@
                         return false;
                     }
                 }
-                
+
                 // 지점 필터
                 if (selectedBranch !== 'all' && cost.branchName !== selectedBranch) {
                     return false;
@@ -1939,7 +1945,7 @@
                 if (selectedManager !== 'all' && branchManagerMap[cost.branchName] !== selectedManager) {
                     return false;
                 }
-                
+
                 // 추가 날짜 필터 (cost.date 기준)
                 if (startDate || endDate) {
                     const costDate = new Date(cost.date);
@@ -2009,13 +2015,13 @@
 
                 return true;
             });
-            
+
             // 페이지네이션 계산
             const totalPages = Math.ceil(filteredCosts.length / ITEMS_PER_PAGE);
             const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
             const endIndex = startIndex + ITEMS_PER_PAGE;
             const paginatedCosts = filteredCosts.slice(startIndex, endIndex);
-            
+
             // 필터 변경 시 페이지 리셋
             useEffect(() => {
                 setCurrentPage(1);
@@ -2188,17 +2194,17 @@
             // 이미지 다운로드
             const handleDownloadImage = async () => {
                 if (previewImages.length === 0) return;
-                
+
                 try {
                     const currentImage = previewImages[currentImageIndex];
                     const fileName = currentImage.name || `증빙이미지_${currentImageIndex + 1}.jpg`;
-                    
+
                     // fetch로 Blob 가져오기 (CORS 설정 완료)
                     const response = await fetch(currentImage.url);
                     if (!response.ok) throw new Error('이미지 다운로드 실패');
-                    
+
                     const blob = await response.blob();
-                    
+
                     // Blob URL 생성 후 다운로드
                     const blobUrl = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -2207,7 +2213,7 @@
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                    
+
                     // Blob URL 메모리 해제
                     window.URL.revokeObjectURL(blobUrl);
                 } catch (error) {
@@ -2271,7 +2277,7 @@
                             const orderSnapshot = await db.collection('toolkitOrders')
                                 .where('costId', '==', costId)
                                 .get();
-                            
+
                             // 주문 삭제 및 툴킷 ID 수집
                             for (const orderDoc of orderSnapshot.docs) {
                                 const orderData = orderDoc.data();
@@ -2295,7 +2301,7 @@
                             const remainingOrdersSnapshot = await db.collection('toolkitOrders')
                                 .where('toolkitId', '==', toolkitId)
                                 .get();
-                            
+
                             if (remainingOrdersSnapshot.empty) continue;
 
                             // 전체 수량 계산
@@ -2365,7 +2371,7 @@
 
             // 엑셀 다운로드
             const handleExportExcel = () => {
-                const dataToExport = selectedCosts.length > 0 
+                const dataToExport = selectedCosts.length > 0
                     ? filteredCosts.filter(cost => selectedCosts.includes(cost.id))
                     : filteredCosts;
 
@@ -2399,7 +2405,7 @@
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.setAttribute('href', url);
-                const fileName = `마케팅비용_${selectedBranch === 'all' ? '전체' : selectedBranch}_${new Date().toLocaleDateString('ko-KR').replace(/\./g, '')}.csv`;
+                const fileName = `마케팅비용_${selectedBranch === 'all' ? '전체' : selectedBranch}_${new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\./g, '')}.csv`;
                 link.setAttribute('download', fileName);
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
@@ -2421,19 +2427,19 @@
             const handleBulkUploadPasswordSubmit = async (e) => {
                 e.preventDefault();
                 setIsVerifyingBulkPassword(true);
-                
+
                 try {
                     // Firestore에서 비밀번호 가져오기
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         alert('고유 비밀번호가 설정되지 않았습니다. Round 관리에서 먼저 설정해주세요.');
                         setIsVerifyingBulkPassword(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (bulkUploadPassword === storedPassword) {
                         setShowBulkUploadPasswordModal(false);
                         setShowBulkUploadModal(true);
@@ -2482,7 +2488,7 @@
                 if (!file) return;
 
                 const fileExtension = file.name.split('.').pop().toLowerCase();
-                
+
                 if (!['csv', 'xlsx', 'xls'].includes(fileExtension)) {
                     alert('CSV 또는 엑셀 파일만 업로드 가능합니다.');
                     return;
@@ -2494,14 +2500,14 @@
                 }
 
                 setUploadFile(file);
-                
+
                 const reader = new FileReader();
-                
+
                 if (fileExtension === 'csv') {
                     reader.onload = (e) => {
                         const text = e.target.result;
                         const lines = text.split('\n').filter(line => line.trim());
-                        
+
                         if (lines.length < 2) {
                             alert('파일에 데이터가 없습니다.');
                             return;
@@ -2509,7 +2515,7 @@
 
                         const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
                         const dataRows = lines.slice(1);
-                        
+
                         const parsedData = dataRows.map((line, index) => {
                             const values = line.split(',').map(v => v.replace(/"/g, '').trim());
                             return {
@@ -2522,7 +2528,7 @@
                                 description: values[5] || ''
                             };
                         });
-                        
+
                         validateUploadData(parsedData);
                     };
                     reader.readAsText(file, 'UTF-8');
@@ -2532,7 +2538,7 @@
                         const workbook = XLSX.read(data, { type: 'array' });
                         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                        
+
                         if (jsonData.length < 2) {
                             alert('파일에 데이터가 없습니다.');
                             return;
@@ -2540,7 +2546,7 @@
 
                         const headers = jsonData[0];
                         const dataRows = jsonData.slice(1);
-                        
+
                         const parsedData = dataRows.map((row, index) => {
                             return {
                                 rowIndex: index + 2,
@@ -2552,7 +2558,7 @@
                                 description: String(row[5] || '').trim()
                             };
                         }).filter(row => row.branchName || row.date || row.amount); // 빈 행 제거
-                        
+
                         validateUploadData(parsedData);
                     };
                     reader.readAsArrayBuffer(file);
@@ -2632,7 +2638,7 @@
 
                     // Firestore batch write (500개씩)
                     const BATCH_SIZE = 500;
-                    
+
                     for (let i = 0; i < validData.length; i += BATCH_SIZE) {
                         const batch = db.batch();
                         const chunk = validData.slice(i, i + BATCH_SIZE);
@@ -2640,10 +2646,10 @@
                         for (const row of chunk) {
                             try {
                                 const docRef = db.collection('costs').doc();
-                                
+
                                 // 날짜 형식 변환
                                 const dateStr = row.date.replace(/[./]/g, '-');
-                                
+
                                 batch.set(docRef, {
                                     userId: user.uid,
                                     branchName: row.branchName,
@@ -2659,7 +2665,7 @@
                                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                                     status: 'pending'
                                 });
-                                
+
                                 uploadedCount++;
                             } catch (error) {
                                 console.error(`Row ${row.rowIndex} upload failed:`, error);
@@ -2672,7 +2678,7 @@
                     }
 
                     setIsUploading(false);
-                    
+
                     if (failedCount > 0) {
                         alert(`업로드 완료!\n성공: ${uploadedCount}건\n실패: ${failedCount}건`);
                     } else {
@@ -2783,7 +2789,7 @@
                 const now = new Date();
                 const currentMonth = now.getMonth();
                 const currentYear = now.getFullYear();
-                
+
                 return filteredCosts
                     .filter(cost => {
                         const costDate = cost.date ? new Date(cost.date) : null;
@@ -2815,8 +2821,8 @@
                     {/* 현재 Round 정보 카드 - 전체 또는 선택된 지점 */}
                     {currentRound && totalBudget > 0 && (
                         <div style={{
-                            background: selectedBranch !== 'all' 
-                                ? 'linear-gradient(135deg, #0d4f3c 0%, #1a6b4f 100%)' 
+                            background: selectedBranch !== 'all'
+                                ? 'linear-gradient(135deg, #0d4f3c 0%, #1a6b4f 100%)'
                                 : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
                             borderRadius: '12px',
                             padding: '24px',
@@ -2841,7 +2847,7 @@
                                         }}>
                                             현재 진행중
                                         </div>
-                                        
+
                                         {/* 담당자 필터 버튼 */}
                                         <div style={{display: 'flex', gap: '6px'}}>
                                             <button
@@ -2880,7 +2886,7 @@
                                                 </button>
                                             ))}
                                         </div>
-                                        
+
                                         {selectedBranch !== 'all' && (
                                             <div style={{
                                                 display: 'inline-block',
@@ -2902,7 +2908,7 @@
                                     </p>
                                 </div>
                                 {(() => {
-                                    const displayBudget = selectedBranch !== 'all' 
+                                    const displayBudget = selectedBranch !== 'all'
                                         ? (branchBudgets[selectedBranch] || 0)
                                         : totalBudget;
                                     const displayUsed = selectedBranch !== 'all'
@@ -2922,10 +2928,10 @@
                                     );
                                 })()}
                             </div>
-                            
+
                             {/* 프로그레스 바 */}
                             {(() => {
-                                const displayBudget = selectedBranch !== 'all' 
+                                const displayBudget = selectedBranch !== 'all'
                                     ? (branchBudgets[selectedBranch] || 0)
                                     : totalBudget;
                                 const displayUsed = selectedBranch !== 'all'
@@ -2943,8 +2949,8 @@
                                         <div style={{
                                             width: `${Math.min(rate, 100)}%`,
                                             height: '100%',
-                                            background: rate > 100 
-                                                ? 'linear-gradient(90deg, #dc3545, #ff6b6b)' 
+                                            background: rate > 100
+                                                ? 'linear-gradient(90deg, #dc3545, #ff6b6b)'
                                                 : rate > 80
                                                 ? 'linear-gradient(90deg, #fbbf24, #fcd34d)'
                                                 : 'linear-gradient(90deg, #e94560, #ff6b6b)',
@@ -2953,7 +2959,7 @@
                                     </div>
                                 );
                             })()}
-                            
+
                             {/* 지점 선택 시 해당 지점 정보 표시 */}
                             {selectedBranch !== 'all' ? (
                                 <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px'}}>
@@ -2972,7 +2978,7 @@
                                     <div>
                                         <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 예산</div>
                                         <div style={{
-                                            fontSize: '22px', 
+                                            fontSize: '22px',
                                             fontWeight: '700',
                                             color: (branchBudgets[selectedBranch] || 0) - getRoundUsedByBranch(selectedBranch) < 0 ? '#ff6b6b' : '#4ade80'
                                         }}>
@@ -3007,7 +3013,7 @@
                                         <div>
                                             <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 예산</div>
                                             <div style={{
-                                                fontSize: '22px', 
+                                                fontSize: '22px',
                                                 fontWeight: '700',
                                                 color: totalBudget - getRoundUsedAmount() < 0 ? '#ff6b6b' : '#4ade80'
                                             }}>
@@ -3297,8 +3303,8 @@
 
                         {/* 필터 영역 */}
                         <div style={{
-                            display: 'flex', 
-                            gap: '20px', 
+                            display: 'flex',
+                            gap: '20px',
                             alignItems: 'center',
                             flexWrap: 'wrap',
                             padding: '15px 20px',
@@ -3309,7 +3315,7 @@
                             {/* 지점 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                 <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>지점:</label>
-                                <select 
+                                <select
                                     value={selectedBranch}
                                     onChange={(e) => {
                                         setSelectedBranch(e.target.value);
@@ -3329,7 +3335,7 @@
                                     ))}
                                 </select>
                             </div>
-                            
+
                             {/* 담당자 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                 <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>담당자:</label>
@@ -3353,7 +3359,7 @@
                                     ))}
                                 </select>
                             </div>
-                            
+
                             {/* 날짜 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                 <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>등록 일시:</label>
@@ -3463,21 +3469,21 @@
                                     필터 초기화
                                 </button>
                             )}
-                            
+
                             {/* 필터 결과 및 엑셀 다운로드 */}
                             <div style={{marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '15px'}}>
                                 <span style={{fontSize: '14px', color: '#666'}}>
                                     총 <strong style={{color: '#001236'}}>{filteredCosts.length}</strong>건
                                 </span>
-                                <button 
-                                    className="btn btn-sm btn-primary" 
+                                <button
+                                    className="btn btn-sm btn-primary"
                                     onClick={() => setShowBulkUploadPasswordModal(true)}
                                     style={{whiteSpace: 'nowrap'}}
                                 >
                                     📤 대량 업로드
                                 </button>
-                                <button 
-                                    className="btn btn-sm btn-success" 
+                                <button
+                                    className="btn btn-sm btn-success"
                                     onClick={handleExportExcel}
                                     style={{whiteSpace: 'nowrap'}}
                                 >
@@ -3540,8 +3546,8 @@
                                     </thead>
                                     <tbody>
                                         {paginatedCosts.map(cost => (
-                                            <tr 
-                                                key={cost.id} 
+                                            <tr
+                                                key={cost.id}
                                                 className={selectedCosts.includes(cost.id) ? 'selected' : ''}
                                                 onClick={(e) => {
                                                     // 체크박스나 버튼 클릭 시에는 모달 열지 않음
@@ -3627,7 +3633,7 @@
                                         ))}
                                     </tbody>
                                 </table>
-                                
+
                                 {/* 페이지네이션 */}
                                 {totalPages > 1 && (
                                     <div style={{
@@ -3653,11 +3659,11 @@
                                         >
                                             ‹ 이전
                                         </button>
-                                        
+
                                         <span style={{fontSize: '14px', color: '#666', minWidth: '120px', textAlign: 'center'}}>
                                             {currentPage} / {totalPages} 페이지 (총 {filteredCosts.length}건)
                                         </span>
-                                        
+
                                         <button
                                             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                             disabled={currentPage === totalPages}
@@ -3704,16 +3710,16 @@
                                         </div>
                                     </div>
                                     <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee'}}>
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={() => setShowDeleteModal(false)}
                                             disabled={isDeleting}
                                         >
                                             취소
                                         </button>
-                                        <button 
-                                            type="submit" 
+                                        <button
+                                            type="submit"
                                             className="btn btn-danger btn-sm"
                                             disabled={isDeleting}
                                         >
@@ -3732,7 +3738,7 @@
                                 <div className="image-modal-header">
                                     <h3>증빙 이미지 ({currentImageIndex + 1} / {previewImages.length})</h3>
                                     <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                                        <button 
+                                        <button
                                             className="btn btn-sm"
                                             style={{
                                                 background: '#4CAF50',
@@ -3758,8 +3764,8 @@
                                             ‹
                                         </button>
                                     )}
-                                    <img 
-                                        src={previewImages[currentImageIndex]?.url} 
+                                    <img
+                                        src={previewImages[currentImageIndex]?.url}
                                         alt={`증빙 이미지 ${currentImageIndex + 1}`}
                                     />
                                     {previewImages.length > 1 && (
@@ -3771,7 +3777,7 @@
                                 {previewImages.length > 1 && (
                                     <div className="image-modal-footer">
                                         {previewImages.map((_, index) => (
-                                            <div 
+                                            <div
                                                 key={index}
                                                 className={`image-dot ${index === currentImageIndex ? 'active' : ''}`}
                                                 onClick={() => setCurrentImageIndex(index)}
@@ -3801,7 +3807,7 @@
                                         </p>
                                         <div className="form-group">
                                             <label>비밀번호</label>
-                                            <input 
+                                            <input
                                                 type="password"
                                                 value={bulkUploadPassword}
                                                 onChange={(e) => setBulkUploadPassword(e.target.value)}
@@ -3812,8 +3818,8 @@
                                         </div>
                                     </div>
                                     <div className="modal-actions">
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary"
                                             onClick={() => {
                                                 setShowBulkUploadPasswordModal(false);
@@ -3822,8 +3828,8 @@
                                         >
                                             취소
                                         </button>
-                                        <button 
-                                            type="submit" 
+                                        <button
+                                            type="submit"
                                             className="btn"
                                             disabled={isVerifyingBulkPassword}
                                         >
@@ -3866,8 +3872,8 @@
                                                 </div>
                                             </div>
 
-                                            <button 
-                                                className="btn btn-sm btn-secondary" 
+                                            <button
+                                                className="btn btn-sm btn-secondary"
                                                 onClick={handleDownloadTemplate}
                                                 style={{marginBottom: '20px'}}
                                             >
@@ -3911,8 +3917,8 @@
                                                     지원 형식: CSV, Excel (.xlsx, .xls) | 최대 10MB
                                                 </div>
                                             </div>
-                                            <input 
-                                                type="file" 
+                                            <input
+                                                type="file"
                                                 id="bulk-upload-file-input"
                                                 accept=".csv,.xlsx,.xls"
                                                 style={{display: 'none'}}
@@ -3928,7 +3934,7 @@
                                                 <div>
                                                     <h4 style={{fontSize: '15px', marginBottom: '5px'}}>📊 데이터 미리보기</h4>
                                                     <div style={{fontSize: '13px', color: '#666'}}>
-                                                        총 <strong>{uploadPreviewData.length}</strong>건 
+                                                        총 <strong>{uploadPreviewData.length}</strong>건
                                                         {uploadErrors.length > 0 && (
                                                             <span style={{color: '#f44336', marginLeft: '10px'}}>
                                                                 | ⚠️ 오류 <strong>{uploadErrors.length}</strong>건
@@ -3936,8 +3942,8 @@
                                                         )}
                                                     </div>
                                                 </div>
-                                                <button 
-                                                    className="btn btn-sm btn-secondary" 
+                                                <button
+                                                    className="btn btn-sm btn-secondary"
                                                     onClick={() => {
                                                         setUploadFile(null);
                                                         setUploadPreviewData([]);
@@ -4445,7 +4451,7 @@
             useEffect(() => {
                 const loadData = async () => {
                     setLoading(true);
-                    
+
                     // 사용자 목록에서 지점명 가져오기
                     const usersResult = await getAllUsers();
                     if (usersResult.success) {
@@ -4492,11 +4498,11 @@
             // 지점별 비용 계산 (선택된 라운드 기간 내)
             const getBranchCosts = (branchName) => {
                 const selectedRound = rounds.find(r => r.id === selectedRoundId);
-                
+
                 return costs
                     .filter(cost => {
                         if (cost.branchName !== branchName) return false;
-                        
+
                         // 라운드가 선택된 경우 해당 기간 내 비용만 계산
                         if (selectedRound) {
                             const costDate = new Date(cost.date);
@@ -4505,7 +4511,7 @@
                             endDate.setHours(23, 59, 59, 999);
                             return costDate >= startDate && costDate <= endDate;
                         }
-                        
+
                         return true;
                     })
                     .reduce((sum, cost) => sum + Number(cost.amount || 0), 0);
@@ -4514,10 +4520,10 @@
             // 지점별 비용 건수 (선택된 라운드 기간 내)
             const getBranchCostCount = (branchName) => {
                 const selectedRound = rounds.find(r => r.id === selectedRoundId);
-                
+
                 return costs.filter(cost => {
                     if (cost.branchName !== branchName) return false;
-                    
+
                     if (selectedRound) {
                         const costDate = new Date(cost.date);
                         const startDate = new Date(selectedRound.startDate);
@@ -4525,7 +4531,7 @@
                         endDate.setHours(23, 59, 59, 999);
                         return costDate >= startDate && costDate <= endDate;
                     }
-                    
+
                     return true;
                 }).length;
             };
@@ -4533,12 +4539,12 @@
             // 라운드 선택 시 배정 비용 로드
             const handleRoundSelect = async (roundId) => {
                 setSelectedRoundId(roundId);
-                
+
                 if (!roundId) {
                     setBranchBudgets({});
                     return;
                 }
-                
+
                 try {
                     const doc = await db.collection('roundBudgets').doc(roundId).get();
                     if (doc.exists) {
@@ -4572,9 +4578,9 @@
                     alert('라운드를 선택해주세요.');
                     return;
                 }
-                
+
                 setIsSavingBudget(true);
-                
+
                 try {
                     await db.collection('roundBudgets').doc(selectedRoundId).set({
                         roundId: selectedRoundId,
@@ -4645,7 +4651,7 @@
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.setAttribute('href', url);
-                const fileName = `지점별비용_${roundName}_${new Date().toLocaleDateString('ko-KR').replace(/\./g, '')}.csv`;
+                const fileName = `지점별비용_${roundName}_${new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\./g, '')}.csv`;
                 link.setAttribute('download', fileName);
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
@@ -4656,7 +4662,7 @@
             // Round 추가
             const handleAddRound = async (e) => {
                 e.preventDefault();
-                
+
                 if (!newRound.name || !newRound.startDate || !newRound.endDate) {
                     alert('모든 필드를 입력해주세요.');
                     return;
@@ -4669,7 +4675,7 @@
                         endDate: newRound.endDate,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    
+
                     setNewRound({ name: '', startDate: '', endDate: '' });
                     alert('Round가 추가되었습니다.');
                 } catch (error) {
@@ -4752,13 +4758,13 @@
                     <div className="content-area">
                         {/* 탭 버튼 */}
                         <div className="tab-buttons">
-                            <button 
+                            <button
                                 className={`tab-button ${activeTab === 'date' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('date')}
                             >
                                 Round 날짜 지정
                             </button>
-                            <button 
+                            <button
                                 className={`tab-button ${activeTab === 'branch' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('branch')}
                             >
@@ -4778,7 +4784,7 @@
                                         <form onSubmit={handleAddRound}>
                                             <div className="form-group" style={{marginBottom: '16px'}}>
                                                 <label>Round 이름</label>
-                                                <input 
+                                                <input
                                                     type="text"
                                                     value={newRound.name}
                                                     onChange={(e) => setNewRound({...newRound, name: e.target.value})}
@@ -4788,7 +4794,7 @@
                                             <div className="round-date-inputs">
                                                 <div className="form-group">
                                                     <label>시작일</label>
-                                                    <input 
+                                                    <input
                                                         type="date"
                                                         value={newRound.startDate}
                                                         onChange={(e) => setNewRound({...newRound, startDate: e.target.value})}
@@ -4796,7 +4802,7 @@
                                                 </div>
                                                 <div className="form-group">
                                                     <label>종료일</label>
-                                                    <input 
+                                                    <input
                                                         type="date"
                                                         value={newRound.endDate}
                                                         onChange={(e) => setNewRound({...newRound, endDate: e.target.value})}
@@ -4975,7 +4981,7 @@
                                                                 const used = getBranchCosts(branch);
                                                                 const remaining = budget - used;
                                                                 const usageRate = budget > 0 ? Math.round((used / budget) * 100) : 0;
-                                                                
+
                                                                 return (
                                                                     <tr key={branch}>
                                                                         <td>
@@ -5048,15 +5054,15 @@
                                                             })}
                                                         </tbody>
                                                     </table>
-                                                    
+
                                                     <div style={{marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                                                        <button 
+                                                        <button
                                                             className="btn btn-success"
                                                             onClick={handleExportBranchCosts}
                                                         >
                                                             📥 엑셀 다운로드
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             className="btn"
                                                             onClick={handleSaveBudgets}
                                                             disabled={isSavingBudget}
@@ -5099,16 +5105,16 @@
                 team: '',
                 manager: ''
             });
-            
+
             // 팀 옵션
             const teamOptions = ['1팀', '2팀', '3팀', '4팀'];
             const [selectedUsers, setSelectedUsers] = useState([]);
-            
+
             // 삭제 확인 모달 상태
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
-            
+
             // 활성화/비활성화 모달 상태
             const [showToggleModal, setShowToggleModal] = useState(false);
             const [toggleUser, setToggleUser] = useState(null);
@@ -5191,15 +5197,15 @@
                 try {
                     // Firestore에서 고유 비밀번호 확인
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         alert('고유 비밀번호가 설정되지 않았습니다. Firebase Console에서 설정해주세요.');
                         setIsDeleting(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (deletePassword !== storedPassword) {
                         alert('비밀번호가 올바르지 않습니다.');
                         setIsDeleting(false);
@@ -5265,7 +5271,7 @@
             // 사용자 등록/수정
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                
+
                 if (editingUser) {
                     // 수정
                     const result = await updateUser(editingUser.uid, {
@@ -5291,10 +5297,10 @@
                         alert('고유 비밀번호를 입력해주세요.');
                         return;
                     }
-                    
+
                     // 사용자 생성 중 플래그 설정 (리다이렉트 방지)
                     isCreatingUser = true;
-                    
+
                     // 관리자용 사용자 생성 (고유 비밀번호로 확인)
                     const result = await createUserByAdmin(
                         formData.email,
@@ -5306,10 +5312,10 @@
                         formData.team,
                         formData.manager
                     );
-                    
+
                     // 플래그 해제
                     isCreatingUser = false;
-                    
+
                     if (result.success) {
                         alert('✅ 사용자가 등록되었습니다.');
                         setShowModal(false);
@@ -5335,7 +5341,7 @@
                 setTogglePassword('');
                 setShowToggleModal(true);
             };
-            
+
             // 고유 비밀번호 확인 후 활성화/비활성화 실행
             const confirmToggleActive = async () => {
                 if (!togglePassword) {
@@ -5348,15 +5354,15 @@
                 try {
                     // Firestore에서 고유 비밀번호 확인
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         alert('고유 비밀번호가 설정되지 않았습니다. Firebase Console에서 설정해주세요.');
                         setIsToggling(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (togglePassword !== storedPassword) {
                         alert('비밀번호가 올바르지 않습니다.');
                         setIsToggling(false);
@@ -5366,7 +5372,7 @@
                     // 활성화/비활성화 실행
                     const newStatus = !toggleUser.isActive;
                     const result = await toggleUserActive(toggleUser.uid, newStatus);
-                    
+
                     if (result.success) {
                         setShowToggleModal(false);
                         setToggleUser(null);
@@ -5386,7 +5392,7 @@
             // 사용자 삭제
             const handleDelete = async (user) => {
                 if (!confirm(`"${user.email}" 사용자를 삭제하시겠습니까?`)) return;
-                
+
                 const result = await deleteUserFromFirestore(user.uid);
                 if (result.success) {
                     alert('사용자가 삭제되었습니다.');
@@ -5652,8 +5658,8 @@
                             <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
                                 <div className="modal-header">
                                     <h3 style={{color: '#dc3545'}}>⚠️ 사용자 삭제</h3>
-                                    <button 
-                                        className="modal-close" 
+                                    <button
+                                        className="modal-close"
                                         onClick={() => setShowDeleteModal(false)}
                                         disabled={isDeleting}
                                     >×</button>
@@ -5693,17 +5699,17 @@
                                     />
                                 </div>
                                 <div className="modal-actions">
-                                    <button 
-                                        type="button" 
-                                        className="btn btn-secondary" 
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
                                         onClick={() => setShowDeleteModal(false)}
                                         disabled={isDeleting}
                                     >
                                         취소
                                     </button>
-                                    <button 
-                                        type="button" 
-                                        className="btn btn-danger" 
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
                                         onClick={confirmDelete}
                                         disabled={isDeleting || !deletePassword}
                                     >
@@ -5722,15 +5728,15 @@
                                     <h3 style={{color: toggleUser.isActive ? '#dc3545' : '#28a745'}}>
                                         {toggleUser.isActive ? '⚠️ 사용자 비활성화' : '✓ 사용자 활성화'}
                                     </h3>
-                                    <button 
-                                        className="modal-close" 
+                                    <button
+                                        className="modal-close"
                                         onClick={() => setShowToggleModal(false)}
                                         disabled={isToggling}
                                     >×</button>
                                 </div>
                                 <div style={{marginBottom: '20px'}}>
                                     <p style={{color: '#666', marginBottom: '15px'}}>
-                                        <strong>{toggleUser.email}</strong> 사용자를 
+                                        <strong>{toggleUser.email}</strong> 사용자를
                                         <strong style={{color: toggleUser.isActive ? '#dc3545' : '#28a745'}}>
                                             {toggleUser.isActive ? ' 비활성화' : ' 활성화'}
                                         </strong>합니다.
@@ -5759,16 +5765,16 @@
                                     </p>
                                 </div>
                                 <div className="modal-actions">
-                                    <button 
-                                        type="button" 
-                                        className="btn btn-secondary" 
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
                                         onClick={() => setShowToggleModal(false)}
                                         disabled={isToggling}
                                     >
                                         취소
                                     </button>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         className={`btn ${toggleUser.isActive ? 'btn-danger' : 'btn-success'}`}
                                         onClick={confirmToggleActive}
                                         disabled={isToggling || !togglePassword}
@@ -11024,15 +11030,15 @@
                 try {
                     // Firestore에서 고유 비밀번호 확인
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         setPasswordMessage({ type: 'error', text: '고유 비밀번호가 설정되지 않았습니다.' });
                         setIsChangingPassword(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (uniquePassword !== storedPassword) {
                         setPasswordMessage({ type: 'error', text: '고유 비밀번호가 올바르지 않습니다.' });
                         setIsChangingPassword(false);
@@ -11042,7 +11048,7 @@
                     // 비밀번호 변경
                     const currentUser = auth.currentUser;
                     await currentUser.updatePassword(newPassword);
-                    
+
                     setPasswordMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' });
                     setUniquePassword('');
                     setNewPassword('');
@@ -11131,7 +11137,7 @@
                                 <div style={{display: 'grid', gridTemplateColumns: '120px 1fr', gap: '15px', alignItems: 'center'}}>
                                     <span style={{color: '#666', fontSize: '14px'}}>이메일</span>
                                     <span style={{fontWeight: '600', color: '#1a1a2e'}}>{user?.email || '-'}</span>
-                                    
+
                                     <span style={{color: '#666', fontSize: '14px'}}>역할</span>
                                     <span>
                                         <span style={{
@@ -11350,44 +11356,62 @@
             );
         }
 
-        // 기획본부 팀 목록
-        const ABP_TEAMS = [
-            { id: 'planning', name: '학원사업기획팀' },
-            { id: 'marketing', name: '학원사업마케팅팀' },
-            { id: 'hrd', name: '학원사업HRD팀' },
-            { id: 'production', name: '콘텐츠제작팀' },
-            { id: 'rnd', name: '콘텐츠R&D팀' }
+        // 기획본부 팀 정의 (abpInquiries.targetTeam) — 관리자(admin) 화면 노출 순서
+        const ABP_TEAM_DEFS = [
+            { id: 'biz_plan', name: '사업기획팀' },
+            { id: 'sales_ops', name: '영업지원팀' },
+            { id: 'hrd_academy', name: '학원HRD팀' },
+            { id: 'eng_lab', name: '영어연구소' },
+            { id: 'content_prod', name: '콘텐츠제작팀' },
+            { id: 'it_dev', name: 'IT본부' },
+            { id: 'corp_admin', name: '경영지원팀' },
+            { id: 'biz_mk1', name: '사업마케팅1팀' },
+            { id: 'biz_mk2', name: '사업마케팅2팀' }
         ];
+        const ABP_TEAM_BY_ID = Object.fromEntries(ABP_TEAM_DEFS.map(t => [t.id, t]));
+        const ABP_ADMIN_ORDER = [
+            'biz_plan', 'biz_mk1', 'biz_mk2', 'sales_ops', 'hrd_academy', 'eng_lab',
+            'content_prod', 'it_dev', 'corp_admin'
+        ];
+        const ABP_TEAMS = ABP_ADMIN_ORDER.map(id => ABP_TEAM_BY_ID[id]);
+        // 구 시스템에서 저장된 targetTeam id → 표시명 (기존 문서 조회용)
+        const LEGACY_ABP_TEAM_NAMES = {
+            planning: '학원사업기획팀',
+            marketing: '학원사업마케팅팀',
+            hrd: '학원사업HRD팀',
+            production: '콘텐츠제작팀',
+            rnd: '콘텐츠R&D팀'
+        };
 
         // 지점 문의 창구 페이지 (관리자용)
         function InquiryPage() {
             const [inquiries, setInquiries] = useState([]);
             const [loading, setLoading] = useState(true);
             const [branches, setBranches] = useState([]);
-            const [teams, setTeams] = useState([]);
             const [selectedBranch, setSelectedBranch] = useState('all');
-            const [selectedTeam, setSelectedTeam] = useState('all');
-            const [selectedManager, setSelectedManager] = useState('all'); // 담당자 필터
+            const [selectedAbpDept, setSelectedAbpDept] = useState('all'); // 담당부서(abpTargetTeam) 필터
+            const [selectedManager, setSelectedManager] = useState('all'); // 지점 담당자 필터
             const [branchManagerMap, setBranchManagerMap] = useState({}); // 지점-담당자 매핑
             const [managers, setManagers] = useState([]); // 담당자 목록
             const [showDetailModal, setShowDetailModal] = useState(false);
             const [selectedInquiry, setSelectedInquiry] = useState(null);
             const [replyText, setReplyText] = useState('');
+            const [replyAuthor, setReplyAuthor] = useState('');
             const [isReplying, setIsReplying] = useState(false);
-            
+
             // 기획본부 문의 관련 상태
             const [showAbpModal, setShowAbpModal] = useState(false);
             const [abpTargetTeam, setAbpTargetTeam] = useState('');
             const [abpContent, setAbpContent] = useState('');
             const [abpAuthorName, setAbpAuthorName] = useState('');
             const [isSubmittingAbp, setIsSubmittingAbp] = useState(false);
-            
+
             // 선택 삭제 관련 상태
             const [selectedInquiries, setSelectedInquiries] = useState([]);
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
-            
+
             // 페이지네이션 상태
             const [currentPage, setCurrentPage] = useState(1);
             const ITEMS_PER_PAGE = 20;
@@ -11410,13 +11434,10 @@
 
                         // 지점 목록 추출
                         const branchSet = new Set();
-                        const teamSet = new Set();
                         data.forEach(inquiry => {
                             if (inquiry.branchName) branchSet.add(inquiry.branchName);
-                            if (inquiry.team) teamSet.add(inquiry.team);
                         });
                         setBranches([...branchSet].sort());
-                        setTeams([...teamSet].sort());
 
                         setLoading(false);
                     }, (error) => {
@@ -11426,6 +11447,15 @@
 
                 return () => unsubscribe();
             }, []);
+
+            const abpDeptFilterIds = useMemo(() => {
+                const ids = new Set();
+                inquiries.forEach(i => {
+                    if (i.abpTargetTeam) ids.add(i.abpTargetTeam);
+                });
+                return [...ids].sort();
+            }, [inquiries]);
+            const hasInquiryWithoutAbpDept = useMemo(() => inquiries.some(i => !i.abpTargetTeam), [inquiries]);
 
             // 지점-담당자 매핑 로드 (users 컬렉션에서)
             useEffect(() => {
@@ -11450,24 +11480,47 @@
                 return () => unsubscribe();
             }, []);
 
+            const getAbpDeptLabel = (inquiry) => {
+                const id = inquiry.abpTargetTeam;
+                if (!id) return '-';
+                const t = ABP_TEAM_BY_ID[id];
+                if (t) return t.name;
+                if (LEGACY_ABP_TEAM_NAMES[id]) return LEGACY_ABP_TEAM_NAMES[id];
+                return id;
+            };
+
+            const getInquiryCategoryLabel = (inquiry) => {
+                const mj = inquiry.inquiryMajorLabel;
+                const mn = inquiry.inquiryMinorLabel;
+                if (!mj && !mn) return '-';
+                if (mj && mn) return `${mj} › ${mn}`;
+                return mj || mn || '-';
+            };
+
             // 필터링된 목록
             const filteredInquiries = inquiries.filter(inquiry => {
                 if (selectedBranch !== 'all' && inquiry.branchName !== selectedBranch) return false;
-                if (selectedTeam !== 'all' && inquiry.team !== selectedTeam) return false;
+                if (selectedAbpDept !== 'all') {
+                    if (selectedAbpDept === '__none__') {
+                        if (inquiry.abpTargetTeam) return false;
+                    } else if (inquiry.abpTargetTeam !== selectedAbpDept) {
+                        return false;
+                    }
+                }
                 if (selectedManager !== 'all' && branchManagerMap[inquiry.branchName] !== selectedManager) return false;
                 return true;
             });
-            
+
             // 페이지네이션 계산
             const totalPages = Math.ceil(filteredInquiries.length / ITEMS_PER_PAGE);
             const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
             const endIndex = startIndex + ITEMS_PER_PAGE;
             const paginatedInquiries = filteredInquiries.slice(startIndex, endIndex);
-            
+
             // 필터 변경 시 페이지 리셋
             useEffect(() => {
                 setCurrentPage(1);
-            }, [selectedBranch, selectedTeam, selectedManager]);
+            }, [selectedBranch, selectedAbpDept, selectedManager]);
 
             // 팀별 통계 계산 (지점 팀: 1팀, 2팀, 3팀, 4팀)
             const BRANCH_TEAMS = ['1팀', '2팀', '3팀', '4팀'];
@@ -11503,7 +11556,7 @@
                 if (!timestamp) return '-';
                 const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
                 return date.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
+                    year: '2-digit',
                     month: '2-digit',
                     day: '2-digit',
                     hour: '2-digit',
@@ -11515,13 +11568,18 @@
             const openDetail = (inquiry) => {
                 setSelectedInquiry(inquiry);
                 setReplyText(inquiry.reply || '');
+                setReplyAuthor(inquiry.replyAuthor || '');
                 setShowDetailModal(true);
             };
 
-            // 답변 저장
+            // 답변 저장 (유형 카테고리 담당 부서 → 지점 최종 답변)
             const handleReply = async () => {
                 if (!replyText.trim()) {
                     alert('답변 내용을 입력해주세요.');
+                    return;
+                }
+                if (!replyAuthor.trim()) {
+                    alert('답변 작성자 이름을 입력해주세요.');
                     return;
                 }
 
@@ -11530,6 +11588,7 @@
                 try {
                     await db.collection('inquiries').doc(selectedInquiry.id).update({
                         reply: replyText.trim(),
+                        replyAuthor: replyAuthor.trim(),
                         status: 'answered',
                         repliedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -11579,12 +11638,13 @@
                         },
                         branchName: selectedInquiry.branchName,
                         team: selectedInquiry.team,
-                        
+                        position: selectedInquiry.position || '',
+
                         // 기획본부 문의 정보
                         targetTeam: abpTargetTeam,
                         content: abpContent.trim(),
                         authorName: abpAuthorName.trim(),
-                        
+
                         // 메타 정보
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -11636,7 +11696,7 @@
             // 선택 삭제 실행
             const handleConfirmDelete = async (e) => {
                 e.preventDefault();
-                
+
                 if (!deletePassword) {
                     alert('고유 비밀번호를 입력해주세요.');
                     return;
@@ -11647,15 +11707,15 @@
                 try {
                     // Firestore에서 고유 비밀번호 확인
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         alert('고유 비밀번호가 설정되지 않았습니다.');
                         setIsDeleting(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (deletePassword !== storedPassword) {
                         alert('비밀번호가 올바르지 않습니다.');
                         setIsDeleting(false);
@@ -11708,7 +11768,7 @@
             // 필터 초기화
             const handleResetFilters = () => {
                 setSelectedBranch('all');
-                setSelectedTeam('all');
+                setSelectedAbpDept('all');
                 setSelectedManager('all');
                 setSelectedInquiries([]);
             };
@@ -11718,16 +11778,19 @@
                 try {
                     // 엑셀 데이터 준비
                     const excelData = filteredInquiries.map((inquiry, index) => ({
-                        '번호': index + 1,
-                        '지점명': inquiry.branchName || '-',
-                        '팀': inquiry.team || '-',
-                        '담당자': branchManagerMap[inquiry.branchName] || '-',
-                        '제목': inquiry.title || '-',
-                        '내용': inquiry.content || '-',
+                        'No': index + 1,
                         '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
-                        '답변': inquiry.reply || '-',
+                        '지점': inquiry.branchName || '-',
+                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '담당부서': getAbpDeptLabel(inquiry),
+                        '유형 카테고리': getInquiryCategoryLabel(inquiry),
+                        '제목': inquiry.title || '-',
+                        '직함': inquiry.position || '-',
                         '작성일': formatDateLocal(inquiry.createdAt),
-                        '답변일': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'
+                        '답변 작성자': inquiry.replyAuthor || '-',
+                        '답변 작성일시': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-',
+                        '답변 내용': inquiry.reply || '-',
+                        '문의 내용': inquiry.content || '-'
                     }));
 
                     // 워크시트 생성
@@ -11735,16 +11798,19 @@
 
                     // 컬럼 너비 설정
                     const colWidths = [
-                        { wch: 8 },  // 번호
-                        { wch: 20 }, // 지점명
-                        { wch: 10 }, // 팀
-                        { wch: 15 }, // 담당자
-                        { wch: 30 }, // 제목
-                        { wch: 50 }, // 내용
-                        { wch: 12 }, // 상태
-                        { wch: 50 }, // 답변
-                        { wch: 18 }, // 작성일
-                        { wch: 18 }  // 답변일
+                        { wch: 6 },
+                        { wch: 10 },
+                        { wch: 14 },
+                        { wch: 12 },
+                        { wch: 14 },
+                        { wch: 28 },
+                        { wch: 24 },
+                        { wch: 10 },
+                        { wch: 18 },
+                        { wch: 12 },
+                        { wch: 18 },
+                        { wch: 40 },
+                        { wch: 40 }
                     ];
                     ws['!cols'] = colWidths;
 
@@ -11777,7 +11843,10 @@
                 <div>
                     <div className="page-header">
                         <h2 className="page-title">지점 문의 창구</h2>
-                        <p className="page-subtitle">전 지점의 문의사항을 확인하고 답변합니다</p>
+                        <p className="page-subtitle">
+                            문의 유형 카테고리에 따라 담당 부서가 확인한 뒤 지점에 최종 답변합니다.
+                            지점에서 유형을 변경하면 담당 부서가 바뀔 수 있습니다.
+                        </p>
                     </div>
 
                     {/* 전체 통계 대시보드 */}
@@ -11812,13 +11881,13 @@
                         </div>
                     </div>
 
-                    {/* 팀별 통계 대시보드 */}
+                    {/* 지점 내 팀(1~4팀) 통계 — 지점 조직 단위 */}
                     <div className="stats-grid">
                         {teamStats.map((team, index) => (
                             <div key={team.name} className="stat-card" style={{
                                 background: `linear-gradient(135deg, ${['#1a1a2e', '#0f3460', '#1a5f7a', '#159895'][index]} 0%, ${['#16213e', '#1a5f7a', '#159895', '#0d3b36'][index]} 100%)`
                             }}>
-                                <h3>{team.name}</h3>
+                                <h3 style={{ fontSize: '14px' }}>지점 팀 {team.name}</h3>
                                 <div className="value">{team.completionRate}%</div>
                                 <div style={{
                                     fontSize: '13px',
@@ -11914,13 +11983,13 @@
                                 </select>
                             </div>
 
-                            {/* 팀 필터 */}
+                            {/* 담당부서(유형 라우팅) 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>팀:</label>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>담당부서:</label>
                                 <select
-                                    value={selectedTeam}
+                                    value={selectedAbpDept}
                                     onChange={(e) => {
-                                        setSelectedTeam(e.target.value);
+                                        setSelectedAbpDept(e.target.value);
                                         setSelectedInquiries([]);
                                     }}
                                     style={{
@@ -11928,19 +11997,22 @@
                                         borderRadius: '6px',
                                         border: '2px solid #e0e0e0',
                                         fontSize: '14px',
-                                        minWidth: '120px'
+                                        minWidth: '160px'
                                     }}
                                 >
-                                    <option value="all">전체 팀</option>
-                                    {teams.map(team => (
-                                        <option key={team} value={team}>{team}</option>
+                                    <option value="all">전체</option>
+                                    {hasInquiryWithoutAbpDept && (
+                                        <option value="__none__">미지정 (구 데이터)</option>
+                                    )}
+                                    {abpDeptFilterIds.map(deptId => (
+                                        <option key={deptId} value={deptId}>{getAbpDeptLabel({ abpTargetTeam: deptId })}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* 담당자 필터 */}
+                            {/* 지점 담당자 필터 */}
                             <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>담당자:</label>
+                                <label style={{fontSize: '14px', color: '#666', fontWeight: '500'}}>지점 담당자:</label>
                                 <select
                                     value={selectedManager}
                                     onChange={(e) => {
@@ -11963,7 +12035,7 @@
                             </div>
 
                             {/* 필터 초기화 */}
-                            {(selectedBranch !== 'all' || selectedTeam !== 'all' || selectedManager !== 'all') && (
+                            {(selectedBranch !== 'all' || selectedAbpDept !== 'all' || selectedManager !== 'all') && (
                                 <button
                                     onClick={handleResetFilters}
                                     style={{
@@ -11987,25 +12059,29 @@
                             </div>
                         ) : (
                             <>
-                            <table className="data-table">
+                            <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <table className="data-table" style={{ minWidth: '1400px' }}>
                                 <thead>
                                     <tr>
                                         <th style={{width: '40px', textAlign: 'center'}}>
-                                            <input 
+                                            <input
                                                 type="checkbox"
                                                 checked={paginatedInquiries.length > 0 && paginatedInquiries.every(inquiry => selectedInquiries.includes(inquiry.id))}
                                                 onChange={handleSelectAllInquiries}
                                                 style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                             />
                                         </th>
-                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
-                                        <th style={{width: '100px', whiteSpace: 'nowrap', textAlign: 'center'}}>상태</th>
-                                        <th style={{width: '110px', textAlign: 'center'}}>지점</th>
-                                        <th style={{width: '70px', textAlign: 'center'}}>팀</th>
-                                        <th style={{width: '80px', textAlign: 'center'}}>담당자</th>
-                                        <th style={{width: '30%'}}>제목</th>
-                                        <th style={{width: '90px', textAlign: 'center'}}>작성자</th>
-                                        <th style={{width: '160px', textAlign: 'center'}}>작성일</th>
+                                        <th style={{width: '44px', textAlign: 'center'}}>No</th>
+                                        <th style={{width: '88px', whiteSpace: 'nowrap', textAlign: 'center'}}>상태</th>
+                                        <th style={{minWidth: '220px', textAlign: 'center', whiteSpace: 'nowrap'}}>지점</th>
+                                        <th style={{width: '100px', textAlign: 'center'}}>지점 담당자</th>
+                                        <th style={{width: '120px', textAlign: 'center'}}>담당부서</th>
+                                        <th style={{minWidth: '200px'}}>유형 카테고리</th>
+                                        <th style={{minWidth: '160px'}}>제목</th>
+                                        <th style={{minWidth: '120px', textAlign: 'center', whiteSpace: 'nowrap'}}>직함</th>
+                                        <th style={{width: '130px', textAlign: 'center'}}>작성일</th>
+                                        <th style={{width: '100px', textAlign: 'center'}}>답변 작성자</th>
+                                        <th style={{width: '130px', textAlign: 'center'}}>답변 작성일시</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -12018,7 +12094,7 @@
                                             }}
                                         >
                                             <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
-                                                <input 
+                                                <input
                                                     type="checkbox"
                                                     checked={selectedInquiries.includes(inquiry.id)}
                                                     onChange={() => handleSelectInquiry(inquiry.id)}
@@ -12027,58 +12103,72 @@
                                             </td>
                                             <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}} onClick={() => openDetail(inquiry)}>{startIndex + index + 1}</td>
                                             <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
-                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
-                                                <span style={{
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', whiteSpace: 'nowrap', minWidth: '220px'}}>
+                                                <span className="pill" style={{
                                                     background: '#f07c00',
                                                     color: 'white',
                                                     padding: '4px 10px',
                                                     borderRadius: '4px',
                                                     fontSize: '12px',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    whiteSpace: 'nowrap'
                                                 }}>
                                                     {inquiry.branchName || '-'}
                                                 </span>
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
-                                                {inquiry.team ? (
-                                                    <span style={{
-                                                        background: '#e3f2fd',
-                                                        color: '#1976d2',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '12px',
-                                                        fontWeight: '500'
-                                                    }}>
-                                                        {inquiry.team}
-                                                    </span>
-                                                ) : '-'}
-                                            </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', fontSize: '13px'}}>
                                                 {branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontWeight: '500'}}>{inquiry.title}</td>
-                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', fontSize: '12px'}}>
+                                                <span style={{
+                                                    background: '#ecfdf5',
+                                                    color: '#047857',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '4px',
+                                                    fontWeight: '600',
+                                                    display: 'inline-block',
+                                                    maxWidth: '140px',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }} title={getAbpDeptLabel(inquiry)}>
+                                                    {getAbpDeptLabel(inquiry)}
+                                                </span>
+                                            </td>
+                                            <td
+                                                onClick={() => openDetail(inquiry)}
+                                                style={{ fontSize: '12px', color: '#444', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                                title={getInquiryCategoryLabel(inquiry)}
+                                            >
+                                                {getInquiryCategoryLabel(inquiry)}
+                                            </td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontWeight: '500', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inquiry.title}>{inquiry.title}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', whiteSpace: 'nowrap', minWidth: '120px'}}>
                                                 {inquiry.position ? (
-                                                    <span style={{
+                                                    <span className="pill" style={{
                                                         background: '#f3e5f5',
                                                         color: '#7b1fa2',
                                                         padding: '4px 10px',
                                                         borderRadius: '4px',
                                                         fontSize: '12px',
-                                                        fontWeight: '500'
+                                                        fontWeight: '500',
+                                                        whiteSpace: 'nowrap'
                                                     }}>
                                                         {inquiry.position}
                                                     </span>
                                                 ) : (
-                                                    <span style={{fontSize: '13px', color: '#666'}}>{inquiry.userName || '-'}</span>
+                                                    <span style={{fontSize: '13px', color: '#999'}}>-</span>
                                                 )}
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '12px', color: '#666', textAlign: 'center', whiteSpace: 'nowrap'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '12px', textAlign: 'center'}}>{inquiry.replyAuthor || '-'}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '12px', color: '#666', textAlign: 'center', whiteSpace: 'nowrap'}}>{inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                            
+                            </div>
+
                             {/* 페이지네이션 */}
                             {totalPages > 1 && (
                                 <div style={{
@@ -12104,11 +12194,11 @@
                                     >
                                         ‹ 이전
                                     </button>
-                                    
+
                                     <span style={{fontSize: '14px', color: '#666', minWidth: '120px', textAlign: 'center'}}>
                                         {currentPage} / {totalPages} 페이지 (총 {filteredInquiries.length}건)
                                     </span>
-                                    
+
                                     <button
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         disabled={currentPage === totalPages}
@@ -12158,16 +12248,16 @@
                                         />
                                     </div>
                                     <div className="modal-actions">
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={() => setShowDeleteModal(false)}
                                             disabled={isDeleting}
                                         >
                                             취소
                                         </button>
-                                        <button 
-                                            type="submit" 
+                                        <button
+                                            type="submit"
                                             className="btn btn-danger btn-sm"
                                             disabled={isDeleting || !deletePassword}
                                         >
@@ -12190,7 +12280,7 @@
                                 <div style={{padding: '20px', maxHeight: '70vh', overflowY: 'auto'}}>
                                     {/* 문의 정보 */}
                                     <div style={{marginBottom: '20px'}}>
-                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
+                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap'}}>
                                             {getStatusBadge(selectedInquiry.status)}
                                             <span style={{
                                                 background: '#f07c00',
@@ -12202,16 +12292,25 @@
                                             }}>
                                                 {selectedInquiry.branchName}
                                             </span>
+                                            <span style={{
+                                                background: '#ecfdf5',
+                                                color: '#047857',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                            }}>
+                                                 {getAbpDeptLabel(selectedInquiry)}                                            </span>
                                             {selectedInquiry.team && (
                                                 <span style={{
                                                     background: '#e3f2fd',
                                                     color: '#1976d2',
                                                     padding: '4px 10px',
                                                     borderRadius: '4px',
-                                                    fontSize: '12px',
+                                                    fontSize: '11px',
                                                     fontWeight: '500'
-                                                }}>
-                                                    {selectedInquiry.team}
+                                                }} title="지점 내 팀">
+                                                    지점 {selectedInquiry.team}
                                                 </span>
                                             )}
                                             {selectedInquiry.position && (
@@ -12223,15 +12322,18 @@
                                                     fontSize: '12px',
                                                     fontWeight: '500'
                                                 }}>
-                                                    {selectedInquiry.position}
+                                                    직함: {selectedInquiry.position}
                                                 </span>
                                             )}
                                             <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
-                                                {formatDateLocal(selectedInquiry.createdAt)}
+                                                작성일 {formatDateLocal(selectedInquiry.createdAt)}
                                             </span>
                                         </div>
+                                        <div style={{fontSize: '13px', color: '#555', marginBottom: '8px'}}>
+                                            <strong>유형 카테고리:</strong> {getInquiryCategoryLabel(selectedInquiry)}
+                                        </div>
                                         <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
-                                            작성자: {selectedInquiry.position || selectedInquiry.userName || '-'} ({selectedInquiry.userEmail})
+                                            문의자: {selectedInquiry.inquirerName || '-'} · 직함: {selectedInquiry.position || '-'} ({selectedInquiry.userEmail})
                                         </div>
                                         <h4 style={{fontSize: '18px', fontWeight: '600', color: '#1a1a2e', marginBottom: '15px'}}>
                                             {selectedInquiry.title}
@@ -12267,8 +12369,13 @@
                                                 fontSize: '12px',
                                                 fontWeight: '600'
                                             }}>
-                                                관리자 답변
+                                                최종 답변 (담당 부서)
                                             </span>
+                                            {selectedInquiry.replyAuthor && (
+                                                <span style={{fontSize: '13px', color: '#333', fontWeight: '600'}}>
+                                                    {selectedInquiry.replyAuthor}
+                                                </span>
+                                            )}
                                             {selectedInquiry.repliedAt && (
                                                 <span style={{fontSize: '13px', color: '#666'}}>
                                                     {formatDateLocal(selectedInquiry.repliedAt)}
@@ -12276,11 +12383,28 @@
                                             )}
                                         </div>
                                         <div className="form-group">
+                                            <label>답변 작성자 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <input
+                                                type="text"
+                                                value={replyAuthor}
+                                                onChange={(e) => setReplyAuthor(e.target.value)}
+                                                placeholder="답변을 남기는 관리자 이름"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px 16px',
+                                                    borderRadius: '8px',
+                                                    border: '2px solid #e0e0e0',
+                                                    fontSize: '14px'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>답변 내용 <span style={{color: '#dc3545'}}>*</span></label>
                                             <textarea
                                                 rows="5"
                                                 value={replyText}
                                                 onChange={(e) => setReplyText(e.target.value)}
-                                                placeholder="답변 내용을 입력하세요"
+                                                placeholder="지점에 전달할 최종 답변을 입력하세요"
                                                 style={{
                                                     width: '100%',
                                                     padding: '12px 16px',
@@ -12301,13 +12425,19 @@
                                     >
                                         닫기
                                     </button>
-                                    <button
-                                        className="btn btn-sm"
-                                        onClick={openAbpModal}
-                                        style={{background: '#10b981'}}
-                                    >
-                                        기획본부 문의하기
-                                    </button>
+                                    {selectedInquiry.abpInquiryId ? (
+                                        <span style={{ fontSize: '13px', color: '#047857', fontWeight: '600' }}>
+                                            ✓ 기획본부 문의함에 유형 분류로 접수됨
+                                        </span>
+                                    ) : (
+                                        <button
+                                            className="btn btn-sm"
+                                            onClick={openAbpModal}
+                                            style={{background: '#10b981'}}
+                                        >
+                                            기획본부 문의하기
+                                        </button>
+                                    )}
                                     <button
                                         className="btn btn-sm"
                                         onClick={handleReply}
@@ -12430,26 +12560,27 @@
             const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
             const [selectedAuthorFilter, setSelectedAuthorFilter] = useState('all');
             const [authors, setAuthors] = useState([]);
+            const [branchManagerMap, setBranchManagerMap] = useState({}); // 지점-담당자 매핑
             const [showDetailModal, setShowDetailModal] = useState(false);
             const [selectedInquiry, setSelectedInquiry] = useState(null);
-            
+
             // 페이지네이션 상태
             const [currentPage, setCurrentPage] = useState(1);
             const ITEMS_PER_PAGE = 20;
-            
+
             // 선택 삭제 관련 상태
             const [selectedAbpInquiries, setSelectedAbpInquiries] = useState([]);
             const [showDeleteModal, setShowDeleteModal] = useState(false);
             const [deletePassword, setDeletePassword] = useState('');
             const [isDeleting, setIsDeleting] = useState(false);
-            
+
             // 원본 지점 문의 모달 상태
             const [showOriginalModal, setShowOriginalModal] = useState(false);
             const [originalInquiryData, setOriginalInquiryData] = useState(null);
             const [originalReplyText, setOriginalReplyText] = useState('');
             const [isLoadingOriginal, setIsLoadingOriginal] = useState(false);
             const [isReplyingOriginal, setIsReplyingOriginal] = useState(false);
-            
+
             // 새 문의 작성 모달 상태
             const [showNewInquiryModal, setShowNewInquiryModal] = useState(false);
             const [newInquiry, setNewInquiry] = useState({
@@ -12474,14 +12605,14 @@
                             return dateB - dateA;
                         });
                         setInquiries(data);
-                        
+
                         // 작성자 목록 추출
                         const authorSet = new Set();
                         data.forEach(inquiry => {
                             if (inquiry.authorName) authorSet.add(inquiry.authorName);
                         });
                         setAuthors([...authorSet].sort());
-                        
+
                         setLoading(false);
                     }, (error) => {
                         console.error('기획본부 문의 로드 오류:', error);
@@ -12491,19 +12622,23 @@
                 return () => unsubscribe();
             }, []);
 
-            // 지점 목록 로드
+            // 지점-담당자 매핑 로드 (users 컬렉션에서)
             useEffect(() => {
-                const loadBranches = async () => {
-                    const usersResult = await getAllUsers();
-                    if (usersResult.success) {
-                        const branchSet = new Set();
-                        usersResult.users.forEach(user => {
-                            if (user.branchName) branchSet.add(user.branchName);
+                const unsubscribe = db.collection('users')
+                    .onSnapshot((snapshot) => {
+                        const mapping = {};
+                        snapshot.docs.forEach(doc => {
+                            const userData = doc.data();
+                            if (userData.branchName && userData.manager) {
+                                mapping[userData.branchName] = userData.manager;
+                            }
                         });
-                        setBranches([...branchSet].sort());
-                    }
-                };
-                loadBranches();
+                        setBranchManagerMap(mapping);
+                    }, (error) => {
+                        console.error('지점-담당자 매핑 로드 오류:', error);
+                    });
+
+                return () => unsubscribe();
             }, []);
 
             // 필터링된 목록
@@ -12512,13 +12647,13 @@
                 if (selectedAuthorFilter !== 'all' && inquiry.authorName !== selectedAuthorFilter) return false;
                 return true;
             });
-            
+
             // 페이지네이션 계산
             const totalPages = Math.ceil(filteredInquiries.length / ITEMS_PER_PAGE);
             const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
             const endIndex = startIndex + ITEMS_PER_PAGE;
             const paginatedInquiries = filteredInquiries.slice(startIndex, endIndex);
-            
+
             // 필터 변경 시 페이지 리셋
             useEffect(() => {
                 setCurrentPage(1);
@@ -12556,7 +12691,7 @@
                 if (!timestamp) return '-';
                 const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
                 return date.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
+                    year: '2-digit',
                     month: '2-digit',
                     day: '2-digit',
                     hour: '2-digit',
@@ -12600,7 +12735,7 @@
             // 선택 삭제 실행
             const handleConfirmAbpDelete = async (e) => {
                 e.preventDefault();
-                
+
                 if (!deletePassword) {
                     alert('고유 비밀번호를 입력해주세요.');
                     return;
@@ -12611,15 +12746,15 @@
                 try {
                     // Firestore에서 고유 비밀번호 확인
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         alert('고유 비밀번호가 설정되지 않았습니다.');
                         setIsDeleting(false);
                         return;
                     }
-                    
+
                     const storedPassword = doc.data().password;
-                    
+
                     if (deletePassword !== storedPassword) {
                         alert('비밀번호가 올바르지 않습니다.');
                         setIsDeleting(false);
@@ -12648,8 +12783,11 @@
 
             // 팀명 가져오기
             const getTeamName = (teamId) => {
-                const team = ABP_TEAMS.find(t => t.id === teamId);
-                return team ? team.name : teamId;
+                if (!teamId) return '-';
+                const team = ABP_TEAM_BY_ID[teamId] || ABP_TEAMS.find(t => t.id === teamId);
+                if (team) return team.name;
+                if (LEGACY_ABP_TEAM_NAMES[teamId]) return LEGACY_ABP_TEAM_NAMES[teamId];
+                return teamId;
             };
 
             // 상태 배지
@@ -12734,16 +12872,6 @@
                 }
             };
 
-            // 새 문의 작성 모달 열기
-            const openNewInquiryModal = () => {
-                setNewInquiry({
-                    targetTeam: '',
-                    authorName: '',
-                    content: ''
-                });
-                setShowNewInquiryModal(true);
-            };
-
             // 새 문의 저장
             const handleNewInquirySubmit = async () => {
                 if (!newInquiry.targetTeam) {
@@ -12768,12 +12896,13 @@
                         originalInquiry: null,
                         branchName: '',
                         team: '',
-                        
+                        position: '',
+
                         // 기획본부 문의 정보
                         targetTeam: newInquiry.targetTeam,
                         content: newInquiry.content.trim(),
                         authorName: newInquiry.authorName.trim(),
-                        
+
                         // 메타 정보
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -12795,17 +12924,18 @@
                     // 엑셀 데이터 준비
                     const excelData = filteredInquiries.map((inquiry, index) => ({
                         '번호': index + 1,
-                        '대상 부서': getTeamName(inquiry.targetTeam),
-                        '작성자': inquiry.authorName || '-',
+                        '담당부서': getTeamName(inquiry.targetTeam),
                         '지점명': inquiry.branchName || '-',
-                        '팀': inquiry.team || '-',
+                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '직함': inquiry.position || '-',
                         '문의 내용': inquiry.content || '-',
                         '원본 문의 제목': inquiry.originalInquiry?.title || '-',
                         '원본 문의 내용': inquiry.originalInquiry?.content || '-',
                         '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
                         '답변': inquiry.reply || '-',
                         '작성일': formatDateLocal(inquiry.createdAt),
-                        '답변일': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'
+                        '답변 작성자': inquiry.replyAuthor || '-',
+                        '답변 작성일시': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'
                     }));
 
                     // 워크시트 생성
@@ -12813,18 +12943,19 @@
 
                     // 컬럼 너비 설정
                     const colWidths = [
-                        { wch: 8 },  // 번호
-                        { wch: 20 }, // 대상 부서
-                        { wch: 15 }, // 작성자
-                        { wch: 20 }, // 지점명
-                        { wch: 10 }, // 팀
-                        { wch: 50 }, // 문의 내용
-                        { wch: 30 }, // 원본 문의 제목
-                        { wch: 50 }, // 원본 문의 내용
-                        { wch: 12 }, // 상태
-                        { wch: 50 }, // 답변
-                        { wch: 18 }, // 작성일
-                        { wch: 18 }  // 답변일
+                        { wch: 8 },   // 번호
+                        { wch: 20 },  // 담당부서
+                        { wch: 20 },  // 지점명
+                        { wch: 15 },  // 지점 담당자
+                        { wch: 12 },  // 직함
+                        { wch: 50 },  // 문의 내용
+                        { wch: 30 },  // 원본 문의 제목
+                        { wch: 50 },  // 원본 문의 내용
+                        { wch: 12 },  // 상태
+                        { wch: 50 },  // 답변
+                        { wch: 18 },  // 작성일
+                        { wch: 15 },  // 답변 작성자
+                        { wch: 18 }   // 답변 작성일시
                     ];
                     ws['!cols'] = colWidths;
 
@@ -12956,13 +13087,6 @@
                                         선택 삭제 ({selectedAbpInquiries.length})
                                     </button>
                                 )}
-                                <button
-                                    className="btn btn-sm"
-                                    onClick={openNewInquiryModal}
-                                    style={{background: '#10b981'}}
-                                >
-                                    + 문의 작성
-                                </button>
                             </div>
                         </div>
 
@@ -13054,11 +13178,12 @@
                             </div>
                         ) : (
                             <>
-                            <table className="data-table">
+                            <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <table className="data-table" style={{ minWidth: '1400px' }}>
                                 <thead>
                                     <tr>
                                         <th style={{width: '40px', textAlign: 'center'}}>
-                                            <input 
+                                            <input
                                                 type="checkbox"
                                                 checked={paginatedInquiries.length > 0 && paginatedInquiries.every(inquiry => selectedAbpInquiries.includes(inquiry.id))}
                                                 onChange={handleSelectAllAbpInquiries}
@@ -13067,11 +13192,14 @@
                                         </th>
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
                                         <th style={{width: '100px', textAlign: 'center'}}>상태</th>
-                                        <th style={{width: '150px', textAlign: 'center'}}>문의 부서</th>
-                                        <th style={{width: '150px', textAlign: 'center'}}>지점</th>
+                                        <th style={{width: '150px', textAlign: 'center'}}>담당부서</th>
+                                        <th style={{minWidth: '220px', textAlign: 'center', whiteSpace: 'nowrap'}}>지점</th>
+                                        <th style={{width: '120px', textAlign: 'center', whiteSpace: 'nowrap'}}>지점 담당자</th>
                                         <th style={{width: '180px'}}>문의 내용</th>
-                                        <th style={{width: '100px', textAlign: 'center'}}>작성자</th>
-                                        <th style={{width: '180px', textAlign: 'center'}}>작성일</th>
+                                        <th style={{width: '100px', textAlign: 'center', whiteSpace: 'nowrap'}}>직함</th>
+                                        <th style={{width: '180px', textAlign: 'center', whiteSpace: 'nowrap'}}>작성일</th>
+                                        <th style={{width: '120px', textAlign: 'center', whiteSpace: 'nowrap'}}>답변 작성자</th>
+                                        <th style={{width: '180px', textAlign: 'center', whiteSpace: 'nowrap'}}>답변 작성일시</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -13084,7 +13212,7 @@
                                             }}
                                         >
                                             <td onClick={(e) => e.stopPropagation()} style={{textAlign: 'center'}}>
-                                                <input 
+                                                <input
                                                     type="checkbox"
                                                     checked={selectedAbpInquiries.includes(inquiry.id)}
                                                     onChange={() => handleSelectAbpInquiry(inquiry.id)}
@@ -13105,17 +13233,21 @@
                                                     {getTeamName(inquiry.targetTeam)}
                                                 </span>
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center'}}>
-                                                <span style={{
+                                            <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', whiteSpace: 'nowrap', minWidth: '220px'}}>
+                                                <span className="pill" style={{
                                                     background: '#f07c00',
                                                     color: 'white',
                                                     padding: '4px 10px',
                                                     borderRadius: '4px',
                                                     fontSize: '12px',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    whiteSpace: 'nowrap'
                                                 }}>
                                                     {inquiry.branchName || '-'}
                                                 </span>
+                                            </td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', textAlign: 'center'}}>
+                                                {branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} style={{
                                                 maxWidth: '180px',
@@ -13125,13 +13257,30 @@
                                             }}>
                                                 {inquiry.content}
                                             </td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', textAlign: 'center'}}>{inquiry.authorName || '-'}</td>
-                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', textAlign: 'center', whiteSpace: 'nowrap', minWidth: '120px'}}>
+                                                {inquiry.position ? (
+                                                    <span className="pill" style={{
+                                                        background: '#f3e5f5',
+                                                        color: '#7b1fa2',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {inquiry.position}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center', whiteSpace: 'nowrap'}}>{formatDateLocal(inquiry.createdAt)}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', textAlign: 'center'}}>{inquiry.replyAuthor || '-'}</td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#666', textAlign: 'center', whiteSpace: 'nowrap'}}>{inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                            
+                            </div>
+
                             {/* 페이지네이션 */}
                             {totalPages > 1 && (
                                 <div style={{
@@ -13157,11 +13306,11 @@
                                     >
                                         ‹ 이전
                                     </button>
-                                    
+
                                     <span style={{fontSize: '14px', color: '#666', minWidth: '120px', textAlign: 'center'}}>
                                         {currentPage} / {totalPages} 페이지 (총 {filteredInquiries.length}건)
                                     </span>
-                                    
+
                                     <button
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         disabled={currentPage === totalPages}
@@ -13211,16 +13360,16 @@
                                         />
                                     </div>
                                     <div className="modal-actions">
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={() => setShowDeleteModal(false)}
                                             disabled={isDeleting}
                                         >
                                             취소
                                         </button>
-                                        <button 
-                                            type="submit" 
+                                        <button
+                                            type="submit"
                                             className="btn btn-danger btn-sm"
                                             disabled={isDeleting || !deletePassword}
                                         >
@@ -13272,7 +13421,7 @@
 
                                         {/* 원본 지점 문의 - 클릭 가능 */}
                                         {selectedInquiry.originalInquiry && (
-                                            <div 
+                                            <div
                                                 style={{
                                                     background: '#f0f9ff',
                                                     border: '2px solid #bae6fd',
@@ -13349,10 +13498,10 @@
                                                     fontSize: '12px',
                                                     fontWeight: '600'
                                                 }}>
-                                                    기획본부 답변
+                                                    {getTeamName(selectedInquiry.targetTeam)} 답변
                                                 </span>
                                                 <span style={{fontSize: '13px', color: '#666'}}>
-                                                    {selectedInquiry.replyAuthor && `작성: ${selectedInquiry.replyAuthor}`}
+                                                    {selectedInquiry.replyAuthor && `작성자: ${selectedInquiry.replyAuthor}`}
                                                 </span>
                                                 <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
                                                     {formatDateLocal(selectedInquiry.repliedAt)}
@@ -13426,29 +13575,27 @@
                                             }}>
                                                 {originalInquiryData.branchName}
                                             </span>
-                                            {originalInquiryData.team && (
-                                                <span style={{
-                                                    background: '#e3f2fd',
-                                                    color: '#1976d2',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '500'
-                                                }}>
-                                                    {originalInquiryData.team}
-                                                </span>
-                                            )}
+                                            <span style={{
+                                                background: '#d1fae5',
+                                                color: '#047857',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                            }}>
+                                                 {getTeamName(selectedInquiry?.targetTeam)}
+                                            </span>
                                         </div>
-                                        
+
                                         <h4 style={{fontSize: '18px', fontWeight: '600', color: '#1a1a2e', marginBottom: '15px'}}>
                                             {originalInquiryData.title}
                                         </h4>
-                                        
+
                                         <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
-                                            작성자: {originalInquiryData.position || originalInquiryData.userName || '-'} 
+                                            작성자: {originalInquiryData.position || originalInquiryData.userName || '-'}
                                             {originalInquiryData.userEmail && ` (${originalInquiryData.userEmail})`}
                                         </div>
-                                        
+
                                         <div style={{
                                             background: '#f8f9fa',
                                             padding: '16px',
@@ -13712,7 +13859,7 @@
             const [currentPage, setCurrentPage] = useState('dashboard');
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
-            
+
             // Round 관리 접근 관련 상태
             const [showRoundPasswordModal, setShowRoundPasswordModal] = useState(false);
             const [roundPassword, setRoundPassword] = useState('');
@@ -13755,7 +13902,7 @@
                         }
                         return;
                     }
-                    
+
                     if (!currentUser) {
                         window.location.href = 'index.html';
                     } else if (currentUser.email !== ADMIN_EMAIL) {
@@ -13785,11 +13932,11 @@
             const handleRoundPasswordSubmit = async (e) => {
                 e.preventDefault();
                 setIsVerifying(true);
-                
+
                 try {
                     // Firestore에서 비밀번호 가져오기
                     const doc = await db.collection('settings').doc('roundPassword').get();
-                    
+
                     if (!doc.exists) {
                         // 비밀번호가 설정되지 않은 경우 기본값으로 생성
                         await db.collection('settings').doc('roundPassword').set({
@@ -13800,10 +13947,11 @@
                         setIsVerifying(false);
                         return;
                     }
-                    
-                    const storedPassword = doc.data().password;
-                    
-                    if (roundPassword === storedPassword) {
+
+                    const storedPassword = String(doc.data().password || '').trim();
+                    const inputPassword = String(roundPassword || '').trim();
+
+                    if (storedPassword && inputPassword === storedPassword) {
                         setRoundAccessGranted(true);
                         setShowRoundPasswordModal(false);
                         setCurrentPage('round');
@@ -13819,7 +13967,7 @@
                     setIsVerifying(false);
                 }
             };
-            
+
             // 툴킷 관리 페이지 접근 시도
             const handleToolkitAccess = () => {
                 if (toolkitAccessGranted) {
@@ -14073,7 +14221,7 @@
                                         </p>
                                         <div className="form-group">
                                             <label>비밀번호</label>
-                                            <input 
+                                            <input
                                                 type="password"
                                                 value={roundPassword}
                                                 onChange={(e) => setRoundPassword(e.target.value)}
@@ -14084,16 +14232,16 @@
                                         </div>
                                     </div>
                                     <div className="modal-actions" style={{padding: '15px 20px', borderTop: '1px solid #eee', display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary btn-sm"
                                             onClick={() => setShowRoundPasswordModal(false)}
                                             disabled={isVerifying}
                                         >
                                             취소
                                         </button>
-                                        <button 
-                                            type="submit" 
+                                        <button
+                                            type="submit"
                                             className="btn btn-sm"
                                             disabled={isVerifying}
                                         >
@@ -14104,7 +14252,7 @@
                             </div>
                         </div>
                     )}
-                    
+
                     {/* 툴킷 관리 비밀번호 모달 */}
                     {showToolkitPasswordModal && (
                         <div className="modal-overlay" onClick={() => setShowToolkitPasswordModal(false)}>
@@ -14313,4 +14461,5 @@
         root.render(<App />);
     </script>
 </body>
+
 </html>

@@ -248,6 +248,19 @@
         const passwordInput = document.getElementById('password');
         const toggleText = document.getElementById('toggleText');
 
+        // ABP 접근 허용 이메일(고정 목록)
+        const ABP_TEAM_EMAILS = new Set([
+            'biz_mk1@kogrop.co.kr',
+            'biz_mk2@kogrop.co.kr',
+            'biz_plan@kogrop.co.kr',
+            'sales_ops@kogrop.co.kr',
+            'hrd_academy@kogrop.co.kr',
+            'eng_lab@kogrop.co.kr',
+            'content_prod@kogrop.co.kr',
+            'it_dev@kogrop.co.kr',
+            'corp_admin@kogrop.co.kr'
+        ]);
+
         passwordToggle.addEventListener('click', function() {
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
@@ -328,7 +341,7 @@
                 // 이메일 확인 후 페이지 분기
                 if (result.user.email === 'admin@dshare.co.kr') {
                     window.location.replace('admin.html');
-                } else if (result.user.email === 'abp@dshare.co.kr') {
+                } else if (result.user.email === 'abp@dshare.co.kr' || ABP_TEAM_EMAILS.has((result.user.email || '').toLowerCase())) {
                     window.location.replace('abp.html');
                 } else {
                     window.location.replace('user.html');
@@ -352,7 +365,7 @@
                 // 이메일 확인 후 페이지 분기
                 if (user.email === 'admin@dshare.co.kr') {
                     window.location.replace('admin.html');
-                } else if (user.email === 'abp@dshare.co.kr') {
+                } else if (user.email === 'abp@dshare.co.kr' || ABP_TEAM_EMAILS.has((user.email || '').toLowerCase())) {
                     window.location.replace('abp.html');
                 } else {
                     window.location.replace('user.html');

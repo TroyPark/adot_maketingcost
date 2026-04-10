@@ -17,6 +17,34 @@ var auth = firebase.auth();
 var db = firebase.firestore();
 var storage = firebase.storage();
 
+// ===== ABP 팀 계정(kogrop.co.kr) 설정 =====
+const ABP_TEAM_EMAIL_DOMAIN = 'kogrop.co.kr';
+const ABP_TEAM_IDS = new Set([
+    'biz_mk1',
+    'biz_mk2',
+    'biz_plan',
+    'sales_ops',
+    'hrd_academy',
+    'eng_lab',
+    'content_prod',
+    'it_dev',
+    'corp_admin'
+]);
+
+function parseTeamIdFromEmail(email) {
+    if (!email || typeof email !== 'string') return null;
+    const parts = email.toLowerCase().split('@');
+    if (parts.length !== 2) return null;
+    const [local, domain] = parts;
+    if (domain !== ABP_TEAM_EMAIL_DOMAIN) return null;
+    if (!ABP_TEAM_IDS.has(local)) return null;
+    return local;
+}
+
+function isAbpTeamEmail(email) {
+    return !!parseTeamIdFromEmail(email);
+}
+
 // Firebase 오류 메시지 한국어 변환
 function getFirebaseErrorMessage(errorCode) {
     const errorMessages = {
@@ -44,8 +72,8 @@ async function loginWithEmail(email, password) {
         console.log('✅ Firebase Auth 로그인 성공:', user.email);
 
         // ===== 보안: 승인된 계정만 로그인 허용 (관리자/ABP 계정 제외) =====
-        // 관리자 및 ABP 계정은 자동 승인
-        if (user.email !== 'admin@dshare.co.kr' && user.email !== 'abp@dshare.co.kr') {
+        // 관리자 및 ABP 계정, ABP 팀 계정은 자동 승인
+        if (user.email !== 'admin@dshare.co.kr' && user.email !== 'abp@dshare.co.kr' && !isAbpTeamEmail(user.email)) {
             console.log('🔍 일반 사용자 계정 검증 시작...');
             const validationResult = await validateUserAccount(user);
             if (!validationResult.success) {
@@ -55,7 +83,40 @@ async function loginWithEmail(email, password) {
             }
             console.log('✅ 계정 검증 통과');
         } else {
-            console.log('✅ 관리자/ABP 계정 - 자동 승인');
+            console.log('✅ 관리자/ABP/ABP팀 계정 - 자동 승인');
+
+            // ABP 팀 계정은 users 문서가 없으면 자동 생성 (승인 체크/lastLogin update를 위해)
+            if (isAbpTeamEmail(user.email)) {
+                const teamId = parseTeamIdFromEmail(user.email);
+                try {
+                    const ref = db.collection('users').doc(user.uid);
+                    const doc = await ref.get();
+                    if (!doc.exists) {
+                        await ref.set({
+                            uid: user.uid,
+                            email: user.email,
+                            isActive: true,
+                            role: 'abp_team',
+                            abpTeamId: teamId,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        // 최소한 이메일 불일치로 막히지 않도록 유지
+                        await ref.set(
+                            {
+                                email: user.email,
+                                isActive: doc.data()?.isActive === false ? false : true,
+                                role: doc.data()?.role || 'abp_team',
+                                abpTeamId: doc.data()?.abpTeamId || teamId
+                            },
+                            { merge: true }
+                        );
+                    }
+                } catch (e) {
+                    console.error('ABP 팀 users 문서 생성/갱신 실패:', e);
+                    // 여기서 로그인 자체를 막지는 않음 (페이지 가드에서 다시 처리 가능)
+                }
+            }
         }
         // ===== 보안 확인 끝 =====
 
