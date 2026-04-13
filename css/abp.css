@@ -271,6 +271,57 @@ body {
   background: #c82333;
 }
 
+/* 테이블 행 관리(수정·삭제·복구) — 보조 버튼, 테마 정렬 */
+.btn-action-edit,
+.btn-action-delete,
+.btn-action-restore {
+  transform: none;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.btn-action-edit {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.btn-action-edit:hover {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #34d399;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.25);
+}
+
+.btn-action-delete {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+
+.btn-action-delete:hover {
+  background: #ffe4e6;
+  color: #9f1239;
+  border-color: #fda4af;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(190, 18, 60, 0.2);
+}
+
+.btn-action-restore {
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+
+.btn-action-restore:hover {
+  background: #ccfbf1;
+  color: #115e59;
+  border-color: #5eead4;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.2);
+}
+
 .section-title {
   color: #0d3b36;
   font-size: 18px;
@@ -395,12 +446,106 @@ body {
   transition: all 0.3s ease;
 }
 
-.form-group input:focus,
+/* 체크·라디오는 전폭 입력 규칙 제외 (레이아웃 깨짐 방지) */
+.form-group input[type="checkbox"],
+.form-group input[type="radio"] {
+  width: auto;
+  height: auto;
+  min-width: 1.125rem;
+  min-height: 1.125rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+  flex-shrink: 0;
+  accent-color: #10b981;
+}
+
+.form-group input[type="checkbox"]:focus,
+.form-group input[type="radio"]:focus {
+  outline: 2px solid rgba(16, 185, 129, 0.5);
+  outline-offset: 2px;
+}
+
+.form-group input:not([type="checkbox"]):not([type="radio"]):focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* 분류 수정 모달 — 사용 여부(체크박스): 전역 .form-group input 100% 폭과 label 중첩 방지 */
+.inquiry-modal-status .inquiry-modal-status-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.inquiry-modal-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inquiry-modal-status-label {
+  display: inline !important;
+  margin-bottom: 0 !important;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.inquiry-modal-status-hint {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+/* 분류 추가 모달: 기존 대분류 vs 새 대분류 (라디오 대신 세그먼트 버튼) */
+.inquiry-major-mode-toggle {
+  display: flex;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+}
+
+.inquiry-major-mode-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  line-height: 1.3;
+}
+
+.inquiry-major-mode-btn:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.65);
+  color: #334155;
+}
+
+.inquiry-major-mode-btn.is-active {
+  background: #fff;
+  color: #047857;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.inquiry-major-mode-btn + .inquiry-major-mode-btn {
+  border-left: 1px solid #e2e8f0;
 }
 
 .modal-actions {
@@ -415,6 +560,21 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+/* 문의 유형 카테고리: 제목 + 분류 추가 버튼 한 줄 */
+.inquiry-category-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.inquiry-category-section-head .section-title {
+  margin-bottom: 0;
 }
 
 /* 팀 배지 색상 */
@@ -512,6 +672,67 @@ body {
   color: #333;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* 문의 상세: 대분류·중분류 + 저장 */
+.abp-inquiry-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.abp-inquiry-category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d3b36;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.abp-inquiry-category-pair {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: min(100%, 280px);
+  gap: 10px 14px;
+  align-items: flex-end;
+}
+
+.abp-inquiry-category-field {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.abp-inquiry-category-sublabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: -0.02em;
+}
+
+.abp-inquiry-category-select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  background: #fff;
+}
+
+.abp-inquiry-category-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.abp-inquiry-category-save {
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
