@@ -33,42 +33,16 @@
         const INQUIRY_CATEGORY_DEFS_COLLECTION = 'inquiryCategoryDefinitions';
 
         /**
-         * Firestore에 행을 만들지 않아도 되는 시스템 대분류.
-         * 선택 시 중분류 값 = 기획본부 팀 id → 해당 팀함으로 직접 라우팅.
+         * 예약된 시스템 대분류.
+         * '담당부서 지정'은 기획본부/관리자 화면에서만 사용하며, user.html(지점)에서는 노출/선택 불가.
          */
         const USER_MANUAL_TEAM_MAJOR_ID = 'manual_team';
-        const USER_ABP_TEAM_DEFS = [
-            { id: 'biz_plan', name: '사업기획팀' },
-            { id: 'sales_ops', name: '영업지원팀' },
-            { id: 'hrd_academy', name: '학원HRD팀' },
-            { id: 'eng_lab', name: '영어연구소' },
-            { id: 'content_prod', name: '콘텐츠제작팀' },
-            { id: 'it_dev', name: 'IT본부' },
-            { id: 'corp_admin', name: '경영지원팀' },
-            { id: 'biz_mk1', name: '사업마케팅1팀' },
-            { id: 'biz_mk2', name: '사업마케팅2팀' }
-        ];
-        const USER_ABP_TEAM_BY_ID = Object.fromEntries(USER_ABP_TEAM_DEFS.map((t) => [t.id, t]));
-
-        /** Firestore에 manual_team 행이 있으면 그걸 쓰고, 없으면 코드 목록으로 대분류만 주입 */
-        function mergeManualTeamMajorIntoCategoryTree(baseTree) {
-            const rest = (baseTree || []).filter((m) => m.majorId !== USER_MANUAL_TEAM_MAJOR_ID);
-            const fromFirestore = (baseTree || []).find((m) => m.majorId === USER_MANUAL_TEAM_MAJOR_ID);
-            if (fromFirestore && Array.isArray(fromFirestore.minors) && fromFirestore.minors.length > 0) {
-                return [...rest, fromFirestore];
-            }
-            return [
-                ...rest,
-                {
-                    majorId: USER_MANUAL_TEAM_MAJOR_ID,
-                    majorLabel: '담당부서 지정',
-                    minors: USER_ABP_TEAM_DEFS.map((t) => ({ minorId: t.id, minorLabel: t.name }))
-                }
-            ];
-        }
 
         function buildInquiryCategoryTreeFromRows(rows) {
-            const active = (rows || []).filter((r) => r.active !== false);
+            const active = (rows || [])
+                .filter((r) => r.active !== false)
+                // 지점 화면에서는 '담당부서 지정' 대분류를 숨김
+                .filter((r) => r.majorId !== USER_MANUAL_TEAM_MAJOR_ID);
             const byMajor = new Map();
             active.forEach((r) => {
                 if (!r.majorId || !r.minorId) return;
@@ -90,11 +64,6 @@
         }
 
         function resolveAbpTargetTeamFromCategoryRows(majorId, minorId, categoryRows) {
-            if (majorId === USER_MANUAL_TEAM_MAJOR_ID) {
-                const tid = minorId && String(minorId).trim();
-                if (tid && USER_ABP_TEAM_BY_ID[tid]) return tid;
-                return null;
-            }
             let m = minorId;
             if (majorId === 'unset' && !m) m = 'general';
             const hit = (categoryRows || []).find(
@@ -3584,13 +3553,6 @@
                 return major?.minors || [];
             };
             const getInquiryTypeLabels = (majorId, minorId) => {
-                if (majorId === USER_MANUAL_TEAM_MAJOR_ID) {
-                    const team = USER_ABP_TEAM_BY_ID[minorId];
-                    return {
-                        majorLabel: '담당부서 지정',
-                        minorLabel: team?.name || minorId || ''
-                    };
-                }
                 const m = majorId === 'unset' && !minorId ? 'general' : minorId;
                 const major = categoryTree.find((x) => x.majorId === majorId);
                 const majorLabel = major?.majorLabel || '';
@@ -3655,9 +3617,7 @@
                     (snapshot) => {
                         const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
                         setCategoryRows(list);
-                        setCategoryTree(
-                            mergeManualTeamMajorIntoCategoryTree(buildInquiryCategoryTreeFromRows(list))
-                        );
+                        setCategoryTree(buildInquiryCategoryTreeFromRows(list));
                         setCategoriesLoading(false);
                     },
                     (err) => {
@@ -3735,11 +3695,13 @@
                     alert('문의 유형(대분류)을 선택해주세요.');
                     return;
                 }
-                // '미정'은 중분류 없이도 제출 가능 / '담당 부서 직접 지정'은 부서(중분류) 필수
+                if (formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID) {
+                    alert('해당 문의 유형은 지점 화면에서 선택할 수 없습니다. 문의 유형을 다시 선택해주세요.');
+                    return;
+                }
+                // '미정'은 중분류 없이도 제출 가능
                 if (formData.inquiryMajor !== 'unset' && !formData.inquiryMinor) {
-                    alert(formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID
-                        ? '담당 부서를 선택해주세요.'
-                        : '문의 유형(중분류)을 선택해주세요.');
+                    alert('문의 유형(중분류)을 선택해주세요.');
                     return;
                 }
                 if (!formData.position) {
@@ -3766,7 +3728,7 @@
                         formData.inquiryMajor === 'unset'
                             ? formData.inquiryMinor || 'general'
                             : formData.inquiryMinor;
-                    const inquiryTypeLabels = getInquiryTypeLabels(formData.inquiryMajor, minorKey);
+                        const inquiryTypeLabels = getInquiryTypeLabels(formData.inquiryMajor, minorKey);
                     const abpTargetTeam = resolveAbpTargetTeamFromCategoryRows(
                         formData.inquiryMajor,
                         minorKey,
@@ -3809,8 +3771,7 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         abpTargetTeam,
                         abpInquiryId: abpRef.id,
-                        abpRoutedBy:
-                            formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? 'manual_team' : 'firestore'
+                        abpRoutedBy: 'firestore'
                     };
 
                     const abpPayload = {
@@ -3827,8 +3788,7 @@
                         authorName: formData.inquirerName.trim(),
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        abpRoutedBy:
-                            formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? 'manual_team' : 'firestore',
+                        abpRoutedBy: 'firestore',
                         inquiryMajor: formData.inquiryMajor,
                         inquiryMinor: formData.inquiryMajor === 'unset' ? '' : formData.inquiryMinor,
                         inquiryMajorLabel: inquiryTypeLabels.majorLabel,
@@ -3903,11 +3863,13 @@
                     alert('문의 유형(대분류)을 선택해주세요.');
                     return;
                 }
-                // '미정'은 중분류 없이도 제출 가능 / '담당 부서 직접 지정'은 부서(중분류) 필수
+                if (editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID) {
+                    alert('해당 문의 유형은 지점 화면에서 선택할 수 없습니다. 문의 유형을 다시 선택해주세요.');
+                    return;
+                }
+                // '미정'은 중분류 없이도 제출 가능
                 if (editFormData.inquiryMajor !== 'unset' && !editFormData.inquiryMinor) {
-                    alert(editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID
-                        ? '담당 부서를 선택해주세요.'
-                        : '문의 유형(중분류)을 선택해주세요.');
+                    alert('문의 유형(중분류)을 선택해주세요.');
                     return;
                 }
                 if (!editFormData.position) {
@@ -3984,8 +3946,7 @@
                                 inquiryMinor: editFormData.inquiryMajor === 'unset' ? '' : editFormData.inquiryMinor,
                                 inquiryMajorLabel: inquiryTypeLabels.majorLabel,
                                 inquiryMinorLabel: inquiryTypeLabels.minorLabel,
-                                abpRoutedBy:
-                                    editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? 'manual_team' : 'firestore'
+                                    abpRoutedBy: 'firestore'
                             });
                         } catch (abpErr) {
                             // 권한(규칙) 또는 문서 상태 문제로 ABP 연동 업데이트가 실패해도,
@@ -4072,6 +4033,15 @@
                 );
             };
 
+            const getInquiryCategoryText = (inquiry) => {
+                const major = inquiry?.inquiryMajorLabel || inquiry?.inquiryMajor || '';
+                const minor = inquiry?.inquiryMinorLabel || inquiry?.inquiryMinor || '';
+                if (!major && !minor) return '미정';
+                if (!minor) return major || '미정';
+                if (!major) return minor || '미정';
+                return `${major} › ${minor}`;
+            };
+
             if (loading) {
                 return (
                     <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
@@ -4136,21 +4106,8 @@
                                             <td style={{textAlign: 'center', color: '#666', fontSize: '13px'}}>{index + 1}</td>
                                             <td style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
                                             <td style={{textAlign: 'center'}}>
-                                                <span style={{
-                                                    background: '#f0f4f8',
-                                                    color: '#334155',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '999px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600',
-                                                    display: 'inline-block',
-                                                    maxWidth: '170px',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                    verticalAlign: 'middle'
-                                                }} title={`${inquiry.inquiryMajorLabel || '미정'}`}>
-                                                    {inquiry.inquiryMajorLabel || '미정'}
+                                                <span style={{ fontSize: '13px', color: '#334155' }}>
+                                                    {getInquiryCategoryText(inquiry)}
                                                 </span>
                                             </td>
                                             <td style={{fontWeight: '500'}}>{inquiry.title}</td>
@@ -4228,22 +4185,17 @@
                                         </div>
                                         {formData.inquiryMajor && formData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>{formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? '담당 부서' : '문의 유형 (중분류)'} <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
                                                 <select
                                                     value={formData.inquiryMinor}
                                                     onChange={(e) => setFormData({...formData, inquiryMinor: e.target.value})}
                                                     required
                                                 >
-                                                    <option value="">{formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? '부서를 선택하세요' : '중분류를 선택하세요'}</option>
+                                                    <option value="">중분류를 선택하세요</option>
                                                     {getMinorOptions(formData.inquiryMajor).map(mi => (
                                                         <option key={mi.minorId} value={mi.minorId}>{mi.minorLabel}</option>
                                                     ))}
                                                 </select>
-                                                {formData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID && (
-                                                    <p style={{ fontSize: '12px', color: '#64748b', margin: '8px 0 0' }}>
-                                                        세부 유형이 없을 때 선택한 기획본부 담당 부서로 바로 전달됩니다.
-                                                    </p>
-                                                )}
                                             </div>
                                         )}
                                         <div className="form-group">
@@ -4562,22 +4514,17 @@
                                         </div>
                                         {editFormData.inquiryMajor && editFormData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>{editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? '담당 부서' : '문의 유형 (중분류)'} <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
                                                 <select
                                                     value={editFormData.inquiryMinor}
                                                     onChange={(e) => setEditFormData({...editFormData, inquiryMinor: e.target.value})}
                                                     required
                                                 >
-                                                    <option value="">{editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID ? '부서를 선택하세요' : '중분류를 선택하세요'}</option>
+                                                    <option value="">중분류를 선택하세요</option>
                                                     {getMinorOptions(editFormData.inquiryMajor).map(mi => (
                                                         <option key={mi.minorId} value={mi.minorId}>{mi.minorLabel}</option>
                                                     ))}
                                                 </select>
-                                                {editFormData.inquiryMajor === USER_MANUAL_TEAM_MAJOR_ID && (
-                                                    <p style={{ fontSize: '12px', color: '#64748b', margin: '8px 0 0' }}>
-                                                        세부 유형이 없을 때 선택한 기획본부 담당 부서로 바로 전달됩니다.
-                                                    </p>
-                                                )}
                                             </div>
                                         )}
                                         <div className="form-group">

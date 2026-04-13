@@ -151,6 +151,7 @@
             const [categoryDefRows, setCategoryDefRows] = useState([]);
             const [detailRouteMajorId, setDetailRouteMajorId] = useState('');
             const [detailRouteMinorDocId, setDetailRouteMinorDocId] = useState('');
+            const [detailManualTargetTeamId, setDetailManualTargetTeamId] = useState('');
             const [savingCategoryRoute, setSavingCategoryRoute] = useState(false);
             const userPickedCategoryRef = useRef(false);
 
@@ -162,13 +163,16 @@
                     if (r.active === false || !r.majorId) return;
                     if (!m.has(r.majorId)) m.set(r.majorId, r.majorLabel || r.majorId);
                 });
-                return Array.from(m.entries())
+                const list = Array.from(m.entries())
                     .map(([majorId, majorLabel]) => ({ majorId, majorLabel }))
                     .sort((a, b) => a.majorLabel.localeCompare(b.majorLabel, 'ko'));
+                // 「담당부서 지정」은 코드 주입 (Firestore 정의에 없어도 항상 노출)
+                return [{ majorId: ABP_MANUAL_TEAM_MAJOR_ID, majorLabel: '담당부서 지정' }, ...list];
             }, [categoryDefRows]);
 
             const routeMinorOptions = useMemo(() => {
                 if (!detailRouteMajorId) return [];
+                if (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID) return [];
                 return (categoryDefRows || [])
                     .filter((r) => r.active !== false && r.majorId === detailRouteMajorId)
                     .slice()
@@ -190,6 +194,12 @@
                 if (!showDetailModal || !selectedInquiry) return;
                 if (userPickedCategoryRef.current) return;
                 const inv = selectedInquiry;
+                if (inv.inquiryMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                    setDetailRouteMajorId(ABP_MANUAL_TEAM_MAJOR_ID);
+                    setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId(inv.targetTeam || inv.abpTargetTeam || inv.inquiryMinor || '');
+                    return;
+                }
                 const hit = categoryDefRows.find(
                     (r) =>
                         r.active !== false &&
@@ -199,9 +209,11 @@
                 if (hit) {
                     setDetailRouteMajorId(hit.majorId || '');
                     setDetailRouteMinorDocId(hit.id || '');
+                    setDetailManualTargetTeamId('');
                 } else {
                     setDetailRouteMajorId('');
                     setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId('');
                 }
             }, [showDetailModal, selectedInquiry, categoryDefRows]);
 
@@ -269,38 +281,71 @@
                     alert('대분류를 선택해주세요.');
                     return;
                 }
-                if (!detailRouteMinorDocId) {
-                    alert('중분류를 선택해주세요.');
-                    return;
-                }
-                const def = categoryDefRows.find((r) => r.id === detailRouteMinorDocId);
-                if (!def || !def.targetTeam) {
-                    alert('선택한 분류를 찾을 수 없습니다.');
-                    return;
-                }
-                if (!isKnownAbpTargetTeam(def.targetTeam)) {
-                    alert('분류에 연결된 담당 팀이 올바르지 않습니다.');
-                    return;
-                }
                 setSavingCategoryRoute(true);
-                const routedBy =
-                    def.majorId === ABP_MANUAL_TEAM_MAJOR_ID ? 'manual_team' : 'firestore';
+                const isManual = detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID;
                 const str = (v) => (v != null && v !== undefined ? String(v) : '');
-                const abpPayload = {
-                    targetTeam: def.targetTeam,
-                    inquiryMajor: def.majorId,
-                    inquiryMinor: str(def.minorId),
-                    inquiryMajorLabel: str(def.majorLabel),
-                    inquiryMinorLabel: str(def.minorLabel),
-                    abpRoutedBy: routedBy
-                };
-                const invPayload = {
-                    abpTargetTeam: def.targetTeam,
-                    inquiryMajor: def.majorId,
-                    inquiryMinor: str(def.minorId),
-                    inquiryMajorLabel: str(def.majorLabel),
-                    inquiryMinorLabel: str(def.minorLabel)
-                };
+                let abpPayload;
+                let invPayload;
+                if (isManual) {
+                    if (!detailManualTargetTeamId) {
+                        alert('담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(detailManualTargetTeamId)) {
+                        alert('유효한 담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const teamMeta = ABP_TEAM_BY_ID[detailManualTargetTeamId];
+                    abpPayload = {
+                        targetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId),
+                        abpRoutedBy: 'manual_team'
+                    };
+                    invPayload = {
+                        abpTargetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId)
+                    };
+                } else {
+                    if (!detailRouteMinorDocId) {
+                        alert('중분류를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const def = categoryDefRows.find((r) => r.id === detailRouteMinorDocId);
+                    if (!def || !def.targetTeam) {
+                        alert('선택한 분류를 찾을 수 없습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(def.targetTeam)) {
+                        alert('분류에 연결된 담당 팀이 올바르지 않습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    abpPayload = {
+                        targetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel),
+                        abpRoutedBy: 'firestore'
+                    };
+                    invPayload = {
+                        abpTargetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel)
+                    };
+                }
                 try {
                     await db.collection('abpInquiries').doc(selectedInquiry.id).update({
                         ...abpPayload,
@@ -571,10 +616,21 @@
                                                             userPickedCategoryRef.current = true;
                                                             const nextMajor = e.target.value;
                                                             setDetailRouteMajorId(nextMajor);
-                                                            const minors = (categoryDefRows || []).filter(
-                                                                (r) => r.active !== false && r.majorId === nextMajor
-                                                            );
-                                                            setDetailRouteMinorDocId(minors[0]?.id || '');
+                                                            if (nextMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                                                                setDetailRouteMinorDocId('');
+                                                                setDetailManualTargetTeamId(
+                                                                    selectedInquiry?.targetTeam ||
+                                                                        selectedInquiry?.abpTargetTeam ||
+                                                                        selectedInquiry?.inquiryMinor ||
+                                                                        ''
+                                                                );
+                                                            } else {
+                                                                setDetailManualTargetTeamId('');
+                                                                const minors = (categoryDefRows || []).filter(
+                                                                    (r) => r.active !== false && r.majorId === nextMajor
+                                                                );
+                                                                setDetailRouteMinorDocId(minors[0]?.id || '');
+                                                            }
                                                         }}
                                                     >
                                                         <option value="">— 선택 —</option>
@@ -585,36 +641,67 @@
                                                         ))}
                                                     </select>
                                                 </div>
-                                                <div className="abp-inquiry-category-field">
-                                                    <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailMinorSelect">
-                                                        중분류
-                                                    </label>
-                                                    <select
-                                                        id="abpDetailMinorSelect"
-                                                        className="abp-inquiry-category-select"
-                                                        value={detailRouteMinorDocId}
-                                                        disabled={!detailRouteMajorId}
-                                                        onChange={(e) => {
-                                                            userPickedCategoryRef.current = true;
-                                                            setDetailRouteMinorDocId(e.target.value);
-                                                        }}
-                                                    >
-                                                        <option value="">
-                                                            {detailRouteMajorId ? '— 선택 —' : '대분류를 먼저 선택'}
-                                                        </option>
-                                                        {routeMinorOptions.map((r) => (
-                                                            <option key={r.id} value={r.id}>
-                                                                {r.minorLabel || r.minorId}
+                                                {detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID ? (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailManualTeamSelect">
+                                                            담당 부서
+                                                        </label>
+                                                        <select
+                                                            id="abpDetailManualTeamSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailManualTargetTeamId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailManualTargetTeamId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">— 선택 —</option>
+                                                            {TEAMS.map((t) => (
+                                                                <option key={t.id} value={t.id}>
+                                                                    {t.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailMinorSelect">
+                                                            중분류
+                                                        </label>
+                                                        <select
+                                                            id="abpDetailMinorSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailRouteMinorDocId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailRouteMinorDocId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">
+                                                                {detailRouteMajorId ? '— 선택 —' : '대분류를 먼저 선택'}
                                                             </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                            {routeMinorOptions.map((r) => (
+                                                                <option key={r.id} value={r.id}>
+                                                                    {r.minorLabel || r.minorId}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
                                             </div>
                                             <button
                                                 type="button"
                                                 className="btn btn-sm abp-inquiry-category-save"
                                                 style={{ background: '#10b981' }}
-                                                disabled={savingCategoryRoute || !detailRouteMajorId || !detailRouteMinorDocId}
+                                                disabled={
+                                                    savingCategoryRoute ||
+                                                    !detailRouteMajorId ||
+                                                    (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID
+                                                        ? !detailManualTargetTeamId
+                                                        : !detailRouteMinorDocId)
+                                                }
                                                 onClick={handleSaveInquiryCategoryRoute}
                                             >
                                                 {savingCategoryRoute ? '저장 중...' : '저장'}
