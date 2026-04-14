@@ -27,6 +27,7 @@ body {
   position: fixed;
   height: 100%;
   z-index: 100;
+  overflow-y: auto;
 }
 
 .sidebar-header {
@@ -358,6 +359,17 @@ body {
   color: #e94560;
 }
 
+/* 기획본부 문의함 (abp 이식) */
+.status-badge.pending {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.status-badge.answered {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
 /* 모달 스타일 */
 .modal-overlay {
   position: fixed;
@@ -547,8 +559,25 @@ body {
   transition: all 0.3s ease;
 }
 
+.form-group textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+}
+
 .form-group input:focus,
 .form-group select:focus {
+  outline: none;
+  border-color: #e94560;
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.1);
+}
+
+.form-group textarea:focus {
   outline: none;
   border-color: #e94560;
   box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.1);
@@ -908,4 +937,268 @@ body {
     display: block;
     overflow-x: auto;
   }
+}
+
+/* 기획본부 소통 창구 — 문의 상세: 대분류·중분류·담당부서 (abp.html과 동일 패턴) */
+.abp-inquiry-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.abp-inquiry-category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d3b36;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.abp-inquiry-category-pair {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: min(100%, 280px);
+  gap: 10px 14px;
+  align-items: flex-end;
+}
+
+.abp-inquiry-category-field {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.abp-inquiry-category-sublabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: -0.02em;
+}
+
+.abp-inquiry-category-select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  background: #fff;
+}
+
+.abp-inquiry-category-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.abp-inquiry-category-save {
+  flex-shrink: 0;
+}
+
+/* 담당 부서·문의 유형 페이지 + 팀 문의함 (abp 이식) */
+.btn-action-edit,
+.btn-action-delete,
+.btn-action-restore {
+  transform: none;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.btn-action-edit {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.btn-action-edit:hover {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #34d399;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.25);
+}
+
+.btn-action-delete {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+
+.btn-action-delete:hover {
+  background: #ffe4e6;
+  color: #9f1239;
+  border-color: #fda4af;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(190, 18, 60, 0.2);
+}
+
+.btn-action-restore {
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+
+.btn-action-restore:hover {
+  background: #ccfbf1;
+  color: #115e59;
+  border-color: #5eead4;
+  transform: none;
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.2);
+}
+
+.inquiry-modal-status .inquiry-modal-status-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.inquiry-modal-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inquiry-modal-status-label {
+  display: inline !important;
+  margin-bottom: 0 !important;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.inquiry-modal-status-hint {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.inquiry-major-mode-toggle {
+  display: flex;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+}
+
+.inquiry-major-mode-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  line-height: 1.3;
+}
+
+.inquiry-major-mode-btn:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.65);
+  color: #334155;
+}
+
+.inquiry-major-mode-btn.is-active {
+  background: #fff;
+  color: #047857;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.inquiry-major-mode-btn + .inquiry-major-mode-btn {
+  border-left: 1px solid #e2e8f0;
+}
+
+.inquiry-category-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.inquiry-category-section-head .section-title {
+  margin-bottom: 0;
+}
+
+.team-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.team-badge.biz_plan {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.team-badge.sales_ops {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.team-badge.hrd_academy {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.team-badge.eng_lab {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.team-badge.content_prod {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.team-badge.it_dev {
+  background: #cffafe;
+  color: #0e7490;
+}
+
+.team-badge.corp_admin {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.team-badge.biz_mk1 {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.team-badge.biz_mk2 {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.original-inquiry-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.original-inquiry-box p {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
 }

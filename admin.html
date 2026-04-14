@@ -35,7 +35,7 @@
     <script src="firebase.js"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
         const ADMIN_EMAIL = 'admin@dshare.co.kr';
         const ABP_EMAIL = 'abp@dshare.co.kr';
 
@@ -69,6 +69,28 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                     <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            ),
+            InboxAll: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
+                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                </svg>
+            ),
+            DeptCategory: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    <line x1="12" y1="6" x2="12" y2="12"/>
+                    <line x1="9" y1="9" x2="15" y2="9"/>
+                </svg>
+            ),
+            Team: () => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
             ),
             Round: () => (
@@ -11358,15 +11380,15 @@
 
         // 기획본부 팀 정의 (abpInquiries.targetTeam) — 관리자(admin) 화면 노출 순서
         const ABP_TEAM_DEFS = [
-            { id: 'biz_plan', name: '사업기획팀' },
-            { id: 'sales_ops', name: '영업지원팀' },
-            { id: 'hrd_academy', name: '학원HRD팀' },
-            { id: 'eng_lab', name: '영어연구소' },
-            { id: 'content_prod', name: '콘텐츠제작팀' },
-            { id: 'it_dev', name: 'IT본부' },
-            { id: 'corp_admin', name: '경영지원팀' },
-            { id: 'biz_mk1', name: '사업마케팅1팀' },
-            { id: 'biz_mk2', name: '사업마케팅2팀' }
+            { id: 'biz_plan', name: '사업기획팀', className: 'biz_plan' },
+            { id: 'sales_ops', name: '영업지원팀', className: 'sales_ops' },
+            { id: 'hrd_academy', name: '학원HRD팀', className: 'hrd_academy' },
+            { id: 'eng_lab', name: '영어연구소', className: 'eng_lab' },
+            { id: 'content_prod', name: '콘텐츠제작팀', className: 'content_prod' },
+            { id: 'it_dev', name: 'IT본부', className: 'it_dev' },
+            { id: 'corp_admin', name: '경영지원팀', className: 'corp_admin' },
+            { id: 'biz_mk1', name: '사업마케팅1팀', className: 'biz_mk1' },
+            { id: 'biz_mk2', name: '사업마케팅2팀', className: 'biz_mk2' }
         ];
         const ABP_TEAM_BY_ID = Object.fromEntries(ABP_TEAM_DEFS.map(t => [t.id, t]));
         const ABP_ADMIN_ORDER = [
@@ -11374,6 +11396,12 @@
             'content_prod', 'it_dev', 'corp_admin'
         ];
         const ABP_TEAMS = ABP_ADMIN_ORDER.map(id => ABP_TEAM_BY_ID[id]);
+        /** abp.html 사이드바·팀별 문의함과 동일한 팀 노출 순서 (ABP_ADMIN_ORDER와 별도) */
+        const ABP_SIDEBAR_ORDER = [
+            'biz_plan', 'sales_ops', 'hrd_academy', 'eng_lab', 'content_prod',
+            'it_dev', 'corp_admin', 'biz_mk1', 'biz_mk2'
+        ];
+        const ABP_TEAMS_NAV = ABP_SIDEBAR_ORDER.map((id) => ABP_TEAM_BY_ID[id]);
         // 구 시스템에서 저장된 targetTeam id → 표시명 (기존 문서 조회용)
         const LEGACY_ABP_TEAM_NAMES = {
             planning: '학원사업기획팀',
@@ -11382,6 +11410,73 @@
             production: '콘텐츠제작팀',
             rnd: '콘텐츠R&D팀'
         };
+
+        const isKnownAbpTargetTeam = (teamId) => Boolean(teamId && ABP_TEAM_BY_ID[teamId]);
+        const INQUIRY_CATEGORY_DEFS_COLLECTION = 'inquiryCategoryDefinitions';
+        const ABP_MANUAL_TEAM_MAJOR_ID = 'manual_team';
+
+        function sanitizeAbpInquiryFileName(name) {
+            return (name || 'file')
+                .replace(/[^\w.\-]+/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_+|_+$/g, '');
+        }
+
+        async function uploadAbpReplyAttachments({ files, inquiryId }) {
+            if (!files || !files.length) return [];
+            const uploads = files.map(async (file, idx) => {
+                const timestamp = Date.now();
+                const safeName = sanitizeAbpInquiryFileName(file.name);
+                const filePath = `abpInquiries/${inquiryId}/reply/${timestamp}_${idx + 1}_${safeName}`;
+                const ref = storage.ref(filePath);
+                const uploadTask = await ref.put(file);
+                const url = await uploadTask.ref.getDownloadURL();
+                return {
+                    name: file.name,
+                    path: filePath,
+                    url,
+                    contentType: file.type || '',
+                    size: file.size || 0,
+                    uploadedAtMs: Date.now()
+                };
+            });
+            return await Promise.all(uploads);
+        }
+
+        const uploadInquiryAttachments = uploadAbpReplyAttachments;
+
+        function inquiryMajorLabelFromRows(majorId, rows) {
+            const hit = (rows || []).find((r) => r.majorId === majorId);
+            return hit?.majorLabel || majorId || '-';
+        }
+
+        function generateInquiryMinorId(minorLabel) {
+            const base = String(minorLabel || 'cat')
+                .toLowerCase()
+                .replace(/[^a-z0-9가-힣]+/g, '_')
+                .replace(/^_+|_+$/g, '')
+                .slice(0, 28) || 'cat';
+            return base + '_' + Math.random().toString(36).slice(2, 9);
+        }
+
+        function getAbpEditorLabel(u) {
+            if (!u) return '';
+            const dn = (u.displayName || '').trim();
+            if (dn) return dn;
+            return u.email || '';
+        }
+
+        function formatFirestoreDateKo(timestamp) {
+            if (!timestamp) return '-';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('ko-KR', {
+                year: '2-digit',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
 
         /** inquiries / abpInquiries 문서의 attachments·replyAttachments path → Storage 삭제 (best-effort) */
         async function deleteInquiryAttachmentStorageFromRows(rows) {
@@ -12521,6 +12616,1362 @@
             );
         }
 
+
+        // —— abp.html 이식: 전체·팀별 문의함 (TeamInquiryPage) ——
+        function TeamInquiryPage({ teamId, allTeams }) {
+            const [inquiries, setInquiries] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showDetailModal, setShowDetailModal] = useState(false);
+            const [selectedInquiry, setSelectedInquiry] = useState(null);
+            const [replyText, setReplyText] = useState('');
+            const [replyAuthor, setReplyAuthor] = useState('');
+            const [replyAttachedFiles, setReplyAttachedFiles] = useState([]); // File[]
+            const [isReplying, setIsReplying] = useState(false);
+
+            const [categoryDefRows, setCategoryDefRows] = useState([]);
+            const [detailRouteMajorId, setDetailRouteMajorId] = useState('');
+            const [detailRouteMinorDocId, setDetailRouteMinorDocId] = useState('');
+            const [detailManualTargetTeamId, setDetailManualTargetTeamId] = useState('');
+            const [savingCategoryRoute, setSavingCategoryRoute] = useState(false);
+            const userPickedCategoryRef = useRef(false);
+
+            const team = allTeams ? null : ABP_TEAMS_NAV.find(t => t.id === teamId);
+
+            const routeMajorOptions = useMemo(() => {
+                const m = new Map();
+                (categoryDefRows || []).forEach((r) => {
+                    if (r.active === false || !r.majorId) return;
+                    if (!m.has(r.majorId)) m.set(r.majorId, r.majorLabel || r.majorId);
+                });
+                const list = Array.from(m.entries())
+                    .map(([majorId, majorLabel]) => ({ majorId, majorLabel }))
+                    .sort((a, b) => a.majorLabel.localeCompare(b.majorLabel, 'ko'));
+                // 「담당부서 지정」은 코드 주입 (Firestore 정의에 없어도 항상 노출)
+                return [{ majorId: ABP_MANUAL_TEAM_MAJOR_ID, majorLabel: '담당부서 지정' }, ...list];
+            }, [categoryDefRows]);
+
+            const routeMinorOptions = useMemo(() => {
+                if (!detailRouteMajorId) return [];
+                if (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID) return [];
+                return (categoryDefRows || [])
+                    .filter((r) => r.active !== false && r.majorId === detailRouteMajorId)
+                    .slice()
+                    .sort((a, b) => (a.minorLabel || '').localeCompare(b.minorLabel || '', 'ko'));
+            }, [categoryDefRows, detailRouteMajorId]);
+
+            useEffect(() => {
+                const unsub = db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).onSnapshot(
+                    (snapshot) => {
+                        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                        setCategoryDefRows(list);
+                    },
+                    (err) => console.error('[inquiryCategoryDefinitions] 로드:', err)
+                );
+                return () => unsub();
+            }, []);
+
+            useEffect(() => {
+                if (!showDetailModal || !selectedInquiry) return;
+                if (userPickedCategoryRef.current) return;
+                const inv = selectedInquiry;
+                if (inv.inquiryMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                    setDetailRouteMajorId(ABP_MANUAL_TEAM_MAJOR_ID);
+                    setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId(inv.targetTeam || inv.abpTargetTeam || inv.inquiryMinor || '');
+                    return;
+                }
+                const hit = categoryDefRows.find(
+                    (r) =>
+                        r.active !== false &&
+                        r.majorId === inv.inquiryMajor &&
+                        String(r.minorId ?? '') === String(inv.inquiryMinor ?? '')
+                );
+                if (hit) {
+                    setDetailRouteMajorId(hit.majorId || '');
+                    setDetailRouteMinorDocId(hit.id || '');
+                    setDetailManualTargetTeamId('');
+                } else {
+                    setDetailRouteMajorId('');
+                    setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId('');
+                }
+            }, [showDetailModal, selectedInquiry, categoryDefRows]);
+
+            // 해당 팀 또는 전체 문의글 로드
+            useEffect(() => {
+                const base = db.collection('abpInquiries');
+                const unsubscribe = (allTeams ? base : base.where('targetTeam', '==', teamId))
+                    .onSnapshot((snapshot) => {
+                        let data = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        // 전체 문의함: 팀 미배정·구 스키마 문의는 팀함과 합계가 맞도록 제외
+                        if (allTeams) {
+                            data = data.filter((row) => isKnownAbpTargetTeam(row.targetTeam));
+                        }
+                        // 최신순 정렬
+                        data.sort((a, b) => {
+                            const dateA = a.createdAt?.toDate?.() || new Date(0);
+                            const dateB = b.createdAt?.toDate?.() || new Date(0);
+                            return dateB - dateA;
+                        });
+                        setInquiries(data);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error('문의글 로드 오류:', error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, [teamId, allTeams]);
+
+            // 상세보기
+            const openDetail = (inquiry) => {
+                userPickedCategoryRef.current = false;
+                setReplyText(inquiry.reply || '');
+                setReplyAuthor(inquiry.replyAuthor || '');
+                setReplyAttachedFiles([]);
+                setSelectedInquiry(inquiry);
+                setShowDetailModal(true);
+                if (inquiry.originalInquiryId) {
+                    db.collection('inquiries')
+                        .doc(inquiry.originalInquiryId)
+                        .get()
+                        .then((snap) => {
+                            if (!snap.exists) return;
+                            const d = snap.data();
+                            setSelectedInquiry((prev) => {
+                                if (!prev || prev.id !== inquiry.id) return prev;
+                                return {
+                                    ...prev,
+                                    inquiryMajor: prev.inquiryMajor || d.inquiryMajor,
+                                    inquiryMinor: prev.inquiryMinor || d.inquiryMinor,
+                                    inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
+                                    inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
+                                    // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
+                                    attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
+                                };
+                            });
+                        })
+                        .catch((err) => console.warn('inquiries 보강 로드:', err));
+                }
+            };
+
+            const handleSaveInquiryCategoryRoute = async () => {
+                if (!selectedInquiry) return;
+                if (!detailRouteMajorId) {
+                    alert('대분류를 선택해주세요.');
+                    return;
+                }
+                setSavingCategoryRoute(true);
+                const isManual = detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID;
+                const str = (v) => (v != null && v !== undefined ? String(v) : '');
+                let abpPayload;
+                let invPayload;
+                if (isManual) {
+                    if (!detailManualTargetTeamId) {
+                        alert('담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(detailManualTargetTeamId)) {
+                        alert('유효한 담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const teamMeta = ABP_TEAM_BY_ID[detailManualTargetTeamId];
+                    abpPayload = {
+                        targetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId),
+                        abpRoutedBy: 'manual_team'
+                    };
+                    invPayload = {
+                        abpTargetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId)
+                    };
+                } else {
+                    if (!detailRouteMinorDocId) {
+                        alert('중분류를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const def = categoryDefRows.find((r) => r.id === detailRouteMinorDocId);
+                    if (!def || !def.targetTeam) {
+                        alert('선택한 분류를 찾을 수 없습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(def.targetTeam)) {
+                        alert('분류에 연결된 담당 팀이 올바르지 않습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    abpPayload = {
+                        targetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel),
+                        abpRoutedBy: 'firestore'
+                    };
+                    invPayload = {
+                        abpTargetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel)
+                    };
+                }
+                try {
+                    await db.collection('abpInquiries').doc(selectedInquiry.id).update({
+                        ...abpPayload,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    let inquiriesSyncFailed = false;
+                    if (selectedInquiry.originalInquiryId) {
+                        try {
+                            await db
+                                .collection('inquiries')
+                                .doc(selectedInquiry.originalInquiryId)
+                                .update({
+                                    ...invPayload,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                        } catch (syncErr) {
+                            inquiriesSyncFailed = true;
+                            console.error('inquiries 동기화 오류(분류):', syncErr);
+                            alert(
+                                '기획본부함에는 반영되었습니다.\n\n' +
+                                    '다만 지점 문의(inquiries) 동기화에 실패했습니다. Firestore 규칙에서 기획본부 계정이 해당 지점 문의 문서를 수정할 수 있는지 확인해 주세요.\n\n' +
+                                    (syncErr.code ? `[${syncErr.code}] ` : '') +
+                                    (syncErr.message || String(syncErr))
+                            );
+                        }
+                    }
+
+                    setSelectedInquiry((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  ...abpPayload
+                              }
+                            : prev
+                    );
+                    userPickedCategoryRef.current = false;
+                    if (!inquiriesSyncFailed) {
+                        alert('담당 팀이 선택한 분류에 맞게 반영되었습니다.');
+                    }
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('abpInquiries 분류 반영 오류:', error);
+                    alert(
+                        '기획본부 문의(abpInquiries) 저장에 실패했습니다.\n\n' +
+                            (error.code ? `[${error.code}] ` : '') +
+                            (error.message || String(error))
+                    );
+                } finally {
+                    setSavingCategoryRoute(false);
+                }
+            };
+
+            // 답변 저장
+            const handleReply = async () => {
+                if (!replyText.trim()) {
+                    alert('답변 내용을 입력해주세요.');
+                    return;
+                }
+                if (!replyAuthor.trim()) {
+                    alert('작성자 이름을 입력해주세요.');
+                    return;
+                }
+                const existingReplyAttachments = Array.isArray(selectedInquiry?.replyAttachments)
+                    ? selectedInquiry.replyAttachments
+                    : [];
+                if (existingReplyAttachments.length + (replyAttachedFiles?.length || 0) > 5) {
+                    alert('첨부파일은 최대 5개까지 가능합니다.');
+                    return;
+                }
+
+                setIsReplying(true);
+
+                try {
+                    const abpRef = db.collection('abpInquiries').doc(selectedInquiry.id);
+                    const newReplyAttachments = await uploadInquiryAttachments({
+                        files: replyAttachedFiles,
+                        inquiryId: selectedInquiry.id
+                    });
+                    const payload = {
+                        reply: replyText.trim(),
+                        replyAuthor: replyAuthor.trim(),
+                        status: 'answered',
+                        repliedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        replyAttachments: [...existingReplyAttachments, ...newReplyAttachments]
+                    };
+
+                    // 1) 기획본부 문의에만 먼저 저장 (배치에 inquiries를 넣으면 규칙/문서 문제 시 전부 실패할 수 있음)
+                    await abpRef.update(payload);
+
+                    // 2) 지점 원본 문의(inquiries) 동기화 — 사용자 화면은 inquiries만 구독함
+                    if (selectedInquiry.originalInquiryId) {
+                        try {
+                            await db.collection('inquiries').doc(selectedInquiry.originalInquiryId).update(payload);
+                        } catch (syncErr) {
+                            console.error('inquiries 동기화 오류:', syncErr);
+                            alert(
+                                '기획본부 문의에는 답변이 저장되었습니다.\n\n' +
+                                '다만 지점 문의(inquiries)에 반영되지 않았습니다. (Firestore 규칙에서 기획본부 계정의 inquiries 업데이트 허용 여부를 확인해 주세요.)\n' +
+                                (syncErr.message || String(syncErr))
+                            );
+                            setShowDetailModal(false);
+                            return;
+                        }
+                    }
+
+                    alert('답변이 저장되었습니다.');
+                    setReplyAttachedFiles([]);
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('답변 저장 오류:', error);
+                    alert('답변 저장에 실패했습니다: ' + (error.message || error));
+                } finally {
+                    setIsReplying(false);
+                }
+            };
+
+            // 상태 배지
+            const getStatusBadge = (status) => {
+                if (status === 'answered') {
+                    return <span className="status-badge answered">답변완료</span>;
+                }
+                return <span className="status-badge pending">대기중</span>;
+            };
+
+            const getInquiryTeamMeta = (inquiry) => {
+                const t = inquiry?.targetTeam && ABP_TEAM_BY_ID[inquiry.targetTeam];
+                return t || { name: inquiry?.targetTeam || '-', className: '' };
+            };
+
+            const getInquiryCategoryText = (inquiry) => {
+                const major = inquiry?.inquiryMajorLabel || inquiry?.inquiryMajor || '';
+                const minor = inquiry?.inquiryMinorLabel || inquiry?.inquiryMinor || '';
+                if (!major && !minor) return '-';
+                if (!minor) return major || '-';
+                if (!major) return minor || '-';
+                return `${major} › ${minor}`;
+            };
+
+            if (loading) {
+                return (
+                    <div className="loading-spinner">
+                        <p>문의 목록을 불러오는 중...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">{allTeams ? '전체 문의함' : team?.name}</h2>
+                        <p className="page-subtitle">
+                            {allTeams
+                                ? '팀별 문의함에 분산된 문의를 한곳에서 최신순으로 확인합니다'
+                                : '지점에서 접수된 문의사항에 답변합니다'}
+                        </p>
+                    </div>
+
+                    {/* 통계 카드 */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <h3>전체 문의</h3>
+                            <div className="value">{inquiries.length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>대기중</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'pending').length}</div>
+                        </div>
+                        <div className="stat-card">
+                            <h3>답변완료</h3>
+                            <div className="value">{inquiries.filter(i => i.status === 'answered').length}</div>
+                        </div>
+                    </div>
+
+                    <div className="content-area">
+                        <div className="page-header-actions">
+                            <h3 className="section-title" style={{ marginBottom: 0 }}>
+                                문의 목록 ({inquiries.length}건)
+                            </h3>
+                        </div>
+
+                        {inquiries.length === 0 ? (
+                            <div className="empty-state">
+                                <p>접수된 문의가 없습니다.</p>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
+                                        <th style={{width: '100px'}}>상태</th>
+                                        {allTeams && (
+                                            <th style={{width: '120px'}}>담당 팀</th>
+                                        )}
+                                        <th style={{width: '210px'}}>문의 유형</th>
+                                        <th>문의 내용</th>
+                                        <th style={{width: '100px'}}>작성자</th>
+                                        <th style={{width: '160px'}}>작성일</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {inquiries.map((inquiry, index) => (
+                                        <tr
+                                            key={inquiry.id}
+                                            onClick={() => openDetail(inquiry)}
+                                            style={{
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <td style={{textAlign: 'center', color: '#888', fontSize: '13px'}}>{index + 1}</td>
+                                            <td>{getStatusBadge(inquiry.status)}</td>
+                                            {allTeams && (
+                                                <td style={{fontSize: '13px'}}>
+                                                    <span className={`team-badge ${getInquiryTeamMeta(inquiry).className}`}>
+                                                        {getInquiryTeamMeta(inquiry).name}
+                                                    </span>
+                                                </td>
+                                            )}
+                                            <td style={{ fontSize: '13px', color: '#334155' }}>
+                                                {getInquiryCategoryText(inquiry)}
+                                            </td>
+                                            <td style={{
+                                                maxWidth: '300px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                {inquiry.content}
+                                            </td>
+                                            <td style={{fontSize: '13px'}}>{inquiry.authorName || '-'}</td>
+                                            <td style={{fontSize: '13px', color: '#666'}}>{formatDate(inquiry.createdAt)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* 문의 상세/답변 모달 */}
+                    {showDetailModal && selectedInquiry && (
+                        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>문의 상세</h3>
+                                    <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                </div>
+                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                    {/* 문의 정보 */}
+                                    <div style={{marginBottom: '20px'}}>
+                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
+                                            {getStatusBadge(selectedInquiry.status)}
+                                            <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
+                                                {formatDate(selectedInquiry.createdAt)}
+                                            </span>
+                                        </div>
+
+                                        {/* 원본 지점 문의 내용 */}
+                                        {selectedInquiry.originalInquiry && (
+                                            <div className="original-inquiry-box">
+                                                <p><strong>{selectedInquiry.originalInquiry.title}</strong></p>
+                                                <p style={{marginTop: '8px', color: '#555'}}>{selectedInquiry.originalInquiry.content}</p>
+                                            </div>
+                                        )}
+
+                                        {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.length > 0 && (
+                                            <div style={{ marginTop: '12px', marginBottom: '12px' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px', fontWeight: '600' }}>
+                                                    문의 첨부파일
+                                                </div>
+                                                <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                    {selectedInquiry.attachments.map((att, idx) => (
+                                                        <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                            <a
+                                                                href={att.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                            >
+                                                                {att.name || `첨부파일 ${idx + 1}`}
+                                                            </a>
+                                                            {typeof att.size === 'number' && att.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(att.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
+                                            작성자: {selectedInquiry.authorName || '-'}
+                                        </div>
+
+                                        <div className="abp-inquiry-category-row">
+                                            <span className="abp-inquiry-category-label">문의 유형</span>
+                                            <div className="abp-inquiry-category-pair">
+                                                <div className="abp-inquiry-category-field">
+                                                    <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailMajorSelect">
+                                                        대분류
+                                                    </label>
+                                                    <select
+                                                        id="abpDetailMajorSelect"
+                                                        className="abp-inquiry-category-select"
+                                                        value={detailRouteMajorId}
+                                                        onChange={(e) => {
+                                                            userPickedCategoryRef.current = true;
+                                                            const nextMajor = e.target.value;
+                                                            setDetailRouteMajorId(nextMajor);
+                                                            if (nextMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                                                                setDetailRouteMinorDocId('');
+                                                                setDetailManualTargetTeamId(
+                                                                    selectedInquiry?.targetTeam ||
+                                                                        selectedInquiry?.abpTargetTeam ||
+                                                                        selectedInquiry?.inquiryMinor ||
+                                                                        ''
+                                                                );
+                                                            } else {
+                                                                setDetailManualTargetTeamId('');
+                                                                const minors = (categoryDefRows || []).filter(
+                                                                    (r) => r.active !== false && r.majorId === nextMajor
+                                                                );
+                                                                setDetailRouteMinorDocId(minors[0]?.id || '');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">— 선택 —</option>
+                                                        {routeMajorOptions.map((m) => (
+                                                            <option key={m.majorId} value={m.majorId}>
+                                                                {m.majorLabel}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                {detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID ? (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailManualTeamSelect">
+                                                            담당 부서
+                                                        </label>
+                                                        <select
+                                                            id="abpDetailManualTeamSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailManualTargetTeamId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailManualTargetTeamId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">— 선택 —</option>
+                                                            {ABP_TEAMS_NAV.map((t) => (
+                                                                <option key={t.id} value={t.id}>
+                                                                    {t.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailMinorSelect">
+                                                            중분류
+                                                        </label>
+                                                        <select
+                                                            id="abpDetailMinorSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailRouteMinorDocId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailRouteMinorDocId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">
+                                                                {detailRouteMajorId ? '— 선택 —' : '대분류를 먼저 선택'}
+                                                            </option>
+                                                            {routeMinorOptions.map((r) => (
+                                                                <option key={r.id} value={r.id}>
+                                                                    {r.minorLabel || r.minorId}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm abp-inquiry-category-save"
+                                                style={{ background: '#10b981' }}
+                                                disabled={
+                                                    savingCategoryRoute ||
+                                                    !detailRouteMajorId ||
+                                                    (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID
+                                                        ? !detailManualTargetTeamId
+                                                        : !detailRouteMinorDocId)
+                                                }
+                                                onClick={handleSaveInquiryCategoryRoute}
+                                            >
+                                                {savingCategoryRoute ? '저장 중...' : '변경'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 답변 작성 영역 */}
+                                    <div style={{
+                                        borderTop: '1px solid #eee',
+                                        paddingTop: '20px'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            marginBottom: '12px'
+                                        }}>
+                                            <span className={`team-badge ${(allTeams ? getInquiryTeamMeta(selectedInquiry).className : team?.className) || ''}`}>
+                                                {(allTeams ? getInquiryTeamMeta(selectedInquiry).name : team?.name) || '담당 팀'} 답변
+                                            </span>
+                                            {selectedInquiry.repliedAt && (
+                                                <span style={{fontSize: '13px', color: '#666'}}>
+                                                    {formatDate(selectedInquiry.repliedAt)}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>작성자 이름 *</label>
+                                            <input
+                                                type="text"
+                                                value={replyAuthor}
+                                                onChange={(e) => setReplyAuthor(e.target.value)}
+                                                placeholder="답변 작성자 이름을 입력하세요"
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>답변 내용 *</label>
+                                            <textarea
+                                                rows="5"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                placeholder="답변 내용을 입력하세요"
+                                                style={{resize: 'vertical'}}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>첨부파일 (최대 5개)</label>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                onChange={(e) => {
+                                                    const files = Array.from(e.target.files || []);
+                                                    if (!files.length) return;
+                                                    const existing = Array.isArray(selectedInquiry?.replyAttachments)
+                                                        ? selectedInquiry.replyAttachments
+                                                        : [];
+                                                    if (existing.length + files.length > 5) {
+                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                        e.target.value = '';
+                                                        return;
+                                                    }
+                                                    setReplyAttachedFiles(files);
+                                                }}
+                                                disabled={isReplying}
+                                            />
+                                            {Array.isArray(replyAttachedFiles) && replyAttachedFiles.length > 0 && (
+                                                <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#334155' }}>
+                                                    {replyAttachedFiles.map((f, idx) => (
+                                                        <li key={`${f.name}_${idx}`} style={{ marginBottom: '6px' }}>
+                                                            {f.name}
+                                                            {typeof f.size === 'number' && f.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(f.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-sm"
+                                                                style={{ marginLeft: '10px', padding: '2px 8px' }}
+                                                                onClick={() =>
+                                                                    setReplyAttachedFiles((prev) =>
+                                                                        (prev || []).filter((_, i) => i !== idx)
+                                                                    )
+                                                                }
+                                                                disabled={isReplying}
+                                                            >
+                                                                제거
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {Array.isArray(selectedInquiry?.replyAttachments) &&
+                                                selectedInquiry.replyAttachments.length > 0 && (
+                                                    <div style={{ marginTop: '10px' }}>
+                                                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                                                            기존 답변 첨부파일
+                                                        </div>
+                                                        <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                            {selectedInquiry.replyAttachments.map((att, idx) => (
+                                                                <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                                    <a
+                                                                        href={att.url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                    >
+                                                                        {att.name || `첨부파일 ${idx + 1}`}
+                                                                    </a>
+                                                                    {typeof att.size === 'number' && att.size > 0 && (
+                                                                        <span
+                                                                            style={{
+                                                                                marginLeft: '8px',
+                                                                                color: '#64748b',
+                                                                                fontSize: '12px'
+                                                                            }}
+                                                                        >
+                                                                            ({Math.round(att.size / 1024)}KB)
+                                                                        </span>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee'}}>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setShowDetailModal(false)}
+                                        disabled={isReplying}
+                                    >
+                                        닫기
+                                    </button>
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={handleReply}
+                                        disabled={isReplying}
+                                    >
+                                        {isReplying ? '저장 중...' : '답변 저장'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // —— abp.html 이식: 담당 부서·문의 유형 ——
+        // 문의 유형 카테고리 · 담당 부서 (Firestore inquiryCategoryDefinitions 단일 소스)
+        function InquiryCategoryDeptPage({ user }) {
+            const [rows, setRows] = useState([]);
+            const [firestoreError, setFirestoreError] = useState(null);
+            const [filterTeam, setFilterTeam] = useState('all');
+            const [filterMajor, setFilterMajor] = useState('all');
+            const [showInactive, setShowInactive] = useState(false);
+
+            const [showModal, setShowModal] = useState(false);
+            const [modalMode, setModalMode] = useState('add');
+            const [editingId, setEditingId] = useState(null);
+            const [formMajorId, setFormMajorId] = useState('');
+            const [formBootstrapMajorId, setFormBootstrapMajorId] = useState('');
+            const [formBootstrapMajorLabel, setFormBootstrapMajorLabel] = useState('');
+            /** 분류 추가 시: 기존 대분류 선택 vs 새 대분류 id·표시명 입력 */
+            const [addMajorSource, setAddMajorSource] = useState('existing');
+            const [formMinorLabel, setFormMinorLabel] = useState('');
+            const [formTargetTeam, setFormTargetTeam] = useState('');
+            /** 분류 수정 시: true = 사용, false = 비활성 */
+            const [formActive, setFormActive] = useState(true);
+            const [saving, setSaving] = useState(false);
+
+            const uniqueMajorOptions = useMemo(() => {
+                const m = new Map();
+                rows.forEach((r) => {
+                    if (r.majorId) m.set(r.majorId, r.majorLabel || r.majorId);
+                });
+                return Array.from(m.entries())
+                    .map(([majorId, majorLabel]) => ({ majorId, majorLabel }))
+                    .sort((a, b) => a.majorLabel.localeCompare(b.majorLabel, 'ko'));
+            }, [rows]);
+
+            useEffect(() => {
+                const unsub = db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).onSnapshot(
+                    (snapshot) => {
+                        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                        list.sort((a, b) => {
+                            const ta = a.createdAt?.toDate?.() || new Date(0);
+                            const tb = b.createdAt?.toDate?.() || new Date(0);
+                            return tb - ta;
+                        });
+                        setRows(list);
+                        setFirestoreError(null);
+                    },
+                    (err) => {
+                        if (err.code === 'permission-denied') {
+                            console.warn(
+                                '[inquiryCategoryDefinitions] 읽기 권한 없음. Firebase 콘솔 규칙을 확인하세요.'
+                            );
+                            setFirestoreError(null);
+                            return;
+                        }
+                        console.error('문의 유형 정의 로드 오류:', err);
+                        setFirestoreError(err.message || String(err));
+                    }
+                );
+                return () => unsub();
+            }, []);
+
+            const filteredRows = useMemo(() => {
+                return rows.filter((row) => {
+                    if (!showInactive && row.active === false) return false;
+                    if (filterTeam !== 'all' && row.targetTeam !== filterTeam) return false;
+                    if (filterMajor !== 'all' && row.majorId !== filterMajor) return false;
+                    return true;
+                });
+            }, [rows, filterTeam, filterMajor, showInactive]);
+
+            const openAdd = () => {
+                setModalMode('add');
+                setEditingId(null);
+                setAddMajorSource(uniqueMajorOptions.length > 0 ? 'existing' : 'new');
+                if (uniqueMajorOptions.length > 0) {
+                    setFormMajorId(uniqueMajorOptions[0].majorId);
+                    setFormBootstrapMajorId('');
+                    setFormBootstrapMajorLabel('');
+                } else {
+                    setFormMajorId('');
+                    setFormBootstrapMajorId('');
+                    setFormBootstrapMajorLabel('');
+                }
+                setFormMinorLabel('');
+                setFormTargetTeam('');
+                setFormActive(true);
+                setShowModal(true);
+            };
+
+            const openEdit = (row) => {
+                setModalMode('edit');
+                setEditingId(row.id);
+                setFormMajorId(row.majorId || '');
+                setFormBootstrapMajorId('');
+                setFormBootstrapMajorLabel('');
+                setFormMinorLabel(row.minorLabel || '');
+                setFormTargetTeam(row.targetTeam || '');
+                setFormActive(row.active !== false);
+                setShowModal(true);
+            };
+
+            const handleSave = async () => {
+                const minor = formMinorLabel.trim();
+                if (!minor) {
+                    alert('문의 유형 카테고리 명을 입력해주세요.');
+                    return;
+                }
+                if (!formTargetTeam) {
+                    alert('담당 부서를 선택해주세요.');
+                    return;
+                }
+                if (!isKnownAbpTargetTeam(formTargetTeam)) {
+                    alert('유효한 담당 부서를 선택해주세요.');
+                    return;
+                }
+
+                let resolvedMajorId;
+                let resolvedMajorLabel;
+                const useBootstrapMajor =
+                    modalMode === 'add' &&
+                    (uniqueMajorOptions.length === 0 || addMajorSource === 'new');
+
+                if (useBootstrapMajor) {
+                    resolvedMajorId = formBootstrapMajorId.trim();
+                    resolvedMajorLabel = formBootstrapMajorLabel.trim();
+                    if (!resolvedMajorId || !resolvedMajorLabel) {
+                        alert('대분류 id(영문)·대분류 표시명을 모두 입력해주세요.');
+                        return;
+                    }
+                } else {
+                    resolvedMajorId = formMajorId;
+                    resolvedMajorLabel = inquiryMajorLabelFromRows(formMajorId, rows);
+                    if (modalMode === 'add' && !resolvedMajorId) {
+                        alert('대분류를 선택해주세요.');
+                        return;
+                    }
+                }
+
+                if (modalMode === 'add') {
+                    setSaving(true);
+                    try {
+                        await db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).add({
+                            majorId: resolvedMajorId,
+                            majorLabel: resolvedMajorLabel,
+                            minorId: generateInquiryMinorId(minor),
+                            minorLabel: minor,
+                            targetTeam: formTargetTeam,
+                            active: true,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedByName: getAbpEditorLabel(user),
+                            updatedByUid: user?.uid || ''
+                        });
+                        setShowModal(false);
+                    } catch (e) {
+                        console.error(e);
+                        alert('저장에 실패했습니다: ' + (e.message || e));
+                    } finally {
+                        setSaving(false);
+                    }
+                    return;
+                }
+
+                if (modalMode === 'edit' && editingId) {
+                    setSaving(true);
+                    try {
+                        await db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).doc(editingId).update({
+                            majorId: resolvedMajorId,
+                            majorLabel: resolvedMajorLabel,
+                            minorLabel: minor,
+                            targetTeam: formTargetTeam,
+                            active: formActive,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedByName: getAbpEditorLabel(user),
+                            updatedByUid: user?.uid || ''
+                        });
+                        setShowModal(false);
+                    } catch (e) {
+                        console.error(e);
+                        alert('수정에 실패했습니다: ' + (e.message || e));
+                    } finally {
+                        setSaving(false);
+                    }
+                }
+            };
+
+            const handleSoftDelete = async (row) => {
+                if (!confirm(`「${row.majorLabel || inquiryMajorLabelFromRows(row.majorId, rows)} › ${row.minorLabel}」 분류를 비활성화할까요?`)) return;
+                try {
+                    await db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).doc(row.id).update({
+                        active: false,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedByName: getAbpEditorLabel(user),
+                        updatedByUid: user?.uid || ''
+                    });
+                } catch (e) {
+                    console.error(e);
+                    alert('삭제 처리에 실패했습니다: ' + (e.message || e));
+                }
+            };
+
+            const handleRestore = async (row) => {
+                try {
+                    await db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).doc(row.id).update({
+                        active: true,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedByName: getAbpEditorLabel(user),
+                        updatedByUid: user?.uid || ''
+                    });
+                } catch (e) {
+                    console.error(e);
+                    alert('복구에 실패했습니다: ' + (e.message || e));
+                }
+            };
+
+            return (
+                <div>
+                    <div className="page-header">
+                        <h2 className="page-title">담당 부서 / 문의 유형</h2>
+                    </div>
+
+                    {firestoreError && (
+                        <div
+                            style={{
+                                margin: '0 24px 12px',
+                                padding: '12px 16px',
+                                background: '#fef2f2',
+                                color: '#991b1b',
+                                borderRadius: '8px',
+                                fontSize: '14px'
+                            }}
+                        >
+                            Firestore 연동 오류: {firestoreError}
+                        </div>
+                    )}
+
+                    <div className="content-area">
+                        <div style={{ marginBottom: '20px' }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '12px',
+                                    alignItems: 'center',
+                                    padding: '12px 16px',
+                                    background: '#f8fafc',
+                                    borderRadius: '10px'
+                                }}
+                            >
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', color: '#64748b' }}>팀 / 부서</label>
+                                    <select
+                                        value={filterTeam}
+                                        onChange={(e) => setFilterTeam(e.target.value)}
+                                        style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0',
+                                            minWidth: '160px'
+                                        }}
+                                    >
+                                        <option value="all">전체</option>
+                                        {ABP_TEAM_DEFS.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', color: '#64748b' }}>유형(대분류)</label>
+                                    <select
+                                        value={filterMajor}
+                                        onChange={(e) => setFilterMajor(e.target.value)}
+                                        style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0',
+                                            minWidth: '200px'
+                                        }}
+                                    >
+                                        <option value="all">전체</option>
+                                        {uniqueMajorOptions.map((m) => (
+                                            <option key={m.majorId} value={m.majorId}>
+                                                {m.majorLabel}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <label
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        alignSelf: 'flex-end',
+                                        paddingBottom: '2px'
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={showInactive}
+                                        onChange={(e) => setShowInactive(e.target.checked)}
+                                    />
+                                    <span style={{ fontSize: '13px', color: '#475569', whiteSpace: 'nowrap' }}>
+                                        비활성 포함
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="inquiry-category-section-head">
+                            <h3 className="section-title">문의 유형 카테고리 ({filteredRows.length}건)</h3>
+                            <button type="button" className="btn btn-sm" onClick={openAdd} style={{ background: '#10b981' }}>
+                                + 분류 추가
+                            </button>
+                        </div>
+
+                        {filteredRows.length === 0 ? (
+                            <div className="empty-state">
+                                <p>{rows.length === 0 ? '등록된 분류가 없습니다. 상단에서 분류를 추가하세요.' : '조건에 맞는 분류가 없습니다.'}</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '44px', textAlign: 'center' }}>No</th>
+                                            <th style={{ minWidth: '240px' }}>문의 유형 카테고리</th>
+                                            <th style={{ width: '140px' }}>담당 부서</th>
+                                            <th style={{ width: '100px', textAlign: 'center' }}>상태</th>
+                                            <th style={{ width: '100px' }}>최종 수정자</th>
+                                            <th style={{ width: '150px' }}>생성일</th>
+                                            <th style={{ width: '140px', textAlign: 'center' }}>관리</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredRows.map((row, index) => {
+                                            const teamMeta = ABP_TEAM_BY_ID[row.targetTeam];
+                                            const path = `${row.majorLabel || inquiryMajorLabelFromRows(row.majorId, rows)} › ${row.minorLabel || '-'}`;
+                                            return (
+                                                <tr key={row.id} style={{ opacity: row.active === false ? 0.65 : 1 }}>
+                                                    <td style={{ textAlign: 'center', color: '#94a3b8' }}>{index + 1}</td>
+                                                    <td style={{ fontSize: '14px' }}>{path}</td>
+                                                    <td>
+                                                        <span
+                                                            className={`team-badge ${teamMeta?.className || ''}`}
+                                                            style={{ fontSize: '12px' }}
+                                                        >
+                                                            {teamMeta?.name || row.targetTeam || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center', fontSize: '12px' }}>
+                                                        {row.active === false ? (
+                                                            <span className="status-badge pending">비활성</span>
+                                                        ) : (
+                                                            <span className="status-badge answered">사용</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ fontSize: '13px' }}>{row.updatedByName || '—'}</td>
+                                                    <td style={{ fontSize: '13px', color: '#64748b' }}>{formatFirestoreDateKo(row.createdAt)}</td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-action-edit"
+                                                            style={{ marginRight: '8px', padding: '5px 12px' }}
+                                                            onClick={() => openEdit(row)}
+                                                        >
+                                                            수정
+                                                        </button>
+                                                        {row.active !== false ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-action-delete"
+                                                                style={{ padding: '5px 12px' }}
+                                                                onClick={() => handleSoftDelete(row)}
+                                                            >
+                                                                삭제
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-action-restore"
+                                                                style={{ padding: '5px 12px' }}
+                                                                onClick={() => handleRestore(row)}
+                                                            >
+                                                                복구
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {showModal && (
+                        <div className="modal-overlay" onClick={() => !saving && setShowModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+                                <div className="modal-header">
+                                    <h3>{modalMode === 'add' ? '분류 추가' : '분류 수정'}</h3>
+                                    <button className="modal-close" disabled={saving} onClick={() => setShowModal(false)}>
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="modal-body">
+                                    {modalMode === 'add' && uniqueMajorOptions.length === 0 ? (
+                                        <>
+                                            <div className="form-group">
+                                                <label>대분류 id (영문, 예: marketing) *</label>
+                                                <input
+                                                    type="text"
+                                                    value={formBootstrapMajorId}
+                                                    onChange={(e) => setFormBootstrapMajorId(e.target.value)}
+                                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>대분류 표시명 *</label>
+                                                <input
+                                                    type="text"
+                                                    value={formBootstrapMajorLabel}
+                                                    onChange={(e) => setFormBootstrapMajorLabel(e.target.value)}
+                                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                                />
+                                            </div>
+                                        </>
+                                    ) : modalMode === 'add' ? (
+                                        <>
+                                            <div className="form-group">
+                                                <label>대분류 *</label>
+                                                <div className="inquiry-major-mode-toggle" role="group" aria-label="대분류 등록 방식">
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            'inquiry-major-mode-btn' +
+                                                            (addMajorSource === 'existing' ? ' is-active' : '')
+                                                        }
+                                                        onClick={() => setAddMajorSource('existing')}
+                                                    >
+                                                        기존 대분류
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            'inquiry-major-mode-btn' +
+                                                            (addMajorSource === 'new' ? ' is-active' : '')
+                                                        }
+                                                        onClick={() => setAddMajorSource('new')}
+                                                    >
+                                                        새 대분류
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {addMajorSource === 'existing' ? (
+                                                <div className="form-group">
+                                                    <label>선택한 대분류</label>
+                                                    <select
+                                                        value={formMajorId}
+                                                        onChange={(e) => setFormMajorId(e.target.value)}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '10px 12px',
+                                                            borderRadius: '8px',
+                                                            border: '1px solid #e2e8f0'
+                                                        }}
+                                                    >
+                                                        {uniqueMajorOptions.map((m) => (
+                                                            <option key={m.majorId} value={m.majorId}>
+                                                                {m.majorLabel}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="form-group">
+                                                        <label>대분류 id (영문) *</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formBootstrapMajorId}
+                                                            onChange={(e) => setFormBootstrapMajorId(e.target.value)}
+                                                            placeholder="예: marketing"
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '10px 12px',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #e2e8f0'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label>대분류 표시명 *</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formBootstrapMajorLabel}
+                                                            onChange={(e) => setFormBootstrapMajorLabel(e.target.value)}
+                                                            placeholder="예: 마케팅"
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '10px 12px',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #e2e8f0'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="form-group">
+                                            <label>대분류 *</label>
+                                            <select
+                                                value={formMajorId}
+                                                onChange={(e) => setFormMajorId(e.target.value)}
+                                                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                            >
+                                                {uniqueMajorOptions.map((m) => (
+                                                    <option key={m.majorId} value={m.majorId}>
+                                                        {m.majorLabel}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="form-group">
+                                        <label>문의 유형 카테고리 명 (중분류 표시) *</label>
+                                        <input
+                                            type="text"
+                                            value={formMinorLabel}
+                                            onChange={(e) => setFormMinorLabel(e.target.value)}
+                                            placeholder="예: 홍보 / 프로모션"
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>담당 부서 *</label>
+                                        <select
+                                            value={formTargetTeam}
+                                            onChange={(e) => setFormTargetTeam(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                        >
+                                            <option value="">-- 선택 --</option>
+                                            {ABP_TEAM_DEFS.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {modalMode === 'edit' && (
+                                        <div className="form-group inquiry-modal-status">
+                                            <span className="inquiry-modal-status-title">상태</span>
+                                            <div className="inquiry-modal-status-row">
+                                                <input
+                                                    type="checkbox"
+                                                    id="inquiryCategoryFormActive"
+                                                    checked={formActive}
+                                                    onChange={(e) => setFormActive(e.target.checked)}
+                                                />
+                                                <label htmlFor="inquiryCategoryFormActive" className="inquiry-modal-status-label">
+                                                    사용 중
+                                                </label>
+                                            </div>
+                                            <p className="inquiry-modal-status-hint">
+                                                해제하면 비활성 처리되며, 지점 문의 유형 목록에서 숨깁니다.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="modal-actions" style={{ padding: '15px 0 0', borderTop: '1px solid #eee' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        disabled={saving}
+                                        onClick={() => setShowModal(false)}
+                                    >
+                                        취소
+                                    </button>
+                                    <button type="button" className="btn btn-sm" disabled={saving} onClick={handleSave} style={{ background: '#10b981' }}>
+                                        {saving ? '저장 중...' : modalMode === 'add' ? '등록' : '저장'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // 기획본부 소통 창구 페이지
         function AbpCommunicationPage() {
             const [inquiries, setInquiries] = useState([]);
@@ -12550,6 +14001,17 @@
                 content: ''
             });
             const [isSubmittingNew, setIsSubmittingNew] = useState(false);
+
+            const userPickedCategoryRef = useRef(false);
+            const [categoryDefRows, setCategoryDefRows] = useState([]);
+            const [detailRouteMajorId, setDetailRouteMajorId] = useState('');
+            const [detailRouteMinorDocId, setDetailRouteMinorDocId] = useState('');
+            const [detailManualTargetTeamId, setDetailManualTargetTeamId] = useState('');
+            const [savingCategoryRoute, setSavingCategoryRoute] = useState(false);
+            const [replyText, setReplyText] = useState('');
+            const [replyAuthor, setReplyAuthor] = useState('');
+            const [replyAttachedFiles, setReplyAttachedFiles] = useState([]);
+            const [isReplying, setIsReplying] = useState(false);
 
             // 기획본부 문의 목록 로드
             useEffect(() => {
@@ -12583,6 +14045,16 @@
                 return () => unsubscribe();
             }, []);
 
+            useEffect(() => {
+                const unsub = db.collection(INQUIRY_CATEGORY_DEFS_COLLECTION).onSnapshot(
+                    (snapshot) => {
+                        setCategoryDefRows(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+                    },
+                    (err) => console.error('[inquiryCategoryDefinitions] 로드:', err)
+                );
+                return () => unsub();
+            }, []);
+
             // 지점-담당자 매핑 로드 (users 컬렉션에서)
             useEffect(() => {
                 const unsubscribe = db.collection('users')
@@ -12601,6 +14073,54 @@
 
                 return () => unsubscribe();
             }, []);
+
+            const routeMajorOptions = useMemo(() => {
+                const m = new Map();
+                (categoryDefRows || []).forEach((r) => {
+                    if (r.active === false || !r.majorId) return;
+                    if (!m.has(r.majorId)) m.set(r.majorId, r.majorLabel || r.majorId);
+                });
+                const list = Array.from(m.entries())
+                    .map(([majorId, majorLabel]) => ({ majorId, majorLabel }))
+                    .sort((a, b) => a.majorLabel.localeCompare(b.majorLabel, 'ko'));
+                return [{ majorId: ABP_MANUAL_TEAM_MAJOR_ID, majorLabel: '담당부서 지정' }, ...list];
+            }, [categoryDefRows]);
+
+            const routeMinorOptions = useMemo(() => {
+                if (!detailRouteMajorId) return [];
+                if (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID) return [];
+                return (categoryDefRows || [])
+                    .filter((r) => r.active !== false && r.majorId === detailRouteMajorId)
+                    .slice()
+                    .sort((a, b) => (a.minorLabel || '').localeCompare(b.minorLabel || '', 'ko'));
+            }, [categoryDefRows, detailRouteMajorId]);
+
+            useEffect(() => {
+                if (!showDetailModal || !selectedInquiry) return;
+                if (userPickedCategoryRef.current) return;
+                const inv = selectedInquiry;
+                if (inv.inquiryMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                    setDetailRouteMajorId(ABP_MANUAL_TEAM_MAJOR_ID);
+                    setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId(inv.targetTeam || inv.abpTargetTeam || inv.inquiryMinor || '');
+                    return;
+                }
+                const hit = categoryDefRows.find(
+                    (r) =>
+                        r.active !== false &&
+                        r.majorId === inv.inquiryMajor &&
+                        String(r.minorId ?? '') === String(inv.inquiryMinor ?? '')
+                );
+                if (hit) {
+                    setDetailRouteMajorId(hit.majorId || '');
+                    setDetailRouteMinorDocId(hit.id || '');
+                    setDetailManualTargetTeamId('');
+                } else {
+                    setDetailRouteMajorId('');
+                    setDetailRouteMinorDocId('');
+                    setDetailManualTargetTeamId('');
+                }
+            }, [showDetailModal, selectedInquiry, categoryDefRows]);
 
             // 필터링된 목록
             const filteredInquiries = inquiries.filter(inquiry => {
@@ -12781,10 +14301,230 @@
                 );
             };
 
-            // 상세보기
+            const getInquiryCategoryText = (inquiry) => {
+                const major = inquiry?.inquiryMajorLabel || inquiry?.inquiryMajor || '';
+                const minor = inquiry?.inquiryMinorLabel || inquiry?.inquiryMinor || '';
+                if (!major && !minor) return '-';
+                if (!minor) return major || '-';
+                if (!major) return minor || '-';
+                return `${major} › ${minor}`;
+            };
+
+            // 상세보기 (abp.html과 동일: 답변 폼 초기화 + 지점 inquiries 병합)
             const openDetail = (inquiry) => {
+                userPickedCategoryRef.current = false;
+                setReplyText(inquiry.reply || '');
+                setReplyAuthor(inquiry.replyAuthor || '');
+                setReplyAttachedFiles([]);
                 setSelectedInquiry(inquiry);
                 setShowDetailModal(true);
+                if (inquiry.originalInquiryId) {
+                    db.collection('inquiries')
+                        .doc(inquiry.originalInquiryId)
+                        .get()
+                        .then((snap) => {
+                            if (!snap.exists) return;
+                            const d = snap.data();
+                            setSelectedInquiry((prev) => {
+                                if (!prev || prev.id !== inquiry.id) return prev;
+                                return {
+                                    ...prev,
+                                    inquiryMajor: prev.inquiryMajor || d.inquiryMajor,
+                                    inquiryMinor: prev.inquiryMinor || d.inquiryMinor,
+                                    inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
+                                    inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
+                                    attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
+                                };
+                            });
+                        })
+                        .catch((err) => console.warn('inquiries 보강 로드:', err));
+                }
+            };
+
+            const handleSaveInquiryCategoryRoute = async () => {
+                if (!selectedInquiry) return;
+                if (!detailRouteMajorId) {
+                    alert('대분류를 선택해주세요.');
+                    return;
+                }
+                setSavingCategoryRoute(true);
+                const isManual = detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID;
+                const str = (v) => (v != null && v !== undefined ? String(v) : '');
+                let abpPayload;
+                let invPayload;
+                if (isManual) {
+                    if (!detailManualTargetTeamId) {
+                        alert('담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(detailManualTargetTeamId)) {
+                        alert('유효한 담당 부서를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const teamMeta = ABP_TEAM_BY_ID[detailManualTargetTeamId];
+                    abpPayload = {
+                        targetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId),
+                        abpRoutedBy: 'manual_team'
+                    };
+                    invPayload = {
+                        abpTargetTeam: detailManualTargetTeamId,
+                        inquiryMajor: ABP_MANUAL_TEAM_MAJOR_ID,
+                        inquiryMinor: str(detailManualTargetTeamId),
+                        inquiryMajorLabel: '담당부서 지정',
+                        inquiryMinorLabel: str(teamMeta?.name || detailManualTargetTeamId)
+                    };
+                } else {
+                    if (!detailRouteMinorDocId) {
+                        alert('중분류를 선택해주세요.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    const def = categoryDefRows.find((r) => r.id === detailRouteMinorDocId);
+                    if (!def || !def.targetTeam) {
+                        alert('선택한 분류를 찾을 수 없습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    if (!isKnownAbpTargetTeam(def.targetTeam)) {
+                        alert('분류에 연결된 담당 팀이 올바르지 않습니다.');
+                        setSavingCategoryRoute(false);
+                        return;
+                    }
+                    abpPayload = {
+                        targetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel),
+                        abpRoutedBy: 'firestore'
+                    };
+                    invPayload = {
+                        abpTargetTeam: def.targetTeam,
+                        inquiryMajor: def.majorId,
+                        inquiryMinor: str(def.minorId),
+                        inquiryMajorLabel: str(def.majorLabel),
+                        inquiryMinorLabel: str(def.minorLabel)
+                    };
+                }
+                try {
+                    await db.collection('abpInquiries').doc(selectedInquiry.id).update({
+                        ...abpPayload,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    let inquiriesSyncFailed = false;
+                    if (selectedInquiry.originalInquiryId) {
+                        try {
+                            await db
+                                .collection('inquiries')
+                                .doc(selectedInquiry.originalInquiryId)
+                                .update({
+                                    ...invPayload,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                        } catch (syncErr) {
+                            inquiriesSyncFailed = true;
+                            console.error('inquiries 동기화 오류(분류):', syncErr);
+                            alert(
+                                '기획본부함에는 반영되었습니다.\n\n' +
+                                    '다만 지점 문의(inquiries) 동기화에 실패했습니다. Firestore 규칙에서 관리자 계정이 해당 지점 문의를 수정할 수 있는지 확인해 주세요.\n\n' +
+                                    (syncErr.code ? `[${syncErr.code}] ` : '') +
+                                    (syncErr.message || String(syncErr))
+                            );
+                        }
+                    }
+
+                    setSelectedInquiry((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  ...abpPayload
+                              }
+                            : prev
+                    );
+                    userPickedCategoryRef.current = false;
+                    if (!inquiriesSyncFailed) {
+                        alert('담당 팀이 선택한 분류에 맞게 반영되었습니다.');
+                    }
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('abpInquiries 분류 반영 오류:', error);
+                    alert(
+                        '기획본부 문의(abpInquiries) 저장에 실패했습니다.\n\n' +
+                            (error.code ? `[${error.code}] ` : '') +
+                            (error.message || String(error))
+                    );
+                } finally {
+                    setSavingCategoryRoute(false);
+                }
+            };
+
+            const handleAbpAdminReply = async () => {
+                if (!selectedInquiry?.id) return;
+                if (!replyText.trim()) {
+                    alert('답변 내용을 입력해주세요.');
+                    return;
+                }
+                if (!replyAuthor.trim()) {
+                    alert('작성자 이름을 입력해주세요.');
+                    return;
+                }
+                const existingReplyAttachments = Array.isArray(selectedInquiry?.replyAttachments)
+                    ? selectedInquiry.replyAttachments
+                    : [];
+                if (existingReplyAttachments.length + (replyAttachedFiles?.length || 0) > 5) {
+                    alert('첨부파일은 최대 5개까지 가능합니다.');
+                    return;
+                }
+
+                setIsReplying(true);
+
+                try {
+                    const abpRef = db.collection('abpInquiries').doc(selectedInquiry.id);
+                    const newReplyAttachments = await uploadAbpReplyAttachments({
+                        files: replyAttachedFiles,
+                        inquiryId: selectedInquiry.id
+                    });
+                    const payload = {
+                        reply: replyText.trim(),
+                        replyAuthor: replyAuthor.trim(),
+                        status: 'answered',
+                        repliedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        replyAttachments: [...existingReplyAttachments, ...newReplyAttachments]
+                    };
+
+                    await abpRef.update(payload);
+
+                    if (selectedInquiry.originalInquiryId) {
+                        try {
+                            await db.collection('inquiries').doc(selectedInquiry.originalInquiryId).update(payload);
+                        } catch (syncErr) {
+                            console.error('inquiries 동기화 오류:', syncErr);
+                            alert(
+                                '기획본부 문의에는 답변이 저장되었습니다.\n\n' +
+                                    '다만 지점 문의(inquiries)에 반영되지 않았습니다. (Firestore 규칙 확인)\n' +
+                                    (syncErr.message || String(syncErr))
+                            );
+                            setShowDetailModal(false);
+                            return;
+                        }
+                    }
+
+                    alert('답변이 저장되었습니다.');
+                    setReplyAttachedFiles([]);
+                    setShowDetailModal(false);
+                } catch (error) {
+                    console.error('답변 저장 오류:', error);
+                    alert('답변 저장에 실패했습니다: ' + (error.message || error));
+                } finally {
+                    setIsReplying(false);
+                }
             };
 
             // 새 문의 저장
@@ -12840,6 +14580,7 @@
                     const excelData = filteredInquiries.map((inquiry, index) => ({
                         '번호': index + 1,
                         '담당부서': getTeamName(inquiry.targetTeam),
+                        '문의 유형': getInquiryCategoryText(inquiry),
                         '지점명': inquiry.branchName || '-',
                         '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
                         '직함': inquiry.position || '-',
@@ -12860,6 +14601,7 @@
                     const colWidths = [
                         { wch: 8 },   // 번호
                         { wch: 20 },  // 담당부서
+                        { wch: 28 },  // 문의 유형
                         { wch: 20 },  // 지점명
                         { wch: 15 },  // 지점 담당자
                         { wch: 12 },  // 직함
@@ -13094,7 +14836,7 @@
                         ) : (
                             <>
                             <div style={{ overflowX: 'auto', width: '100%' }}>
-                            <table className="data-table" style={{ minWidth: '1400px' }}>
+                            <table className="data-table" style={{ minWidth: '1580px' }}>
                                 <thead>
                                     <tr>
                                         <th style={{width: '40px', textAlign: 'center'}}>
@@ -13108,6 +14850,7 @@
                                         <th style={{width: '50px', textAlign: 'center'}}>No</th>
                                         <th style={{width: '100px', textAlign: 'center'}}>상태</th>
                                         <th style={{width: '150px', textAlign: 'center'}}>담당부서</th>
+                                        <th style={{width: '200px', textAlign: 'center', whiteSpace: 'nowrap'}}>문의 유형</th>
                                         <th style={{minWidth: '220px', textAlign: 'center', whiteSpace: 'nowrap'}}>지점</th>
                                         <th style={{width: '120px', textAlign: 'center', whiteSpace: 'nowrap'}}>지점 담당자</th>
                                         <th style={{width: '180px'}}>문의 내용</th>
@@ -13147,6 +14890,9 @@
                                                 }}>
                                                     {getTeamName(inquiry.targetTeam)}
                                                 </span>
+                                            </td>
+                                            <td onClick={() => openDetail(inquiry)} style={{fontSize: '13px', color: '#334155', textAlign: 'center', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                                                {getInquiryCategoryText(inquiry)}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} style={{textAlign: 'center', whiteSpace: 'nowrap', minWidth: '220px'}}>
                                                 <span className="pill" style={{
@@ -13299,15 +15045,14 @@
                     {/* 문의 상세 모달 */}
                     {showDetailModal && selectedInquiry && (
                         <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '700px'}}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '720px'}}>
                                 <div className="modal-header">
                                     <h3>{getTeamName(selectedInquiry.targetTeam)} 문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
                                 <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
-                                    {/* 문의 정보 */}
                                     <div style={{marginBottom: '20px'}}>
-                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap'}}>
+                                        <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap'}}>
                                             {getStatusBadge(selectedInquiry.status)}
                                             <span style={{
                                                 background: '#d1fae5',
@@ -13327,14 +15072,16 @@
                                                 fontSize: '12px',
                                                 fontWeight: '600'
                                             }}>
-                                                {selectedInquiry.branchName}
+                                                {selectedInquiry.branchName || '-'}
                                             </span>
                                             <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
                                                 {formatDateLocal(selectedInquiry.createdAt)}
                                             </span>
                                         </div>
+                                        <div style={{fontSize: '13px', color: '#334155', marginBottom: '14px'}}>
+                                            문의 유형: <strong>{getInquiryCategoryText(selectedInquiry)}</strong>
+                                        </div>
 
-                                        {/* 원본 지점 문의 (조회 전용) */}
                                         {selectedInquiry.originalInquiry && (
                                             <div
                                                 style={{
@@ -13342,15 +15089,40 @@
                                                     border: '2px solid #bae6fd',
                                                     borderRadius: '8px',
                                                     padding: '16px',
-                                                    marginBottom: '16px',
-                                                    transition: 'all 0.2s ease'
+                                                    marginBottom: '16px'
                                                 }}
                                             >
                                                 <p style={{fontWeight: '600', marginBottom: '6px'}}>{selectedInquiry.originalInquiry.title}</p>
-                                                <p style={{fontSize: '14px', color: '#555', lineHeight: '1.5', margin: 0}}>
-                                                    {selectedInquiry.originalInquiry.content?.substring(0, 150)}
-                                                    {selectedInquiry.originalInquiry.content?.length > 150 ? '...' : ''}
+                                                <p style={{fontSize: '14px', color: '#555', lineHeight: '1.5', margin: 0, whiteSpace: 'pre-wrap'}}>
+                                                    {selectedInquiry.originalInquiry.content}
                                                 </p>
+                                            </div>
+                                        )}
+
+                                        {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.length > 0 && (
+                                            <div style={{ marginTop: '12px', marginBottom: '12px' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px', fontWeight: '600' }}>
+                                                    문의 첨부파일
+                                                </div>
+                                                <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                    {selectedInquiry.attachments.map((att, idx) => (
+                                                        <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                            <a
+                                                                href={att.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                            >
+                                                                {att.name || `첨부파일 ${idx + 1}`}
+                                                            </a>
+                                                            {typeof att.size === 'number' && att.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(att.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
                                         )}
 
@@ -13368,67 +15140,264 @@
                                         }}>
                                             {selectedInquiry.content}
                                         </div>
+
+                                        <div className="abp-inquiry-category-row" style={{ marginTop: '18px' }}>
+                                            <span className="abp-inquiry-category-label">문의 유형</span>
+                                            <div className="abp-inquiry-category-pair">
+                                                <div className="abp-inquiry-category-field">
+                                                    <label className="abp-inquiry-category-sublabel" htmlFor="adminAbpDetailMajorSelect">
+                                                        대분류
+                                                    </label>
+                                                    <select
+                                                        id="adminAbpDetailMajorSelect"
+                                                        className="abp-inquiry-category-select"
+                                                        value={detailRouteMajorId}
+                                                        onChange={(e) => {
+                                                            userPickedCategoryRef.current = true;
+                                                            const nextMajor = e.target.value;
+                                                            setDetailRouteMajorId(nextMajor);
+                                                            if (nextMajor === ABP_MANUAL_TEAM_MAJOR_ID) {
+                                                                setDetailRouteMinorDocId('');
+                                                                setDetailManualTargetTeamId(
+                                                                    selectedInquiry?.targetTeam ||
+                                                                        selectedInquiry?.abpTargetTeam ||
+                                                                        selectedInquiry?.inquiryMinor ||
+                                                                        ''
+                                                                );
+                                                            } else {
+                                                                setDetailManualTargetTeamId('');
+                                                                const minors = (categoryDefRows || []).filter(
+                                                                    (r) => r.active !== false && r.majorId === nextMajor
+                                                                );
+                                                                setDetailRouteMinorDocId(minors[0]?.id || '');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">— 선택 —</option>
+                                                        {routeMajorOptions.map((m) => (
+                                                            <option key={m.majorId} value={m.majorId}>
+                                                                {m.majorLabel}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                {detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID ? (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="adminAbpDetailManualTeamSelect">
+                                                            담당 부서
+                                                        </label>
+                                                        <select
+                                                            id="adminAbpDetailManualTeamSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailManualTargetTeamId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailManualTargetTeamId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">— 선택 —</option>
+                                                            {ABP_TEAMS.map((t) => (
+                                                                <option key={t.id} value={t.id}>
+                                                                    {t.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div className="abp-inquiry-category-field">
+                                                        <label className="abp-inquiry-category-sublabel" htmlFor="adminAbpDetailMinorSelect">
+                                                            중분류
+                                                        </label>
+                                                        <select
+                                                            id="adminAbpDetailMinorSelect"
+                                                            className="abp-inquiry-category-select"
+                                                            value={detailRouteMinorDocId}
+                                                            disabled={!detailRouteMajorId}
+                                                            onChange={(e) => {
+                                                                userPickedCategoryRef.current = true;
+                                                                setDetailRouteMinorDocId(e.target.value);
+                                                            }}
+                                                        >
+                                                            <option value="">
+                                                                {detailRouteMajorId ? '— 선택 —' : '대분류를 먼저 선택'}
+                                                            </option>
+                                                            {routeMinorOptions.map((r) => (
+                                                                <option key={r.id} value={r.id}>
+                                                                    {r.minorLabel || r.minorId}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm abp-inquiry-category-save"
+                                                style={{ background: '#10b981', color: 'white', border: 'none' }}
+                                                disabled={
+                                                    savingCategoryRoute ||
+                                                    !detailRouteMajorId ||
+                                                    (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID
+                                                        ? !detailManualTargetTeamId
+                                                        : !detailRouteMinorDocId)
+                                                }
+                                                onClick={handleSaveInquiryCategoryRoute}
+                                            >
+                                                {savingCategoryRoute ? '저장 중...' : '변경'}
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* 기획본부 답변 */}
-                                    {selectedInquiry.reply && (
+                                    <div style={{
+                                        borderTop: '1px solid #eee',
+                                        paddingTop: '20px'
+                                    }}>
                                         <div style={{
-                                            borderTop: '1px solid #eee',
-                                            paddingTop: '20px'
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            marginBottom: '12px',
+                                            flexWrap: 'wrap'
                                         }}>
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                marginBottom: '12px'
+                                            <span style={{
+                                                background: '#10b981',
+                                                color: 'white',
+                                                padding: '4px 10px',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
                                             }}>
-                                                <span style={{
-                                                    background: '#10b981',
-                                                    color: 'white',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {getTeamName(selectedInquiry.targetTeam)} 답변
-                                                </span>
+                                                {getTeamName(selectedInquiry.targetTeam)} 답변
+                                            </span>
+                                            {selectedInquiry.repliedAt && (
                                                 <span style={{fontSize: '13px', color: '#666'}}>
-                                                    {selectedInquiry.replyAuthor && `작성자: ${selectedInquiry.replyAuthor}`}
-                                                </span>
-                                                <span style={{fontSize: '13px', color: '#666', marginLeft: 'auto'}}>
                                                     {formatDateLocal(selectedInquiry.repliedAt)}
                                                 </span>
-                                            </div>
-                                            <div style={{
-                                                background: '#d1fae5',
-                                                padding: '16px',
-                                                borderRadius: '8px',
-                                                whiteSpace: 'pre-wrap',
-                                                lineHeight: '1.6',
-                                                color: '#047857'
-                                            }}>
-                                                {selectedInquiry.reply}
-                                            </div>
+                                            )}
                                         </div>
-                                    )}
 
-                                    {!selectedInquiry.reply && (
-                                        <div style={{
-                                            borderTop: '1px solid #eee',
-                                            paddingTop: '20px',
-                                            textAlign: 'center',
-                                            color: '#999'
-                                        }}>
-                                            <p>아직 답변이 등록되지 않았습니다.</p>
+                                        <div className="form-group">
+                                            <label>작성자 이름 *</label>
+                                            <input
+                                                type="text"
+                                                value={replyAuthor}
+                                                onChange={(e) => setReplyAuthor(e.target.value)}
+                                                placeholder="답변 작성자 이름을 입력하세요"
+                                            />
                                         </div>
-                                    )}
+
+                                        <div className="form-group">
+                                            <label>답변 내용 *</label>
+                                            <textarea
+                                                rows="5"
+                                                value={replyText}
+                                                onChange={(e) => setReplyText(e.target.value)}
+                                                placeholder="답변 내용을 입력하세요"
+                                                style={{resize: 'vertical'}}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>첨부파일 (최대 5개)</label>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                onChange={(e) => {
+                                                    const files = Array.from(e.target.files || []);
+                                                    if (!files.length) return;
+                                                    const existing = Array.isArray(selectedInquiry?.replyAttachments)
+                                                        ? selectedInquiry.replyAttachments
+                                                        : [];
+                                                    if (existing.length + files.length > 5) {
+                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                        e.target.value = '';
+                                                        return;
+                                                    }
+                                                    setReplyAttachedFiles(files);
+                                                }}
+                                                disabled={isReplying}
+                                            />
+                                            {Array.isArray(replyAttachedFiles) && replyAttachedFiles.length > 0 && (
+                                                <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#334155' }}>
+                                                    {replyAttachedFiles.map((f, idx) => (
+                                                        <li key={`${f.name}_${idx}`} style={{ marginBottom: '6px' }}>
+                                                            {f.name}
+                                                            {typeof f.size === 'number' && f.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(f.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-sm"
+                                                                style={{ marginLeft: '10px', padding: '2px 8px' }}
+                                                                onClick={() =>
+                                                                    setReplyAttachedFiles((prev) =>
+                                                                        (prev || []).filter((_, i) => i !== idx)
+                                                                    )
+                                                                }
+                                                                disabled={isReplying}
+                                                            >
+                                                                제거
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {Array.isArray(selectedInquiry?.replyAttachments) &&
+                                                selectedInquiry.replyAttachments.length > 0 && (
+                                                    <div style={{ marginTop: '10px' }}>
+                                                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                                                            기존 답변 첨부파일
+                                                        </div>
+                                                        <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                            {selectedInquiry.replyAttachments.map((att, idx) => (
+                                                                <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                                    <a
+                                                                        href={att.url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                    >
+                                                                        {att.name || `첨부파일 ${idx + 1}`}
+                                                                    </a>
+                                                                    {typeof att.size === 'number' && att.size > 0 && (
+                                                                        <span
+                                                                            style={{
+                                                                                marginLeft: '8px',
+                                                                                color: '#64748b',
+                                                                                fontSize: '12px'
+                                                                            }}
+                                                                        >
+                                                                            ({Math.round(att.size / 1024)}KB)
+                                                                        </span>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee'}}>
+                                <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap'}}>
                                     <button
+                                        type="button"
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => setShowDetailModal(false)}
+                                        disabled={isReplying || savingCategoryRoute}
                                     >
                                         닫기
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm"
+                                        onClick={handleAbpAdminReply}
+                                        disabled={isReplying || savingCategoryRoute}
+                                        style={{background: '#10b981', color: 'white', border: 'none'}}
+                                    >
+                                        {isReplying ? '저장 중...' : '답변 저장'}
                                     </button>
                                 </div>
                             </div>
@@ -13520,42 +15489,92 @@
             );
         }
 
-        // 사이드바 컴포넌트
+        // 사이드바: 팀별 문의함(abp 순서) + 하단 지점/기획본부 소통 창구
         function Sidebar({ currentPage, setCurrentPage, user, onLogout, onRoundAccess, onToolkitAccess, onDataAccess, onUsersAccess, onSettingsAccess }) {
-            const menuItems = [
-                {
-                    category: '대시보드',
-                    items: [
-                        { id: 'dashboard', name: '종합', icon: Icons.Dashboard },
-                        { id: 'managerCompare', name: '담당자 별 비교', icon: Icons.Users }
-                    ]
-                },
-                {
-                    category: '소통 창구',
-                    items: [
-                        { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
-                        { id: 'abpComm', name: '기획본부 소통 창구', icon: Icons.AbpComm }
-                    ]
-                },
-                {
-                    category: '지점 마케팅',
-                    items: [
-                        { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
-                        { id: 'toolkit', name: '마케팅 툴킷 신청', icon: Icons.Toolkit },
-                        { id: 'round', name: 'Round 관리', icon: Icons.Round }
-                    ]
-                },
-                {
-                    category: '설정',
-                    items: [
-                        { id: 'users', name: '사용자 관리', icon: Icons.Users },
-                        { id: 'data', name: '데이터 관리', icon: Icons.Data },
-                        { id: 'settings', name: '설정', icon: Icons.Settings }
-                    ]
-                }
-            ];
+            const [abpPendingByTeam, setAbpPendingByTeam] = useState({});
 
-            // 메뉴 클릭 핸들러
+            useEffect(() => {
+                const unsub = db.collection('abpInquiries')
+                    .where('status', '==', 'pending')
+                    .onSnapshot(
+                        (snapshot) => {
+                            const counts = {};
+                            snapshot.docs.forEach((doc) => {
+                                const data = doc.data();
+                                if (!isKnownAbpTargetTeam(data.targetTeam)) return;
+                                counts[data.targetTeam] = (counts[data.targetTeam] || 0) + 1;
+                            });
+                            setAbpPendingByTeam(counts);
+                        },
+                        (err) => console.error('abpInquiries pending 집계:', err)
+                    );
+                return () => unsub();
+            }, []);
+
+            const totalAbpPending = useMemo(
+                () => Object.values(abpPendingByTeam).reduce((a, b) => a + b, 0),
+                [abpPendingByTeam]
+            );
+
+            const menuItems = useMemo(
+                () => [
+                    {
+                        category: '대시보드',
+                        items: [
+                            { id: 'dashboard', name: '종합', icon: Icons.Dashboard },
+                            { id: 'managerCompare', name: '담당자 별 비교', icon: Icons.Users }
+                        ]
+                    },
+                    {
+                        category: '팀별 문의함',
+                        items: [
+                            {
+                                id: 'abp_all_inquiries',
+                                name: '전체 문의함',
+                                icon: Icons.InboxAll,
+                                badge: totalAbpPending
+                            },
+                            {
+                                id: 'inquiryCategoryDept',
+                                name: '담당 부서 / 문의 유형',
+                                icon: Icons.DeptCategory
+                            },
+                            ...ABP_TEAMS_NAV.map((t) => ({
+                                id: `abp_team_${t.id}`,
+                                name: t.name,
+                                icon: Icons.Team,
+                                badge: abpPendingByTeam[t.id] || 0
+                            }))
+                        ]
+                    },
+                    {
+                        category: '지점 마케팅',
+                        items: [
+                            { id: 'cost', name: '마케팅 비용', icon: Icons.Cost },
+                            { id: 'toolkit', name: '마케팅 툴킷 신청', icon: Icons.Toolkit },
+                            { id: 'round', name: 'Round 관리', icon: Icons.Round }
+                        ]
+                    },
+                    {
+                        category: '설정',
+                        items: [
+                            { id: 'users', name: '사용자 관리', icon: Icons.Users },
+                            { id: 'data', name: '데이터 관리', icon: Icons.Data },
+                            { id: 'settings', name: '설정', icon: Icons.Settings }
+                        ]
+                    },
+                    {
+                        category: null,
+                        dividerTop: true,
+                        items: [
+                            { id: 'inquiry', name: '지점 문의 창구', icon: Icons.Inquiry },
+                            { id: 'abpComm', name: '기획본부 소통 창구', icon: Icons.AbpComm }
+                        ]
+                    }
+                ],
+                [totalAbpPending, abpPendingByTeam]
+            );
+
             const handleMenuClick = (itemId) => {
                 if (itemId === 'round') {
                     onRoundAccess();
@@ -13582,16 +15601,50 @@
 
                     <nav className="sidebar-nav">
                         {menuItems.map((category, categoryIndex) => (
-                            <div key={categoryIndex}>
-                                <div className="nav-category">{category.category}</div>
-                                {category.items.map(item => (
+                            <div
+                                key={categoryIndex}
+                                style={
+                                    category.dividerTop
+                                        ? {
+                                              marginTop: '10px',
+                                              paddingTop: '14px',
+                                              borderTop: '1px solid rgba(255, 255, 255, 0.12)'
+                                          }
+                                        : undefined
+                                }
+                            >
+                                {category.category ? (
+                                    <div className="nav-category">{category.category}</div>
+                                ) : null}
+                                {category.items.map((item) => (
                                     <div
                                         key={item.id}
                                         className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
                                         onClick={() => handleMenuClick(item.id)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
                                         <item.icon />
-                                        <span>{item.name}</span>
+                                        <span style={{ flex: 1, minWidth: 0 }}>{item.name}</span>
+                                        {item.badge > 0 && (
+                                            <span
+                                                style={{
+                                                    background: '#ef4444',
+                                                    color: 'white',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    minWidth: '20px',
+                                                    height: '20px',
+                                                    borderRadius: '10px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '0 6px',
+                                                    flexShrink: 0
+                                                }}
+                                            >
+                                                {item.badge > 99 ? '99+' : item.badge}
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -13931,6 +15984,10 @@
                         return <MarketingCostPage user={user} />;
                     case 'inquiry':
                         return <InquiryPage />;
+                    case 'abp_all_inquiries':
+                        return <TeamInquiryPage allTeams />;
+                    case 'inquiryCategoryDept':
+                        return <InquiryCategoryDeptPage user={user} />;
                     case 'abpComm':
                         return <AbpCommunicationPage />;
                     case 'toolkit':
@@ -13944,6 +16001,10 @@
                     case 'settings':
                         return <SettingsPage />;
                     default:
+                        if (currentPage && currentPage.startsWith('abp_team_')) {
+                            const _abpTeamOnly = currentPage.replace('abp_team_', '');
+                            return <TeamInquiryPage teamId={_abpTeamOnly} />;
+                        }
                         return <DashboardPage />;
                 }
             };
