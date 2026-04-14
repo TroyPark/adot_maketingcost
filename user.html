@@ -4097,7 +4097,7 @@
                 return `${major} › ${minor}`;
             };
 
-            /** 본사 답변(텍스트·첨부·답변완료 상태)이 있으면 지점에서 수정·삭제 불가 */
+            /** 본사 답변이 있으면 상세 모달에서 수정·삭제 버튼 미표시 */
             const inquiryHasReply = (inquiry) => {
                 if (!inquiry) return false;
                 if (inquiry.status === 'answered') return true;

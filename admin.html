@@ -11428,6 +11428,16 @@
             return results.filter(Boolean);
         }
 
+        /** Firestore batch.delete는 한 번에 최대 500작업 — 문의 대량 삭제 시 분할 커밋 */
+        async function commitBatchedDeletes(docRefs) {
+            const CHUNK = 450;
+            for (let i = 0; i < docRefs.length; i += CHUNK) {
+                const batch = db.batch();
+                docRefs.slice(i, i + CHUNK).forEach((ref) => batch.delete(ref));
+                await batch.commit();
+            }
+        }
+
         // 지점 문의 창구 페이지 (관리자용)
         function InquiryPage() {
             const [inquiries, setInquiries] = useState([]);
@@ -11736,13 +11746,16 @@
                         .filter(Boolean);
                     await deleteInquiryAttachmentStorageFromRows(rowsToPurge);
 
-                    // Firestore에서 문의 데이터 삭제
-                    const batch = db.batch();
-                    selectedInquiries.forEach(id => {
-                        const docRef = db.collection('inquiries').doc(id);
-                        batch.delete(docRef);
+                    const deleteRefs = [];
+                    selectedInquiries.forEach((id) => deleteRefs.push(db.collection('inquiries').doc(id)));
+                    const abpIdsFromBranch = new Set();
+                    rowsToPurge.forEach((row) => {
+                        if (row.abpInquiryId && typeof row.abpInquiryId === 'string') {
+                            abpIdsFromBranch.add(row.abpInquiryId);
+                        }
                     });
-                    await batch.commit();
+                    abpIdsFromBranch.forEach((abpId) => deleteRefs.push(db.collection('abpInquiries').doc(abpId)));
+                    await commitBatchedDeletes(deleteRefs);
 
                     alert(`${selectedInquiries.length}개 항목이 삭제되었습니다.`);
                     setSelectedInquiries([]);
@@ -12715,13 +12728,15 @@
                     const linkedInquiryRows = await loadInquiryRowsForAbpAttachmentPurge(abpRowsToPurge);
                     await deleteInquiryAttachmentStorageFromRows([...abpRowsToPurge, ...linkedInquiryRows]);
 
-                    // Firestore에서 문의 데이터 삭제
-                    const batch = db.batch();
-                    selectedAbpInquiries.forEach(id => {
-                        const docRef = db.collection('abpInquiries').doc(id);
-                        batch.delete(docRef);
-                    });
-                    await batch.commit();
+                    const deleteRefs = [];
+                    selectedAbpInquiries.forEach((id) => deleteRefs.push(db.collection('abpInquiries').doc(id)));
+                    const originalInquiryIdsToDelete = new Set(
+                        abpRowsToPurge
+                            .map((r) => r.originalInquiryId)
+                            .filter((id) => typeof id === 'string' && id.length > 0)
+                    );
+                    originalInquiryIdsToDelete.forEach((oid) => deleteRefs.push(db.collection('inquiries').doc(oid)));
+                    await commitBatchedDeletes(deleteRefs);
 
                     alert(`${selectedAbpInquiries.length}개 항목이 삭제되었습니다.`);
                     setSelectedAbpInquiries([]);
