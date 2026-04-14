@@ -1,0 +1,96 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 기획본부 답변 첨부 업로드(웹) — admin / abp@ / kogrop 팀
+    function isAbpReplyStaff() {
+      return request.auth != null
+        && (
+          request.auth.token.email == 'admin@dshare.co.kr'
+          || request.auth.token.email == 'abp@dshare.co.kr'
+          || request.auth.token.email.matches('(?i)^(biz_mk1|biz_mk2|biz_plan|sales_ops|hrd_academy|eng_lab|content_prod|it_dev|corp_admin)@kogrop\\.co\\.kr$')
+        );
+    }
+
+    // abpInquiries 문서의 originalInquiryId → inquiries.userId 가 현재 사용자와 일치 (지점에서 답변 첨부·목록 삭제)
+    function isAbpReplyLinkedInquiryOwner(abpDocId) {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/abpInquiries/$(abpDocId)).data.originalInquiryId is string
+        && firestore.get(/databases/(default)/documents/inquiries/$(firestore.get(/databases/(default)/documents/abpInquiries/$(abpDocId)).data.originalInquiryId)).data.userId == request.auth.uid;
+    }
+
+    function canAccessAbpReplyPath(abpDocId) {
+      return isAbpReplyStaff() || isAbpReplyLinkedInquiryOwner(abpDocId);
+    }
+
+    match /abpInquiries/{abpDocId}/reply/{fileName} {
+      allow read: if request.auth != null;
+
+      allow write: if isAbpReplyStaff()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
+
+      allow delete: if canAccessAbpReplyPath(abpDocId);
+    }
+
+    // listAll() — reply "폴더" 단위 목록 (지점 삭제 시 전체 비우기)
+    match /abpInquiries/{abpDocId}/reply {
+      allow list: if canAccessAbpReplyPath(abpDocId);
+    }
+
+    // 툴킷 예시 이미지
+    match /toolkits/{fileName} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.auth.token.email == 'admin@dshare.co.kr'
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
+
+      allow delete: if request.auth != null
+        && request.auth.token.email == 'admin@dshare.co.kr';
+    }
+
+    // 증빙 이미지
+    match /costs/{userId}/{costId}/{fileName} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
+
+      allow delete: if request.auth != null
+        && (request.auth.uid == userId
+          || request.auth.token.email == 'admin@dshare.co.kr');
+    }
+
+    match /costs/{userId}/{costId} {
+      allow list: if request.auth != null
+        && (request.auth.uid == userId
+          || request.auth.token.email == 'admin@dshare.co.kr');
+    }
+
+    // 지점 문의 첨부
+    match /inquiries/{userId}/{inquiryId}/{fileName} {
+      allow read: if request.auth != null
+        && (request.auth.uid == userId
+          || request.auth.token.email == 'admin@dshare.co.kr');
+
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png)');
+
+      allow delete: if request.auth != null
+        && (request.auth.uid == userId
+          || request.auth.token.email == 'admin@dshare.co.kr');
+    }
+
+    match /inquiries/{userId}/{inquiryId} {
+      allow list: if request.auth != null
+        && (request.auth.uid == userId
+          || request.auth.token.email == 'admin@dshare.co.kr');
+    }
+  }
+}

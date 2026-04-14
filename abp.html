@@ -138,6 +138,33 @@
             });
         }
 
+        const sanitizeFileName = (name) =>
+            (name || 'file')
+                .replace(/[^\w.\-]+/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_+|_+$/g, '');
+
+        const uploadInquiryAttachments = async ({ files, inquiryId }) => {
+            if (!files || !files.length) return [];
+            const uploads = files.map(async (file, idx) => {
+                const timestamp = Date.now();
+                const safeName = sanitizeFileName(file.name);
+                const filePath = `abpInquiries/${inquiryId}/reply/${timestamp}_${idx + 1}_${safeName}`;
+                const ref = storage.ref(filePath);
+                const uploadTask = await ref.put(file);
+                const url = await uploadTask.ref.getDownloadURL();
+                return {
+                    name: file.name,
+                    path: filePath,
+                    url,
+                    contentType: file.type || '',
+                    size: file.size || 0,
+                    uploadedAtMs: Date.now()
+                };
+            });
+            return await Promise.all(uploads);
+        };
+
         // 팀별 문의 페이지 (allTeams: true 이면 전체 문의함 — 팀별 문의를 한 목록에서 최신순으로 표시)
         function TeamInquiryPage({ teamId, allTeams }) {
             const [inquiries, setInquiries] = useState([]);
@@ -146,6 +173,7 @@
             const [selectedInquiry, setSelectedInquiry] = useState(null);
             const [replyText, setReplyText] = useState('');
             const [replyAuthor, setReplyAuthor] = useState('');
+            const [replyAttachedFiles, setReplyAttachedFiles] = useState([]); // File[]
             const [isReplying, setIsReplying] = useState(false);
 
             const [categoryDefRows, setCategoryDefRows] = useState([]);
@@ -251,6 +279,7 @@
                 userPickedCategoryRef.current = false;
                 setReplyText(inquiry.reply || '');
                 setReplyAuthor(inquiry.replyAuthor || '');
+                setReplyAttachedFiles([]);
                 setSelectedInquiry(inquiry);
                 setShowDetailModal(true);
                 if (inquiry.originalInquiryId) {
@@ -267,7 +296,9 @@
                                     inquiryMajor: prev.inquiryMajor || d.inquiryMajor,
                                     inquiryMinor: prev.inquiryMinor || d.inquiryMinor,
                                     inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
-                                    inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel
+                                    inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
+                                    // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
+                                    attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
                                 };
                             });
                         })
@@ -409,16 +440,28 @@
                     alert('작성자 이름을 입력해주세요.');
                     return;
                 }
+                const existingReplyAttachments = Array.isArray(selectedInquiry?.replyAttachments)
+                    ? selectedInquiry.replyAttachments
+                    : [];
+                if (existingReplyAttachments.length + (replyAttachedFiles?.length || 0) > 5) {
+                    alert('첨부파일은 최대 5개까지 가능합니다.');
+                    return;
+                }
 
                 setIsReplying(true);
 
                 try {
                     const abpRef = db.collection('abpInquiries').doc(selectedInquiry.id);
+                    const newReplyAttachments = await uploadInquiryAttachments({
+                        files: replyAttachedFiles,
+                        inquiryId: selectedInquiry.id
+                    });
                     const payload = {
                         reply: replyText.trim(),
                         replyAuthor: replyAuthor.trim(),
                         status: 'answered',
-                        repliedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        repliedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        replyAttachments: [...existingReplyAttachments, ...newReplyAttachments]
                     };
 
                     // 1) 기획본부 문의에만 먼저 저장 (배치에 inquiries를 넣으면 규칙/문서 문제 시 전부 실패할 수 있음)
@@ -441,6 +484,7 @@
                     }
 
                     alert('답변이 저장되었습니다.');
+                    setReplyAttachedFiles([]);
                     setShowDetailModal(false);
                 } catch (error) {
                     console.error('답변 저장 오류:', error);
@@ -597,6 +641,33 @@
                                             </div>
                                         )}
 
+                                        {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.length > 0 && (
+                                            <div style={{ marginTop: '12px', marginBottom: '12px' }}>
+                                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px', fontWeight: '600' }}>
+                                                    문의 첨부파일
+                                                </div>
+                                                <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                    {selectedInquiry.attachments.map((att, idx) => (
+                                                        <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                            <a
+                                                                href={att.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                            >
+                                                                {att.name || `첨부파일 ${idx + 1}`}
+                                                            </a>
+                                                            {typeof att.size === 'number' && att.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(att.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
                                         <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
                                             작성자: {selectedInquiry.authorName || '-'}
                                         </div>
@@ -704,7 +775,7 @@
                                                 }
                                                 onClick={handleSaveInquiryCategoryRoute}
                                             >
-                                                {savingCategoryRoute ? '저장 중...' : '저장'}
+                                                {savingCategoryRoute ? '저장 중...' : '변경'}
                                             </button>
                                         </div>
                                     </div>
@@ -749,6 +820,88 @@
                                                 placeholder="답변 내용을 입력하세요"
                                                 style={{resize: 'vertical'}}
                                             />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label>첨부파일 (최대 5개)</label>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                onChange={(e) => {
+                                                    const files = Array.from(e.target.files || []);
+                                                    if (!files.length) return;
+                                                    const existing = Array.isArray(selectedInquiry?.replyAttachments)
+                                                        ? selectedInquiry.replyAttachments
+                                                        : [];
+                                                    if (existing.length + files.length > 5) {
+                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                        e.target.value = '';
+                                                        return;
+                                                    }
+                                                    setReplyAttachedFiles(files);
+                                                }}
+                                                disabled={isReplying}
+                                            />
+                                            {Array.isArray(replyAttachedFiles) && replyAttachedFiles.length > 0 && (
+                                                <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#334155' }}>
+                                                    {replyAttachedFiles.map((f, idx) => (
+                                                        <li key={`${f.name}_${idx}`} style={{ marginBottom: '6px' }}>
+                                                            {f.name}
+                                                            {typeof f.size === 'number' && f.size > 0 && (
+                                                                <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    ({Math.round(f.size / 1024)}KB)
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary btn-sm"
+                                                                style={{ marginLeft: '10px', padding: '2px 8px' }}
+                                                                onClick={() =>
+                                                                    setReplyAttachedFiles((prev) =>
+                                                                        (prev || []).filter((_, i) => i !== idx)
+                                                                    )
+                                                                }
+                                                                disabled={isReplying}
+                                                            >
+                                                                제거
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {Array.isArray(selectedInquiry?.replyAttachments) &&
+                                                selectedInquiry.replyAttachments.length > 0 && (
+                                                    <div style={{ marginTop: '10px' }}>
+                                                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                                                            기존 답변 첨부파일
+                                                        </div>
+                                                        <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                            {selectedInquiry.replyAttachments.map((att, idx) => (
+                                                                <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                                    <a
+                                                                        href={att.url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                    >
+                                                                        {att.name || `첨부파일 ${idx + 1}`}
+                                                                    </a>
+                                                                    {typeof att.size === 'number' && att.size > 0 && (
+                                                                        <span
+                                                                            style={{
+                                                                                marginLeft: '8px',
+                                                                                color: '#64748b',
+                                                                                fontSize: '12px'
+                                                                            }}
+                                                                        >
+                                                                            ({Math.round(att.size / 1024)}KB)
+                                                                        </span>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
                                         </div>
                                     </div>
                                 </div>

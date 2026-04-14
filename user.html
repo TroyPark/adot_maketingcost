@@ -3829,6 +3829,7 @@
             // 수정 모달 열기
             const openEditModal = (e) => {
                 e.stopPropagation();
+                if (inquiryHasReply(selectedInquiry)) return;
                 setEditAttachedFiles([]);
                 setEditFormData({
                     inquirerName: selectedInquiry.inquirerName || selectedInquiry.userName || '',
@@ -3846,6 +3847,7 @@
             // 수정 저장
             const handleEdit = async (e) => {
                 e.preventDefault();
+                if (inquiryHasReply(selectedInquiry)) return;
 
                 if (!editFormData.inquirerName.trim()) {
                     alert('이름을 입력해주세요.');
@@ -3971,26 +3973,79 @@
             const handleDeleteClick = async (e) => {
                 e.stopPropagation();
                 if (!selectedInquiry?.id) return;
+                if (inquiryHasReply(selectedInquiry)) return;
 
                 const ok = window.confirm('삭제 된 문의는 원복 할 수 없습니다. 삭제 하시겠습니까?');
                 if (!ok) return;
 
                 try {
-                    // 첨부파일(Storage) 먼저 삭제 (best-effort)
-                    const attachments = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments : [];
-                    if (attachments.length > 0) {
-                        const deletes = attachments
-                            .map(att => att?.path)
-                            .filter(Boolean)
-                            .map(async (path) => {
-                                try {
-                                    await storage.ref(path).delete();
-                                } catch (err) {
-                                    // 파일이 이미 없거나 권한/네트워크 문제 등: 문서 삭제는 계속 진행
-                                    console.warn('첨부파일 삭제 실패:', path, err);
-                                }
-                            });
-                        await Promise.all(deletes);
+                    // Storage: 문의 첨부 + 기획본부 답변 첨부(abpInquiries 경로). path 없이 url만 있는 경우·문서 불일치 대비.
+                    const collectAttachmentRecords = (...arrays) => {
+                        const seen = new Set();
+                        const out = [];
+                        for (const arr of arrays) {
+                            if (!Array.isArray(arr)) continue;
+                            for (const att of arr) {
+                                if (!att) continue;
+                                const key = att.path || att.url || '';
+                                if (!key || seen.has(key)) continue;
+                                seen.add(key);
+                                out.push(att);
+                            }
+                        }
+                        return out;
+                    };
+
+                    let abpDocData = null;
+                    if (selectedInquiry.abpInquiryId) {
+                        try {
+                            const abpSnap = await db.collection('abpInquiries').doc(selectedInquiry.abpInquiryId).get();
+                            if (abpSnap.exists) abpDocData = abpSnap.data();
+                        } catch (abpReadErr) {
+                            console.warn('abpInquiries 조회 실패(답변 첨부 Storage 경로 누락 가능):', abpReadErr);
+                        }
+                    }
+
+                    const attachmentRecords = collectAttachmentRecords(
+                        selectedInquiry.attachments,
+                        selectedInquiry.replyAttachments,
+                        abpDocData && abpDocData.attachments,
+                        abpDocData && abpDocData.replyAttachments
+                    );
+
+                    const deleteOneStoredFile = async (att) => {
+                        try {
+                            if (att.path) {
+                                await storage.ref(att.path).delete();
+                                return;
+                            }
+                            if (att.url && typeof att.url === 'string') {
+                                await storage.refFromURL(att.url).delete();
+                            }
+                        } catch (err) {
+                            console.warn('첨부파일 삭제 실패:', att?.path || att?.url, err);
+                        }
+                    };
+
+                    await Promise.all(attachmentRecords.map(deleteOneStoredFile));
+
+                    // 문서에 없는 잔여 파일(구버전·동기화 누락) — reply 접두어 전체 시도 (Storage list 규칙 필요할 수 있음)
+                    if (selectedInquiry.abpInquiryId) {
+                        try {
+                            const replyPrefix = storage.ref(
+                                `abpInquiries/${selectedInquiry.abpInquiryId}/reply`
+                            );
+                            const listResult = await replyPrefix.listAll();
+                            await Promise.all(
+                                listResult.items.map((itemRef) =>
+                                    itemRef.delete().catch((err) =>
+                                        console.warn('reply 폴더 객체 삭제 실패:', itemRef.fullPath, err)
+                                    )
+                                )
+                            );
+                        } catch (listErr) {
+                            console.warn('abpInquiries/reply 목록 삭제 생략 또는 실패:', listErr);
+                        }
                     }
 
                     if (selectedInquiry.abpInquiryId) {
@@ -4040,6 +4095,15 @@
                 if (!minor) return major || '미정';
                 if (!major) return minor || '미정';
                 return `${major} › ${minor}`;
+            };
+
+            /** 본사 답변(텍스트·첨부·답변완료 상태)이 있으면 지점에서 수정·삭제 불가 */
+            const inquiryHasReply = (inquiry) => {
+                if (!inquiry) return false;
+                if (inquiry.status === 'answered') return true;
+                if (typeof inquiry.reply === 'string' && inquiry.reply.trim().length > 0) return true;
+                if (Array.isArray(inquiry.replyAttachments) && inquiry.replyAttachments.length > 0) return true;
+                return false;
             };
 
             if (loading) {
@@ -4408,6 +4472,7 @@
                                             <div style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
+                                                flexWrap: 'wrap',
                                                 gap: '8px',
                                                 marginBottom: '12px'
                                             }}>
@@ -4420,6 +4485,9 @@
                                                     fontWeight: '600'
                                                 }}>
                                                     본사 답변
+                                                </span>
+                                                <span style={{fontSize: '13px', color: '#334155', fontWeight: '500'}}>
+                                                    작성자: {selectedInquiry.replyAuthor || '-'}
                                                 </span>
                                                 <span style={{fontSize: '13px', color: '#666'}}>
                                                     {formatDate(selectedInquiry.repliedAt)}
@@ -4435,23 +4503,55 @@
                                             }}>
                                                 {selectedInquiry.reply}
                                             </div>
+                                            {Array.isArray(selectedInquiry.replyAttachments) && selectedInquiry.replyAttachments.length > 0 && (
+                                                <div style={{ marginTop: '14px' }}>
+                                                    <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                                                        답변 첨부파일 ({selectedInquiry.replyAttachments.length})
+                                                    </div>
+                                                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                        {selectedInquiry.replyAttachments.map((att, idx) => (
+                                                            <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                                <a
+                                                                    href={att.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                >
+                                                                    {att.name || `첨부파일 ${idx + 1}`}
+                                                                </a>
+                                                                {typeof att.size === 'number' && att.size > 0 && (
+                                                                    <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                        ({Math.round(att.size / 1024)}KB)
+                                                                    </span>
+                                                                )}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                                 <div className="modal-footer" style={{justifyContent: 'space-between'}}>
                                     <div style={{display: 'flex', gap: '8px'}}>
-                                        <button
-                                            className="btn btn-sm btn-secondary"
-                                            onClick={openEditModal}
-                                        >
-                                            수정
-                                        </button>
-                                        <button
-                                            className="btn btn-sm btn-danger"
-                                            onClick={handleDeleteClick}
-                                        >
-                                            삭제
-                                        </button>
+                                        {!inquiryHasReply(selectedInquiry) && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-secondary"
+                                                    onClick={openEditModal}
+                                                >
+                                                    수정
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-danger"
+                                                    onClick={handleDeleteClick}
+                                                >
+                                                    삭제
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                     <button
                                         className="btn btn-sm"

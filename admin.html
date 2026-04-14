@@ -11383,6 +11383,51 @@
             rnd: '콘텐츠R&D팀'
         };
 
+        /** inquiries / abpInquiries 문서의 attachments·replyAttachments path → Storage 삭제 (best-effort) */
+        async function deleteInquiryAttachmentStorageFromRows(rows) {
+            const pathsFrom = (arr) =>
+                (Array.isArray(arr) ? arr : [])
+                    .map((att) => att?.path)
+                    .filter(Boolean);
+            const paths = [];
+            (rows || []).forEach((row) => {
+                paths.push(...pathsFrom(row.attachments), ...pathsFrom(row.replyAttachments));
+            });
+            const uniquePaths = [...new Set(paths)];
+            if (uniquePaths.length === 0) return;
+            await Promise.all(
+                uniquePaths.map(async (path) => {
+                    try {
+                        await storage.ref(path).delete();
+                    } catch (err) {
+                        console.warn('문의 첨부 Storage 삭제 실패:', path, err);
+                    }
+                })
+            );
+        }
+
+        /** 기획본부 문의 삭제 시 — 문의자 첨부는 inquiries에만 있으므로 originalInquiryId 로 연결 문서 로드 */
+        async function loadInquiryRowsForAbpAttachmentPurge(abpRows) {
+            const ids = [...new Set(
+                (abpRows || [])
+                    .map((r) => r.originalInquiryId)
+                    .filter((id) => typeof id === 'string' && id.length > 0)
+            )];
+            if (ids.length === 0) return [];
+            const results = await Promise.all(
+                ids.map(async (oid) => {
+                    try {
+                        const snap = await db.collection('inquiries').doc(oid).get();
+                        return snap.exists ? { id: snap.id, ...snap.data() } : null;
+                    } catch (e) {
+                        console.warn('연결 inquiries 조회 실패(첨부 삭제 스킵):', oid, e);
+                        return null;
+                    }
+                })
+            );
+            return results.filter(Boolean);
+        }
+
         // 지점 문의 창구 페이지 (관리자용)
         function InquiryPage() {
             const [inquiries, setInquiries] = useState([]);
@@ -11685,6 +11730,11 @@
                         setIsDeleting(false);
                         return;
                     }
+
+                    const rowsToPurge = selectedInquiries
+                        .map((id) => inquiries.find((i) => i.id === id))
+                        .filter(Boolean);
+                    await deleteInquiryAttachmentStorageFromRows(rowsToPurge);
 
                     // Firestore에서 문의 데이터 삭제
                     const batch = db.batch();
@@ -12658,6 +12708,12 @@
                         setIsDeleting(false);
                         return;
                     }
+
+                    const abpRowsToPurge = selectedAbpInquiries
+                        .map((id) => inquiries.find((i) => i.id === id))
+                        .filter(Boolean);
+                    const linkedInquiryRows = await loadInquiryRowsForAbpAttachmentPurge(abpRowsToPurge);
+                    await deleteInquiryAttachmentStorageFromRows([...abpRowsToPurge, ...linkedInquiryRows]);
 
                     // Firestore에서 문의 데이터 삭제
                     const batch = db.batch();
