@@ -10102,7 +10102,7 @@
                                     <h3>👤 {selectedManagerCompare.manager} - 지점별 기간 비교</h3>
                                     <button className="modal-close" onClick={() => setSelectedManagerCompare(null)}>×</button>
                                 </div>
-                                <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                                <div className="modal-body">
                                     <div style={{ marginBottom: '20px', padding: '15px', background: '#f9fafb', borderRadius: '8px', display: 'flex', gap: '20px', justifyContent: 'center' }}>
                                         <div style={{ textAlign: 'center' }}>
                                             <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600', marginBottom: '4px' }}>📊 A 기간 (과거)</div>
@@ -12399,7 +12399,7 @@
                                     <h3>문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
-                                <div style={{padding: '20px', maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div style={{padding: '20px'}}>
                                     {/* 문의 정보 */}
                                     <div style={{marginBottom: '20px'}}>
                                         <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap'}}>
@@ -12521,7 +12521,7 @@
                                     <h3 style={{color: '#10b981'}}>📤 기획본부 문의하기</h3>
                                     <button className="modal-close" onClick={() => setShowAbpModal(false)}>×</button>
                                 </div>
-                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div>
                                     {/* 원본 문의 정보 */}
                                     <div style={{
                                         background: '#f0f9ff',
@@ -13075,7 +13075,7 @@
                                     <h3>문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
-                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div>
                                     {/* 문의 정보 */}
                                     <div style={{marginBottom: '20px'}}>
                                         <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
@@ -15050,7 +15050,7 @@
                                     <h3>{getTeamName(selectedInquiry.targetTeam)} 문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
-                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div>
                                     <div style={{marginBottom: '20px'}}>
                                         <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap'}}>
                                             {getStatusBadge(selectedInquiry.status)}
@@ -15412,7 +15412,7 @@
                                     <h3 style={{color: '#10b981'}}>📝 기획본부 문의 작성</h3>
                                     <button className="modal-close" onClick={() => setShowNewInquiryModal(false)}>×</button>
                                 </div>
-                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div>
                                     {/* 문의 부서 선택 */}
                                     <div className="form-group">
                                         <label>문의할 부서 *</label>
