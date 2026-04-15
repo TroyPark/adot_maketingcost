@@ -1,2 +1,4 @@
 *.md
 firestore.rules
+functions/node_modules/
+functions/.env
