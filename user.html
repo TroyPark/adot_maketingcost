@@ -3658,6 +3658,25 @@
                 return () => unsubscribe();
             }, [user, userInfo?.branchName]);
 
+            // URL에 open 파라미터가 있으면 해당 문의 모달 자동 오픈
+            const initialOpenHandled = React.useRef(false);
+            useEffect(() => {
+                if (loading || inquiries.length === 0 || initialOpenHandled.current) return;
+                const params = new URLSearchParams(window.location.search);
+                if (!params.has('open')) return;
+                let inquiryId = null;
+                for (const [key] of params) {
+                    if (key !== 'path' && key !== 'open') { inquiryId = key; break; }
+                }
+                if (!inquiryId) return;
+                const found = inquiries.find(inq => inq.id === inquiryId);
+                if (found) {
+                    initialOpenHandled.current = true;
+                    setSelectedInquiry(found);
+                    setShowDetailModal(true);
+                }
+            }, [inquiries, loading]);
+
             // 날짜 포맷
             const formatDate = (timestamp) => {
                 if (!timestamp) return '-';
@@ -3825,6 +3844,14 @@
             const openDetail = (inquiry) => {
                 setSelectedInquiry(inquiry);
                 setShowDetailModal(true);
+                window.history.pushState({}, '', `?path=inquiries&${inquiry.id}&open`);
+            };
+
+            // 상세보기 닫기
+            const closeDetail = () => {
+                setSelectedInquiry(null);
+                setShowDetailModal(false);
+                window.history.pushState({}, '', '?path=inquiries');
             };
 
             // 수정 모달 열기
@@ -4058,8 +4085,7 @@
                     }
                     await db.collection('inquiries').doc(selectedInquiry.id).delete();
                     alert('문의가 삭제되었습니다.');
-                    setShowDetailModal(false);
-                    setSelectedInquiry(null);
+                    closeDetail();
                 } catch (error) {
                     console.error('삭제 오류:', error);
                     alert('삭제에 실패했습니다: ' + error.message);
@@ -4351,11 +4377,11 @@
 
                     {/* 문의 상세 모달 */}
                     {showDetailModal && selectedInquiry && (
-                        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+                        <div className="modal-overlay" onClick={closeDetail}>
                             <div className="modal" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h3>문의 상세</h3>
-                                    <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
+                                    <button className="modal-close" onClick={closeDetail}>×</button>
                                 </div>
                                 <div className="modal-body">
                                     <div style={{marginBottom: '20px'}}>
@@ -4556,7 +4582,7 @@
                                     </div>
                                     <button
                                         className="btn btn-sm"
-                                        onClick={() => setShowDetailModal(false)}
+                                        onClick={closeDetail}
                                     >
                                         닫기
                                     </button>
@@ -4847,7 +4873,12 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [currentPage, setCurrentPage] = useState(() => {
+                const params = new URLSearchParams(window.location.search);
+                const path = params.get('path');
+                if (path === 'inquiries') return 'inquiry';
+                return 'dashboard';
+            });
             const [user, setUser] = useState(null);
             const [userInfo, setUserInfo] = useState(null);
             const [loading, setLoading] = useState(true);
