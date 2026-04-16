@@ -1,5 +1,6 @@
 const functions = require("firebase-functions/v1");
 const https = require("https");
+const crypto = require("crypto");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -7,6 +8,13 @@ admin.initializeApp();
 // ⚙️ 설정값
 const COLLECTION_NAME = "inquiries";
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
+
+// NCP SENS 알림톡 설정
+const NCP_ACCESS_KEY = process.env.NCP_ACCESS_KEY;
+const NCP_SECRET_KEY = process.env.NCP_SECRET_KEY;
+const NCP_SENS_SERVICE_ID = process.env.NCP_SENS_SERVICE_ID;
+const KAKAO_CHANNEL_ID = process.env.KAKAO_CHANNEL_ID;
+const KAKAO_TEMPLATE_CODE = process.env.KAKAO_TEMPLATE_CODE;
 
 // 담당자별 Slack 멘션 ID (실제 Slack ID로 교체)
 const MANAGER_SLACK_MENTION = {
@@ -134,6 +142,114 @@ function sendToSlack(message) {
             (res) => {
                 res.on("data", () => { });
                 res.on("end", resolve);
+            }
+        );
+        req.on("error", reject);
+        req.write(body);
+        req.end();
+    });
+}
+
+// 💬 답변 완료 시 카카오 알림톡 발송
+exports.sendAlimtalkOnReply = functions.firestore
+    .document("abpInquiries/{docId}")
+    .onUpdate(async (change) => {
+        const before = change.before.data();
+        const after = change.after.data();
+
+        // 답변완료로 변경된 경우에만 발송
+        if (before.status === "answered" || after.status !== "answered") {
+            return null;
+        }
+
+        const originalInquiryId = after.originalInquiryId;
+        if (!originalInquiryId) {
+            console.warn("originalInquiryId 없음 — 알림톡 발송 생략");
+            return null;
+        }
+
+        // 원본 문의에서 휴대폰 번호 조회
+        const inquiryDoc = await admin.firestore()
+            .collection("inquiries")
+            .doc(originalInquiryId)
+            .get();
+
+        if (!inquiryDoc.exists) {
+            console.warn("원본 문의 문서 없음:", originalInquiryId);
+            return null;
+        }
+
+        const notifyContact = inquiryDoc.data().notifyContact;
+        if (!notifyContact) {
+            console.warn("notifyContact 없음 — 알림톡 발송 생략");
+            return null;
+        }
+
+        try {
+            await sendSensAlimtalk(notifyContact, originalInquiryId);
+            console.log("알림톡 발송 완료:", notifyContact);
+        } catch (err) {
+            console.error("알림톡 발송 실패:", err);
+        }
+
+        return null;
+    });
+
+// 📲 NCP SENS 알림톡 API 호출
+function sendSensAlimtalk(to, inquiryId) {
+    const method = "POST";
+    const path = `/alimtalk/v2/services/${NCP_SENS_SERVICE_ID}/messages`;
+    const timestamp = Date.now().toString();
+
+    const message = `${method} ${path}\n${timestamp}\n${NCP_ACCESS_KEY}`;
+    const signature = crypto
+        .createHmac("sha256", NCP_SECRET_KEY)
+        .update(message)
+        .digest("base64");
+
+    const body = JSON.stringify({
+        plusFriendId: KAKAO_CHANNEL_ID,
+        templateCode: KAKAO_TEMPLATE_CODE,
+        messages: [
+            {
+                to,
+                content: "기다려 주셔서 감사합니다. 문의 주신 내용에 답변이 완료되었습니다.",
+                buttons: [
+                    {
+                        type: "WL",
+                        name: "답변확인하기",
+                        linkMobile: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
+                        linkPc: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
+                    },
+                ],
+            },
+        ],
+    });
+
+    return new Promise((resolve, reject) => {
+        const req = https.request(
+            {
+                hostname: "sens.apigw.ntruss.com",
+                path,
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Content-Length": Buffer.byteLength(body),
+                    "x-ncp-apigw-timestamp": timestamp,
+                    "x-ncp-iam-access-key": NCP_ACCESS_KEY,
+                    "x-ncp-apigw-signature-v2": signature,
+                },
+            },
+            (res) => {
+                let data = "";
+                res.on("data", (chunk) => { data += chunk; });
+                res.on("end", () => {
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(data);
+                    } else {
+                        reject(new Error(`SENS API 오류 ${res.statusCode}: ${data}`));
+                    }
+                });
             }
         );
         req.on("error", reject);
