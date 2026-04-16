@@ -42,21 +42,35 @@ const TEAM_SLACK_MENTION = {
     biz_mk2:      "U0ADXDR90QY", // 사업마케팅2팀
 };
 
+// 지점명으로 담당자 조회 (doc.manager가 없을 때 fallback)
+async function getManagerForBranch(branchName) {
+    if (!branchName) return null;
+    const snapshot = await admin.firestore()
+        .collection("users")
+        .where("branchName", "==", branchName)
+        .limit(1)
+        .get();
+    if (snapshot.empty) return null;
+    return snapshot.docs[0].data().manager || null;
+}
+
 // ✍️ 문의 작성 알림
 exports.notifySlackOnCreate = functions.firestore
     .document(`${COLLECTION_NAME}/{docId}`)
-    .onCreate((snap, context) => {
+    .onCreate(async (snap, context) => {
         const doc = snap.data();
-        const message = buildSlackMessage("📬 새 문의가 접수되었습니다", doc, context.params.docId);
+        const manager = doc.manager || await getManagerForBranch(doc.branchName);
+        const message = buildSlackMessage("📬 새 문의가 접수되었습니다", { ...doc, manager }, context.params.docId);
         return sendToSlack(message);
     });
 
 // 🔄 문의 수정 알림
 exports.notifySlackOnUpdate = functions.firestore
     .document(`${COLLECTION_NAME}/{docId}`)
-    .onUpdate((change, context) => {
+    .onUpdate(async (change, context) => {
         const doc = change.after.data();
-        const message = buildSlackMessage("🔄 문의가 수정되었습니다", doc, context.params.docId);
+        const manager = doc.manager || await getManagerForBranch(doc.branchName);
+        const message = buildSlackMessage("🔄 문의가 수정되었습니다", { ...doc, manager }, context.params.docId);
         return sendToSlack(message);
     });
 
@@ -100,7 +114,7 @@ function buildSlackMessage(headerText, doc, docId) {
             ...(doc.manager ? [{
                 type: "section",
                 fields: [
-                    { type: "mrkdwn", text: `*지점 담당자*\n${doc.manager} (<@${MANAGER_SLACK_MENTION[doc.manager] || doc.manager}>)` },
+                    { type: "mrkdwn", text: `*지점 담당자*\n<@${MANAGER_SLACK_MENTION[doc.manager] || doc.manager}>` },
                 ],
             }] : []),
             {
