@@ -372,6 +372,12 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
 
         if (error.code === 'functions/not-found') {
             errorMessage = 'Firebase Functions가 배포되지 않았습니다. 관리자에게 문의하세요.';
+        } else if (error.code === 'functions/already-exists') {
+            errorMessage = '이미 사용 중인 이메일입니다.';
+        } else if (error.code === 'functions/invalid-argument') {
+            errorMessage = error.message || '입력값이 올바르지 않습니다.';
+        } else if (error.code === 'functions/unauthenticated') {
+            errorMessage = '관리자 인증이 필요합니다. 다시 로그인해주세요.';
         } else if (error.message) {
             errorMessage = error.message;
         }

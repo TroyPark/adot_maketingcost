@@ -181,6 +181,18 @@ exports.createUser = functions.https.onCall(async (data, context) => {
         return { success: true, uid: userRecord.uid, email: userRecord.email };
     } catch (error) {
         console.error("createUser 오류:", error);
-        throw new functions.https.HttpsError("internal", error.message);
+
+        // Firebase Auth 에러 코드에 따라 적절한 HttpsError 반환
+        if (error.code === "auth/email-already-exists") {
+            throw new functions.https.HttpsError("already-exists", "이미 사용 중인 이메일입니다.");
+        } else if (error.code === "auth/invalid-email") {
+            throw new functions.https.HttpsError("invalid-argument", "유효하지 않은 이메일 형식입니다.");
+        } else if (error.code === "auth/invalid-password") {
+            throw new functions.https.HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+        } else if (error.code === "auth/weak-password") {
+            throw new functions.https.HttpsError("invalid-argument", "비밀번호가 너무 약합니다. 6자 이상 입력해주세요.");
+        } else {
+            throw new functions.https.HttpsError("internal", error.message || "사용자 생성 중 오류가 발생했습니다.");
+        }
     }
 });
