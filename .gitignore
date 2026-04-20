@@ -1,5 +1,7 @@
 *.md
 firestore.rules
 storage.rules
-functions/node_modules/
+node_modules/
 functions/.env
+dist/
+.DS_Store
