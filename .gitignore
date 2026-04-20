@@ -1,4 +1,5 @@
 *.md
 firestore.rules
+storage.rules
 functions/node_modules/
 functions/.env
