@@ -17,18 +17,6 @@ const NCP_SENS_SERVICE_ID = process.env.NCP_SENS_SERVICE_ID;
 const KAKAO_CHANNEL_ID = process.env.KAKAO_CHANNEL_ID;
 const KAKAO_TEMPLATE_CODE = process.env.KAKAO_TEMPLATE_CODE;
 
-// 담당자별 Slack 멘션 ID (실제 Slack ID로 교체)
-const MANAGER_SLACK_MENTION = {
-    "문성민": "U0ADXDR90QY",
-    "이용진": "U0ADXDR90QY",
-    "홍수련": "U0ADXDR90QY",
-    "조은제": "U0ADXDR90QY",
-    "곽동신": "U0ADXDR90QY",
-    "정희석": "U0ADXDR90QY",
-    "안여진": "U0ADXDR90QY",
-    "정현호": "U0ADXDR90QY",
-    "박소언": "U0ADXDR90QY",
-};
 
 // 팀별 Slack 멘션 ID (팀 Slack ID 확정 후 각 팀별로 교체)
 const TEAM_SLACK_MENTION = {
@@ -56,16 +44,31 @@ const TEAM_LABEL = {
     biz_mk2:      "사업마케팅2팀",
 };
 
-// 지점명으로 담당자 조회
-async function getManagerForBranch(branchName) {
-    if (!branchName) return null;
-    const snapshot = await admin.firestore()
-        .collection("users")
-        .where("branchName", "==", branchName)
-        .limit(1)
+// config/managerSlackIds 문서에서 담당자 이름 → Slack ID 조회
+async function getManagerSlackId(managerName) {
+    if (!managerName) return null;
+    const doc = await admin.firestore()
+        .collection("config")
+        .doc("managerSlackIds")
         .get();
-    if (snapshot.empty) return null;
-    return snapshot.docs[0].data().manager || null;
+    if (!doc.exists) return null;
+    return doc.data()[managerName] || null;
+}
+
+// 지점명으로 담당자 이름 + Slack ID 조회
+async function getManagerForBranch(branchName, managerName) {
+    const name = managerName || await (async () => {
+        if (!branchName) return null;
+        const snapshot = await admin.firestore()
+            .collection("users")
+            .where("branchName", "==", branchName)
+            .limit(1)
+            .get();
+        return snapshot.empty ? null : snapshot.docs[0].data().manager || null;
+    })();
+    if (!name) return null;
+    const slackId = await getManagerSlackId(name);
+    return { name, slackId };
 }
 
 function getCategoryText(doc) {
@@ -81,7 +84,7 @@ function buildInquiryBlocks(doc, manager, docId, previousTeamId = null) {
     const prevTeamLabel = previousTeamId ? (TEAM_LABEL[previousTeamId] || previousTeamId) : null;
 
     const teamSlackId = teamId && TEAM_SLACK_MENTION[teamId];
-    const managerSlackId = manager && MANAGER_SLACK_MENTION[manager];
+    const managerSlackId = manager?.slackId;
 
     const categoryText = getCategoryText(doc);
     const isAnswered = doc.status === "answered";
@@ -254,7 +257,7 @@ exports.notifySlackOnCreate = functions.firestore
         const doc = snap.data();
         const docId = context.params.docId;
 
-        const manager = doc.manager || await getManagerForBranch(doc.branchName);
+        const manager = await getManagerForBranch(doc.branchName, doc.manager);
         const blocks = buildInquiryBlocks(doc, manager, docId);
         const categoryText = getCategoryText(doc);
 
@@ -304,7 +307,7 @@ exports.notifySlackOnUpdate = functions.firestore
             if (!after.abpTargetTeam) return null;
 
             // 신규 담당부서로 새 메시지 전송
-            const manager = after.manager || await getManagerForBranch(after.branchName);
+            const manager = await getManagerForBranch(after.branchName, after.manager);
             const blocks = buildInquiryBlocks(after, manager, docId, before.abpTargetTeam);
             const categoryText = getCategoryText(after);
             const result = await postSlackMessage(blocks, `📬 ${categoryText} 카테고리의 문의가 인입되었습니다.`);
@@ -325,7 +328,7 @@ exports.notifySlackOnUpdate = functions.firestore
             const channelId = after.slackChannelId;
             if (!ts || !channelId) return null;
 
-            const manager = after.manager || await getManagerForBranch(after.branchName);
+            const manager = await getManagerForBranch(after.branchName, after.manager);
             const blocks = buildInquiryBlocks(after, manager, docId);
             const categoryText = getCategoryText(after);
             const result = await updateSlackMessage(ts, channelId, blocks, `✅ [답변완료] ${categoryText} 문의`);
