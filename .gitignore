@@ -2,6 +2,7 @@
 firestore.rules
 storage.rules
 node_modules/
-functions/.env
+*.env
+*.env.local
 dist/
 .DS_Store
