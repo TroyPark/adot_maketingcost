@@ -3615,6 +3615,7 @@
             });
             const [attachedFiles, setAttachedFiles] = useState([]); // File[]
             const [editAttachedFiles, setEditAttachedFiles] = useState([]); // File[]
+            const [removedAttachments, setRemovedAttachments] = useState([]); // 수정 시 삭제할 기존 첨부파일
             const [editFormData, setEditFormData] = useState({
                 inquirerName: '',
                 notifyContact: '',
@@ -3876,6 +3877,7 @@
                 e.stopPropagation();
                 if (inquiryHasReply(selectedInquiry)) return;
                 setEditAttachedFiles([]);
+                setRemovedAttachments([]);
                 setEditFormData({
                     inquirerName: selectedInquiry.inquirerName || selectedInquiry.userName || '',
                     notifyContact: selectedInquiry.notifyContact || '',
@@ -3952,7 +3954,8 @@
                     }
 
                     const existingAttachments = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments : [];
-                    const totalAfter = existingAttachments.length + editAttachedFiles.length;
+                    const keptAttachments = existingAttachments.filter(att => !removedAttachments.includes(att.path || att.url));
+                    const totalAfter = keptAttachments.length + editAttachedFiles.length;
                     if (totalAfter > 5) {
                         alert('첨부파일은 최대 5개까지 가능합니다.');
                         setIsSubmitting(false);
@@ -3964,6 +3967,16 @@
                         userId: user.uid,
                         inquiryId: selectedInquiry.id
                     });
+                    // 삭제 대상 파일 Storage에서 제거 (best-effort)
+                    await Promise.all(
+                        existingAttachments
+                            .filter(att => removedAttachments.includes(att.path || att.url))
+                            .map(async att => {
+                                if (att.path) {
+                                    try { await storage.ref(att.path).delete(); } catch (_) {}
+                                }
+                            })
+                    );
                     await db.collection('inquiries').doc(selectedInquiry.id).update({
                         inquirerName: editFormData.inquirerName.trim(),
                         notifyContact: normalizePhoneNumber(editFormData.notifyContact),
@@ -3971,7 +3984,7 @@
                         inquiryMinor: editFormData.inquiryMajor === 'unset' ? '' : editFormData.inquiryMinor,
                         inquiryMajorLabel: inquiryTypeLabels.majorLabel,
                         inquiryMinorLabel: inquiryTypeLabels.minorLabel,
-                        attachments: [...existingAttachments, ...newAttachments],
+                        attachments: [...keptAttachments, ...newAttachments],
                         title: editFormData.title.trim(),
                         content: editFormData.content.trim(),
                         position: editFormData.position,
@@ -4005,6 +4018,7 @@
                     alert('문의가 수정되었습니다.');
                     setShowEditModal(false);
                     setEditAttachedFiles([]);
+                    setRemovedAttachments([]);
                     setSelectedInquiry(null);
                 } catch (error) {
                     console.error('문의 수정 오류:', error);
@@ -4364,8 +4378,15 @@
                                                     <div style={{fontWeight: '600', marginBottom: '6px'}}>선택된 파일</div>
                                                     <ul style={{margin: 0, paddingLeft: '18px'}}>
                                                         {attachedFiles.map((f, i) => (
-                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px'}}>
-                                                                {f.name} ({Math.round((f.size || 0) / 1024)}KB)
+                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                                <span>{f.name} ({Math.round((f.size || 0) / 1024)}KB)</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                >
+                                                                    ✕
+                                                                </button>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -4707,7 +4728,7 @@
                                         </div>
                                         <div className="form-group">
                                             <label>이미지 첨부 (선택, 최대 5개)</label>
-                                            {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.length > 0 && (
+                                            {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).length > 0 && (
                                                 <div style={{
                                                     marginBottom: '10px',
                                                     fontSize: '13px',
@@ -4718,11 +4739,11 @@
                                                     borderRadius: '8px'
                                                 }}>
                                                     <div style={{fontWeight: '700', marginBottom: '6px'}}>
-                                                        기존 첨부파일 ({selectedInquiry.attachments.length})
+                                                        기존 첨부파일 ({selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).length})
                                                     </div>
                                                     <ul style={{margin: 0, paddingLeft: '18px'}}>
-                                                        {selectedInquiry.attachments.map((att, idx) => (
-                                                            <li key={`${att.path || att.url || 'att'}_${idx}`} style={{marginBottom: '4px'}}>
+                                                        {selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).map((att, idx) => (
+                                                            <li key={`${att.path || att.url || 'att'}_${idx}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
                                                                 <a
                                                                     href={att.url}
                                                                     target="_blank"
@@ -4731,6 +4752,13 @@
                                                                 >
                                                                     {att.name || `첨부파일 ${idx + 1}`}
                                                                 </a>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setRemovedAttachments(prev => [...prev, att.path || att.url])}
+                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                >
+                                                                    ✕
+                                                                </button>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -4743,7 +4771,7 @@
                                                 onChange={(e) => {
                                                     const newFiles = Array.from(e.target.files || []);
                                                     if (!newFiles.length) return;
-                                                    const existingCount = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments.length : 0;
+                                                    const existingCount = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).length : 0;
                                                     setEditAttachedFiles(prev => {
                                                         const combined = [...(prev || []), ...newFiles];
                                                         if (existingCount + combined.length > 5) {
@@ -4760,8 +4788,15 @@
                                                     <div style={{fontWeight: '600', marginBottom: '6px'}}>추가 선택된 파일</div>
                                                     <ul style={{margin: 0, paddingLeft: '18px'}}>
                                                         {editAttachedFiles.map((f, i) => (
-                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px'}}>
-                                                                {f.name} ({Math.round((f.size || 0) / 1024)}KB)
+                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                                <span>{f.name} ({Math.round((f.size || 0) / 1024)}KB)</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                >
+                                                                    ✕
+                                                                </button>
                                                             </li>
                                                         ))}
                                                     </ul>
