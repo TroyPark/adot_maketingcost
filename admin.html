@@ -10470,17 +10470,20 @@
                                                 multiple
                                                 accept="image/jpeg,image/png"
                                                 onChange={(e) => {
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (!files.length) return;
+                                                    const newFiles = Array.from(e.target.files || []);
+                                                    if (!newFiles.length) return;
                                                     const existing = Array.isArray(selectedInquiry?.replyAttachments)
                                                         ? selectedInquiry.replyAttachments
                                                         : [];
-                                                    if (existing.length + files.length > 5) {
-                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
-                                                        e.target.value = '';
-                                                        return;
-                                                    }
-                                                    setReplyAttachedFiles(files);
+                                                    setReplyAttachedFiles(prev => {
+                                                        const combined = [...(prev || []), ...newFiles];
+                                                        if (existing.length + combined.length > 5) {
+                                                            alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                            return prev;
+                                                        }
+                                                        return combined;
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                                 disabled={isReplying}
                                             />
@@ -12291,17 +12294,20 @@
                                                 multiple
                                                 accept="image/jpeg,image/png"
                                                 onChange={(e) => {
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (!files.length) return;
+                                                    const newFiles = Array.from(e.target.files || []);
+                                                    if (!newFiles.length) return;
                                                     const existing = Array.isArray(selectedInquiry?.replyAttachments)
                                                         ? selectedInquiry.replyAttachments
                                                         : [];
-                                                    if (existing.length + files.length > 5) {
-                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
-                                                        e.target.value = '';
-                                                        return;
-                                                    }
-                                                    setReplyAttachedFiles(files);
+                                                    setReplyAttachedFiles(prev => {
+                                                        const combined = [...(prev || []), ...newFiles];
+                                                        if (existing.length + combined.length > 5) {
+                                                            alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                            return prev;
+                                                        }
+                                                        return combined;
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                                 disabled={isReplying}
                                             />

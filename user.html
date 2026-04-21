@@ -4346,14 +4346,17 @@
                                                 accept="image/jpeg,image/png"
                                                 multiple
                                                 onChange={(e) => {
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (files.length > 5) {
-                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
-                                                        e.target.value = '';
-                                                        setAttachedFiles([]);
-                                                        return;
-                                                    }
-                                                    setAttachedFiles(files);
+                                                    const newFiles = Array.from(e.target.files || []);
+                                                    if (!newFiles.length) return;
+                                                    setAttachedFiles(prev => {
+                                                        const combined = [...(prev || []), ...newFiles];
+                                                        if (combined.length > 5) {
+                                                            alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                            return prev;
+                                                        }
+                                                        return combined;
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                             />
                                             {attachedFiles.length > 0 && (
@@ -4738,15 +4741,18 @@
                                                 accept="image/jpeg,image/png"
                                                 multiple
                                                 onChange={(e) => {
+                                                    const newFiles = Array.from(e.target.files || []);
+                                                    if (!newFiles.length) return;
                                                     const existingCount = Array.isArray(selectedInquiry.attachments) ? selectedInquiry.attachments.length : 0;
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (existingCount + files.length > 5) {
-                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
-                                                        e.target.value = '';
-                                                        setEditAttachedFiles([]);
-                                                        return;
-                                                    }
-                                                    setEditAttachedFiles(files);
+                                                    setEditAttachedFiles(prev => {
+                                                        const combined = [...(prev || []), ...newFiles];
+                                                        if (existingCount + combined.length > 5) {
+                                                            alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                            return prev;
+                                                        }
+                                                        return combined;
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                             />
                                             {editAttachedFiles.length > 0 && (
