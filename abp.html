@@ -144,6 +144,23 @@
                 .replace(/_+/g, '_')
                 .replace(/^_+|_+$/g, '');
 
+        const downloadAttachment = async (url, name) => {
+            try {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = name || 'attachment';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch {
+                window.open(url, '_blank');
+            }
+        };
+
         const uploadInquiryAttachments = async ({ files, inquiryId }) => {
             if (!files || !files.length) return [];
             const uploads = files.map(async (file, idx) => {
@@ -166,7 +183,7 @@
         };
 
         // 팀별 문의 페이지 (allTeams: true 이면 전체 문의함 — 팀별 문의를 한 목록에서 최신순으로 표시)
-        function TeamInquiryPage({ teamId, allTeams }) {
+        function TeamInquiryPage({ teamId, allTeams, openInquiryId }) {
             const [inquiries, setInquiries] = useState([]);
             const [loading, setLoading] = useState(true);
             const [showDetailModal, setShowDetailModal] = useState(false);
@@ -175,6 +192,8 @@
             const [replyAuthor, setReplyAuthor] = useState('');
             const [replyAttachedFiles, setReplyAttachedFiles] = useState([]); // File[]
             const [isReplying, setIsReplying] = useState(false);
+            const fileInputRef = useRef(null);
+            const autoOpenDoneRef = useRef(false);
 
             const [categoryDefRows, setCategoryDefRows] = useState([]);
             const [detailRouteMajorId, setDetailRouteMajorId] = useState('');
@@ -273,6 +292,15 @@
 
                 return () => unsubscribe();
             }, [teamId, allTeams]);
+
+            // URL ?open=<abpInquiryId> 딥링크 처리
+            useEffect(() => {
+                if (!openInquiryId || loading || autoOpenDoneRef.current) return;
+                const target = inquiries.find(inq => inq.id === openInquiryId);
+                if (!target) return;
+                autoOpenDoneRef.current = true;
+                openDetail(target);
+            }, [openInquiryId, loading, inquiries]);
 
             // 상세보기
             const openDetail = (inquiry) => {
@@ -651,9 +679,8 @@
                                                         <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
                                                             <a
                                                                 href={att.url}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}
+                                                                onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                             >
                                                                 {att.name || `첨부파일 ${idx + 1}`}
                                                             </a>
@@ -827,18 +854,22 @@
                                             <input
                                                 type="file"
                                                 multiple
+                                                ref={fileInputRef}
                                                 onChange={(e) => {
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (!files.length) return;
+                                                    const newFiles = Array.from(e.target.files || []);
+                                                    if (!newFiles.length) return;
                                                     const existing = Array.isArray(selectedInquiry?.replyAttachments)
                                                         ? selectedInquiry.replyAttachments
                                                         : [];
-                                                    if (existing.length + files.length > 5) {
-                                                        alert('첨부파일은 최대 5개까지 가능합니다.');
-                                                        e.target.value = '';
-                                                        return;
-                                                    }
-                                                    setReplyAttachedFiles(files);
+                                                    setReplyAttachedFiles(prev => {
+                                                        const combined = [...(prev || []), ...newFiles];
+                                                        if (existing.length + combined.length > 5) {
+                                                            alert('첨부파일은 최대 5개까지 가능합니다.');
+                                                            return prev;
+                                                        }
+                                                        return combined;
+                                                    });
+                                                    e.target.value = '';
                                                 }}
                                                 disabled={isReplying}
                                             />
@@ -856,11 +887,12 @@
                                                                 type="button"
                                                                 className="btn btn-secondary btn-sm"
                                                                 style={{ marginLeft: '10px', padding: '2px 8px' }}
-                                                                onClick={() =>
+                                                                onClick={() => {
                                                                     setReplyAttachedFiles((prev) =>
                                                                         (prev || []).filter((_, i) => i !== idx)
-                                                                    )
-                                                                }
+                                                                    );
+                                                                    if (fileInputRef.current) fileInputRef.current.value = '';
+                                                                }}
                                                                 disabled={isReplying}
                                                             >
                                                                 제거
@@ -880,9 +912,8 @@
                                                                 <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
                                                                     <a
                                                                         href={att.url}
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                        style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}
+                                                                        onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                                     >
                                                                         {att.name || `첨부파일 ${idx + 1}`}
                                                                     </a>
@@ -2833,7 +2864,10 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [openInquiryId] = useState(() => new URLSearchParams(window.location.search).get('open') || null);
+            const [currentPage, setCurrentPage] = useState(() =>
+                new URLSearchParams(window.location.search).has('open') ? 'all_inquiries' : 'dashboard'
+            );
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
 
@@ -2892,7 +2926,7 @@
                     return <InquiryCategoryDeptPage user={user} />;
                 }
                 if (currentPage === 'all_inquiries') {
-                    return <TeamInquiryPage allTeams />;
+                    return <TeamInquiryPage allTeams openInquiryId={openInquiryId} />;
                 }
                 // 팀 페이지
                 const team = TEAMS.find(t => t.id === currentPage);

@@ -3567,6 +3567,23 @@
                     .replace(/_+/g, '_')
                     .replace(/^_+|_+$/g, '');
 
+            const downloadAttachment = async (url, name) => {
+                try {
+                    const res = await fetch(url);
+                    const blob = await res.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = name || 'attachment';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                } catch {
+                    window.open(url, '_blank');
+                }
+            };
+
             const uploadInquiryAttachments = async ({ files, userId, inquiryId }) => {
                 if (!files || !files.length) return [];
                 const uploads = files.map(async (file, idx) => {
@@ -4473,9 +4490,8 @@
                                                 <li key={`${att.path || att.url || 'att'}_${idx}`} style={{marginBottom: '6px'}}>
                                                     <a
                                                         href={att.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        style={{color: '#2563eb', textDecoration: 'underline'}}
+                                                        style={{color: '#2563eb', textDecoration: 'underline', cursor: 'pointer'}}
+                                                        onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                     >
                                                         {att.name || `첨부파일 ${idx + 1}`}
                                                     </a>
@@ -4540,9 +4556,8 @@
                                                             <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
                                                                 <a
                                                                     href={att.url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                                    style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}
+                                                                    onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                                 >
                                                                     {att.name || `첨부파일 ${idx + 1}`}
                                                                 </a>

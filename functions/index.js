@@ -8,6 +8,9 @@ admin.initializeApp();
 // ⚙️ 설정값
 const COLLECTION_NAME = "inquiries";
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;   // Slack Bot OAuth Token (xoxb-...)
+const BASE_URL = process.env.FUNCTIONS_EMULATOR === 'true'
+    ? 'http://192.168.0.217:8000'
+    : 'https://troypark.github.io';
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID; // 알림 받을 채널 ID (C...)
 
 // NCP SENS 알림톡 설정
@@ -152,9 +155,23 @@ function buildInquiryBlocks(doc, manager, docId, previousTeamId = null) {
         type: "section",
         fields: [
             { type: "mrkdwn", text: `*상태*\n${statusText}` },
-            { type: "mrkdwn", text: `*작성자*\n${doc.userName || "-"}` },
+            { type: "mrkdwn", text: `*작성자*\n${doc.inquirerName || doc.userName || "-"}` },
         ],
     });
+
+    // 문의함으로 이동 버튼
+    if (doc.abpInquiryId) {
+        blocks.push({
+            type: "actions",
+            elements: [
+                {
+                    type: "button",
+                    text: { type: "plain_text", text: "문의함으로 이동", emoji: true },
+                    url: `${BASE_URL}/abp?open=${doc.abpInquiryId}`,
+                },
+            ],
+        });
+    }
 
     // 컨텍스트
     blocks.push({

@@ -8798,8 +8798,8 @@
         const ABP_TEAMS = ABP_ADMIN_ORDER.map(id => ABP_TEAM_BY_ID[id]);
         /** abp.html 사이드바·팀별 문의함과 동일한 팀 노출 순서 (ABP_ADMIN_ORDER와 별도) */
         const ABP_SIDEBAR_ORDER = [
-            'biz_plan', 'sales_ops', 'hrd_academy', 'eng_lab', 'content_prod',
-            'it_dev', 'corp_admin', 'biz_mk1', 'biz_mk2'
+            'biz_mk1', 'biz_mk2', 'biz_plan', 'sales_ops', 'hrd_academy', 'eng_lab',
+            'content_prod', 'it_dev', 'corp_admin'
         ];
         const ABP_TEAMS_NAV = ABP_SIDEBAR_ORDER.map((id) => ABP_TEAM_BY_ID[id]);
         // 구 시스템에서 저장된 targetTeam id → 표시명 (기존 문서 조회용)
@@ -10569,6 +10569,7 @@
             const [firestoreError, setFirestoreError] = useState(null);
             const [filterTeam, setFilterTeam] = useState('all');
             const [filterMajor, setFilterMajor] = useState('all');
+            const [filterSearch, setFilterSearch] = useState('');
             const [showInactive, setShowInactive] = useState(false);
 
             const [showModal, setShowModal] = useState(false);
@@ -10625,11 +10626,30 @@
             const filteredRows = useMemo(() => {
                 return rows.filter((row) => {
                     if (!showInactive && row.active === false) return false;
-                    if (filterTeam !== 'all' && row.targetTeam !== filterTeam) return false;
-                    if (filterMajor !== 'all' && row.majorId !== filterMajor) return false;
+
+                    // 팀/대분류 필터 — OR 조건 (둘 중 하나라도 설정된 경우)
+                    const teamActive = filterTeam !== 'all';
+                    const majorActive = filterMajor !== 'all';
+                    if (teamActive || majorActive) {
+                        const matchTeam = teamActive && row.targetTeam === filterTeam;
+                        const matchMajor = majorActive && row.majorId === filterMajor;
+                        if (!matchTeam && !matchMajor) return false;
+                    }
+
+                    // 검색어 필터 (대분류·소분류·담당 부서명 대상)
+                    if (filterSearch.trim()) {
+                        const q = filterSearch.trim().toLowerCase();
+                        const teamName = ABP_TEAM_BY_ID[row.targetTeam]?.name || '';
+                        if (
+                            !(row.majorLabel || '').toLowerCase().includes(q) &&
+                            !(row.minorLabel || '').toLowerCase().includes(q) &&
+                            !teamName.toLowerCase().includes(q)
+                        ) return false;
+                    }
+
                     return true;
                 });
-            }, [rows, filterTeam, filterMajor, showInactive]);
+            }, [rows, filterTeam, filterMajor, filterSearch, showInactive]);
 
             const openAdd = () => {
                 setModalMode('add');
@@ -10792,9 +10812,17 @@
 
                     <div className="content-area">
                         <div className="catdef-filters-wrap">
-                            <div
-                                className="catdef-filters"
-                            >
+                            <div className="catdef-filters">
+                                <div className="catdef-filter catdef-filter-search">
+                                    <label className="catdef-filter-label">검색</label>
+                                    <input
+                                        type="text"
+                                        value={filterSearch}
+                                        onChange={(e) => setFilterSearch(e.target.value)}
+                                        placeholder="대분류·소분류·부서명 검색"
+                                        className="catdef-filter-input"
+                                    />
+                                </div>
                                 <div className="catdef-filter">
                                     <label className="catdef-filter-label">팀 / 부서</label>
                                     <select
