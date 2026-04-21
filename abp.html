@@ -2174,6 +2174,7 @@
             const [firestoreError, setFirestoreError] = useState(null);
             const [filterTeam, setFilterTeam] = useState('all');
             const [filterMajor, setFilterMajor] = useState('all');
+            const [filterSearch, setFilterSearch] = useState('');
             const [showInactive, setShowInactive] = useState(false);
 
             const [showModal, setShowModal] = useState(false);
@@ -2230,11 +2231,30 @@
             const filteredRows = useMemo(() => {
                 return rows.filter((row) => {
                     if (!showInactive && row.active === false) return false;
-                    if (filterTeam !== 'all' && row.targetTeam !== filterTeam) return false;
-                    if (filterMajor !== 'all' && row.majorId !== filterMajor) return false;
+
+                    // 팀/대분류 필터 — OR 조건
+                    const teamActive = filterTeam !== 'all';
+                    const majorActive = filterMajor !== 'all';
+                    if (teamActive || majorActive) {
+                        const matchTeam = teamActive && row.targetTeam === filterTeam;
+                        const matchMajor = majorActive && row.majorId === filterMajor;
+                        if (!matchTeam && !matchMajor) return false;
+                    }
+
+                    // 검색어 필터 (대분류·소분류·담당 부서명 대상)
+                    if (filterSearch.trim()) {
+                        const q = filterSearch.trim().toLowerCase();
+                        const teamName = ABP_TEAM_BY_ID[row.targetTeam]?.name || '';
+                        if (
+                            !(row.majorLabel || '').toLowerCase().includes(q) &&
+                            !(row.minorLabel || '').toLowerCase().includes(q) &&
+                            !teamName.toLowerCase().includes(q)
+                        ) return false;
+                    }
+
                     return true;
                 });
-            }, [rows, filterTeam, filterMajor, showInactive]);
+            }, [rows, filterTeam, filterMajor, filterSearch, showInactive]);
 
             const openAdd = () => {
                 setModalMode('add');
@@ -2415,6 +2435,23 @@
                                     borderRadius: '10px'
                                 }}
                             >
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '180px' }}>
+                                    <label style={{ fontSize: '12px', color: '#64748b' }}>검색</label>
+                                    <input
+                                        type="text"
+                                        value={filterSearch}
+                                        onChange={(e) => setFilterSearch(e.target.value)}
+                                        placeholder="대분류·소분류·부서명 검색"
+                                        style={{
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0',
+                                            fontSize: '14px',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <label style={{ fontSize: '12px', color: '#64748b' }}>팀 / 부서</label>
                                     <select
@@ -2799,6 +2836,21 @@
                             <span>종합</span>
                         </div>
 
+                        <div className="nav-section-title" style={{marginTop: '20px'}}>팀별 문의함</div>
+                        {TEAMS.map(team => (
+                            <div
+                                key={team.id}
+                                className={`nav-item ${currentPage === team.id ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(team.id)}
+                            >
+                                <Icons.Team />
+                                <span>{team.name}</span>
+                                {pendingCounts[team.id] > 0 && (
+                                    <span className="badge">{pendingCounts[team.id]}</span>
+                                )}
+                            </div>
+                        ))}
+
                         <div className="nav-section-title" style={{marginTop: '20px'}}>문의</div>
                         <div
                             className={`nav-item ${currentPage === 'all_inquiries' ? 'active' : ''}`}
@@ -2818,21 +2870,6 @@
                             <Icons.DeptCategory />
                             <span>담당 부서 / 문의 유형</span>
                         </div>
-
-                        <div className="nav-section-title" style={{marginTop: '12px'}}>팀별 문의함</div>
-                        {TEAMS.map(team => (
-                            <div
-                                key={team.id}
-                                className={`nav-item ${currentPage === team.id ? 'active' : ''}`}
-                                onClick={() => setCurrentPage(team.id)}
-                            >
-                                <Icons.Team />
-                                <span>{team.name}</span>
-                                {pendingCounts[team.id] > 0 && (
-                                    <span className="badge">{pendingCounts[team.id]}</span>
-                                )}
-                            </div>
-                        ))}
 
                         <div className="nav-section-title" style={{marginTop: '20px'}}>시스템</div>
                         <div

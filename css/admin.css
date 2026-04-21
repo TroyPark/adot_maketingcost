@@ -5211,7 +5211,8 @@ body {
 }
 
 .inquiry-th-manager {
-  width: 100px;
+  min-width: 120px;
+  white-space: nowrap;
 }
 
 .inquiry-th-dept {
@@ -5284,6 +5285,7 @@ body {
 }
 
 .inquiry-branch-pill {
+  display: inline-block;
   background: #f07c00;
   color: #fff;
   padding: 4px 10px;

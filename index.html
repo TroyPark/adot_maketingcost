@@ -248,6 +248,15 @@
         const passwordInput = document.getElementById('password');
         const toggleText = document.getElementById('toggleText');
 
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                window.innerWidth <= 768;
+        }
+
+        function getUserRedirectUrl() {
+            return isMobile() ? 'user.html?path=inquiries' : 'user.html';
+        }
+
         // ABP 접근 허용 이메일(고정 목록)
         const ABP_TEAM_EMAILS = new Set([
             'biz_mk1@kogrop.co.kr',
@@ -330,7 +339,10 @@
                 result = await loginWithEmail(email, password);
             } catch (err) {
                 console.error(err);
-                result = { success: false, message: '로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.' };
+                result = {
+                    success: false,
+                    message: '로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
+                };
             } finally {
                 loginFormAttemptInProgress = false;
             }
@@ -344,7 +356,7 @@
                 } else if (result.user.email === 'abp@dshare.co.kr' || ABP_TEAM_EMAILS.has((result.user.email || '').toLowerCase())) {
                     window.location.replace('abp.html');
                 } else {
-                    window.location.replace('user.html');
+                    window.location.replace(getUserRedirectUrl());
                 }
             } else {
                 loginError.textContent = result.message;
@@ -368,7 +380,7 @@
                 } else if (user.email === 'abp@dshare.co.kr' || ABP_TEAM_EMAILS.has((user.email || '').toLowerCase())) {
                     window.location.replace('abp.html');
                 } else {
-                    window.location.replace('user.html');
+                    window.location.replace(getUserRedirectUrl());
                 }
             }
         });

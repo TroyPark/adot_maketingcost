@@ -8,9 +8,7 @@ admin.initializeApp();
 // ⚙️ 설정값
 const COLLECTION_NAME = "inquiries";
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;   // Slack Bot OAuth Token (xoxb-...)
-const BASE_URL = process.env.FUNCTIONS_EMULATOR === 'true'
-    ? 'http://192.168.0.217:8000'
-    : 'https://troypark.github.io';
+const BASE_URL = process.env.BASE_URL || 'https://troypark.github.io';
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID; // 알림 받을 채널 ID (C...)
 
 // NCP SENS 알림톡 설정
@@ -23,28 +21,28 @@ const KAKAO_TEMPLATE_CODE = process.env.KAKAO_TEMPLATE_CODE;
 
 // 팀별 Slack 멘션 ID (팀 Slack ID 확정 후 각 팀별로 교체)
 const TEAM_SLACK_MENTION = {
-    biz_plan:     "U0ADXDR90QY", // 사업기획팀
-    sales_ops:    "U0ADXDR90QY", // 영업지원팀
-    hrd_academy:  "U0ADXDR90QY", // 학원HRD팀
-    eng_lab:      "U0ADXDR90QY", // 영어연구소
+    biz_plan: "U0ADXDR90QY", // 사업기획팀
+    sales_ops: "U0ADXDR90QY", // 영업지원팀
+    hrd_academy: "U0ADXDR90QY", // 학원HRD팀
+    eng_lab: "U0ADXDR90QY", // 영어연구소
     content_prod: "U0ADXDR90QY", // 콘텐츠제작팀
-    it_dev:       "U0ADXDR90QY", // IT본부
-    corp_admin:   "U0ADXDR90QY", // 경영지원팀
-    biz_mk1:      "U0ADXDR90QY", // 사업마케팅1팀
-    biz_mk2:      "U0ADXDR90QY", // 사업마케팅2팀
+    it_dev: "U0ADXDR90QY", // IT본부
+    corp_admin: "U0ADXDR90QY", // 경영지원팀
+    biz_mk1: "U0ADXDR90QY", // 사업마케팅1팀
+    biz_mk2: "U0ADXDR90QY", // 사업마케팅2팀
 };
 
 // 팀 한국어 라벨
 const TEAM_LABEL = {
-    biz_plan:     "사업기획팀",
-    sales_ops:    "영업지원팀",
-    hrd_academy:  "학원HRD팀",
-    eng_lab:      "영어연구소",
+    biz_plan: "사업기획팀",
+    sales_ops: "영업지원팀",
+    hrd_academy: "학원HRD팀",
+    eng_lab: "영어연구소",
     content_prod: "콘텐츠제작팀",
-    it_dev:       "IT본부",
-    corp_admin:   "경영지원팀",
-    biz_mk1:      "사업마케팅1팀",
-    biz_mk2:      "사업마케팅2팀",
+    it_dev: "IT본부",
+    corp_admin: "경영지원팀",
+    biz_mk1: "사업마케팅1팀",
+    biz_mk2: "사업마케팅2팀",
 };
 
 // config/managerSlackIds 문서에서 담당자 이름 → Slack ID 조회
