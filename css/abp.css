@@ -5,9 +5,8 @@
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   background-color: #f0f4f3;
   color: #333;
 }
@@ -396,7 +395,7 @@ body {
 .modal {
   background: white;
   border-radius: 12px;
-  padding: 30px;
+  padding: 20px;
   width: 100%;
   max-width: 700px;
   max-height: 90vh;
@@ -526,9 +525,7 @@ body {
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   line-height: 1.3;
 }
 
@@ -677,9 +674,10 @@ body {
 /* 문의 상세: 대분류·중분류 + 저장 */
 .abp-inquiry-category-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 12px;
 }
 
 .abp-inquiry-category-label {
@@ -688,16 +686,15 @@ body {
   color: #0d3b36;
   white-space: nowrap;
   flex-shrink: 0;
-  align-self: center;
+  align-self: flex-start;
 }
 
 .abp-inquiry-category-pair {
   display: flex;
   flex-wrap: wrap;
-  flex: 1;
-  min-width: min(100%, 280px);
+  width: 100%;
   gap: 10px 14px;
-  align-items: flex-end;
+  align-items: center;
 }
 
 .abp-inquiry-category-field {

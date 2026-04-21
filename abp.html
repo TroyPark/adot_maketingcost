@@ -788,22 +788,22 @@
                                                         </select>
                                                     </div>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm abp-inquiry-category-save"
+                                                    style={{ background: '#10b981' }}
+                                                    disabled={
+                                                        savingCategoryRoute ||
+                                                        !detailRouteMajorId ||
+                                                        (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID
+                                                            ? !detailManualTargetTeamId
+                                                            : !detailRouteMinorDocId)
+                                                    }
+                                                    onClick={handleSaveInquiryCategoryRoute}
+                                                >
+                                                    {savingCategoryRoute ? '저장 중...' : '변경'}
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm abp-inquiry-category-save"
-                                                style={{ background: '#10b981' }}
-                                                disabled={
-                                                    savingCategoryRoute ||
-                                                    !detailRouteMajorId ||
-                                                    (detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID
-                                                        ? !detailManualTargetTeamId
-                                                        : !detailRouteMinorDocId)
-                                                }
-                                                onClick={handleSaveInquiryCategoryRoute}
-                                            >
-                                                {savingCategoryRoute ? '저장 중...' : '변경'}
-                                            </button>
                                         </div>
                                     </div>
 
