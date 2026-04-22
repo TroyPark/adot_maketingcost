@@ -38,6 +38,11 @@
         const { useState, useEffect, useMemo, useRef } = React;
         const ADMIN_EMAIL = 'admin@dshare.co.kr';
         const ABP_EMAIL = 'abp@dshare.co.kr';
+        const BIZ_MK_EMAILS = new Set(['biz_mk1@kogrop.co.kr', 'biz_mk2@kogrop.co.kr']);
+
+        function isAdminAccess(email) {
+            return email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((email || '').toLowerCase());
+        }
 
         // 보호된 계정 (삭제 불가)
         const PROTECTED_EMAILS = [ADMIN_EMAIL, ABP_EMAIL];
@@ -11134,7 +11139,7 @@
         }
 
         // 기획본부 소통 창구 페이지
-        function AbpCommunicationPage() {
+        function AbpCommunicationPage({ abpOpenId }) {
             const [inquiries, setInquiries] = useState([]);
             const [loading, setLoading] = useState(true);
             const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
@@ -11215,6 +11220,17 @@
                 );
                 return () => unsub();
             }, []);
+
+            // abpOpen 딥링크: 슬랙에서 어드민 계정으로 접근 시 해당 문의 자동 오픈
+            const abpOpenHandled = useRef(false);
+            useEffect(() => {
+                if (!abpOpenId || loading || inquiries.length === 0 || abpOpenHandled.current) return;
+                const target = inquiries.find(inq => inq.id === abpOpenId);
+                if (target) {
+                    abpOpenHandled.current = true;
+                    openDetail(target);
+                }
+            }, [abpOpenId, loading, inquiries]);
 
             // 지점-담당자 매핑 로드 (users 컬렉션에서)
             useEffect(() => {
@@ -12617,7 +12633,10 @@
 
         // 메인 앱 컴포넌트
         function App() {
-            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [abpOpenId] = useState(() => new URLSearchParams(window.location.search).get('abpOpen') || null);
+            const [currentPage, setCurrentPage] = useState(() =>
+                new URLSearchParams(window.location.search).get('abpOpen') ? 'abpComm' : 'dashboard'
+            );
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
 
@@ -12657,7 +12676,7 @@
                     if (isCreatingUser) {
                         console.log('사용자 생성 중... 리다이렉트 스킵');
                         // 관리자 계정이면 상태만 업데이트
-                        if (currentUser && currentUser.email === ADMIN_EMAIL) {
+                        if (currentUser && isAdminAccess(currentUser.email)) {
                             setUser(currentUser);
                             setLoading(false);
                         }
@@ -12665,8 +12684,9 @@
                     }
 
                     if (!currentUser) {
-                        window.location.href = 'index.html';
-                    } else if (currentUser.email !== ADMIN_EMAIL) {
+                        const returnUrl = encodeURIComponent(window.location.href);
+                        window.location.href = 'index.html?returnUrl=' + returnUrl;
+                    } else if (!isAdminAccess(currentUser.email)) {
                         window.location.href = 'user.html';
                     } else {
                         setUser(currentUser);
@@ -12935,7 +12955,7 @@
                     case 'inquiryCategoryDept':
                         return <InquiryCategoryDeptPage user={user} />;
                     case 'abpComm':
-                        return <AbpCommunicationPage />;
+                        return <AbpCommunicationPage abpOpenId={abpOpenId} />;
                     case 'toolkit':
                         return <ToolkitManagementPage />;
                     case 'round':

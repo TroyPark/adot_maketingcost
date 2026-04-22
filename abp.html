@@ -32,6 +32,7 @@
         const { useState, useEffect, useMemo, useRef } = React;
         const ADMIN_EMAIL = 'admin@dshare.co.kr';
         const ABP_EMAIL = 'abp@dshare.co.kr';
+        const BIZ_MK_EMAILS = new Set(['biz_mk1@kogrop.co.kr', 'biz_mk2@kogrop.co.kr']);
 
         // 기획본부 팀 정의 (Firestore abpInquiries.targetTeam 에 저장되는 id)
         const ABP_TEAM_DEFS = [
@@ -651,7 +652,7 @@
                                     <h3>문의 상세</h3>
                                     <button className="modal-close" onClick={() => setShowDetailModal(false)}>×</button>
                                 </div>
-                                <div style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                                <div>
                                     {/* 문의 정보 */}
                                     <div style={{marginBottom: '20px'}}>
                                         <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px'}}>
@@ -2912,14 +2913,15 @@
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
                     if (!currentUser) {
-                        window.location.href = 'index.html';
+                        const returnUrl = encodeURIComponent(window.location.href);
+                        window.location.href = 'index.html?returnUrl=' + returnUrl;
+                    } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
+                        // admin / biz_mk1 / biz_mk2 → admin.html로 이동 (?open= 파라미터 전달)
+                        const openId = new URLSearchParams(window.location.search).get('open');
+                        window.location.href = openId ? 'admin.html?abpOpen=' + openId : 'admin.html';
                     } else if (currentUser.email !== ABP_EMAIL && !(typeof isAbpTeamEmail === 'function' && isAbpTeamEmail(currentUser.email))) {
-                        // ABP 계정/ABP 팀 계정만 접근 가능
-                        if (currentUser.email === ADMIN_EMAIL) {
-                            window.location.href = 'admin.html';
-                        } else {
-                            window.location.href = 'user.html';
-                        }
+                        // ABP 계정/ABP 팀 계정 외 → user.html
+                        window.location.href = 'user.html';
                     } else {
                         setUser(currentUser);
                         setLoading(false);

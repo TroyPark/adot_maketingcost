@@ -38,17 +38,23 @@ service firebase.storage {
       allow list: if canAccessAbpReplyPath(abpDocId);
     }
 
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'admin@dshare.co.kr' ||
+        request.auth.token.email == 'biz_mk1@kogrop.co.kr' ||
+        request.auth.token.email == 'biz_mk2@kogrop.co.kr'
+      );
+    }
+
     // 툴킷 예시 이미지
     match /toolkits/{fileName} {
       allow read: if request.auth != null;
 
-      allow write: if request.auth != null
-        && request.auth.token.email == 'admin@dshare.co.kr'
+      allow write: if isAdmin()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png)');
 
-      allow delete: if request.auth != null
-        && request.auth.token.email == 'admin@dshare.co.kr';
+      allow delete: if isAdmin();
     }
 
     // 증빙 이미지
@@ -61,21 +67,18 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png)');
 
       allow delete: if request.auth != null
-        && (request.auth.uid == userId
-          || request.auth.token.email == 'admin@dshare.co.kr');
+        && (request.auth.uid == userId || isAdmin());
     }
 
     match /costs/{userId}/{costId} {
       allow list: if request.auth != null
-        && (request.auth.uid == userId
-          || request.auth.token.email == 'admin@dshare.co.kr');
+        && (request.auth.uid == userId || isAdmin());
     }
 
     // 지점 문의 첨부
     match /inquiries/{userId}/{inquiryId}/{fileName} {
       allow read: if request.auth != null
-        && (request.auth.uid == userId
-          || request.auth.token.email == 'admin@dshare.co.kr');
+        && (request.auth.uid == userId || isAdmin());
 
       allow write: if request.auth != null
         && request.auth.uid == userId
@@ -83,14 +86,12 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png)');
 
       allow delete: if request.auth != null
-        && (request.auth.uid == userId
-          || request.auth.token.email == 'admin@dshare.co.kr');
+        && (request.auth.uid == userId || isAdmin());
     }
 
     match /inquiries/{userId}/{inquiryId} {
       allow list: if request.auth != null
-        && (request.auth.uid == userId
-          || request.auth.token.email == 'admin@dshare.co.kr');
+        && (request.auth.uid == userId || isAdmin());
     }
   }
 }
