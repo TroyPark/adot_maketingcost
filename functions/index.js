@@ -159,13 +159,20 @@ function buildInquiryBlocks(doc, manager, docId, previousTeamId = null) {
 
     // 문의함으로 이동 버튼
     if (doc.abpInquiryId) {
+        // 일부 문서는 targetTeam만 저장되어 있을 수 있어(abpTargetTeam 미존재) 둘 다 확인
+        const resolvedTeamId = doc.abpTargetTeam || doc.targetTeam || null;
+        const isBizMarketingTeam = resolvedTeamId === "biz_mk1" || resolvedTeamId === "biz_mk2";
+        const inquiryUrl = isBizMarketingTeam
+            ? `${BASE_URL}/admin?abpOpen=${doc.abpInquiryId}`
+            : `${BASE_URL}/abp?open=${doc.abpInquiryId}`;
+
         blocks.push({
             type: "actions",
             elements: [
                 {
                     type: "button",
                     text: { type: "plain_text", text: "문의함으로 이동", emoji: true },
-                    url: `${BASE_URL}/abp?open=${doc.abpInquiryId}`,
+                    url: inquiryUrl,
                 },
             ],
         });

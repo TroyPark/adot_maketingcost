@@ -2917,8 +2917,14 @@
                         window.location.href = 'index.html?returnUrl=' + returnUrl;
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
                         // admin / biz_mk1 / biz_mk2 → admin.html로 이동 (?open= 파라미터 전달)
-                        const openId = new URLSearchParams(window.location.search).get('open');
-                        window.location.href = openId ? 'admin.html?abpOpen=' + openId : 'admin.html';
+                        const params = new URLSearchParams(window.location.search);
+                        // abp.html에서 쓰는 open= 을 admin.html의 abpOpen= 으로도 전달 (다른 쿼리스트링은 그대로 보존)
+                        const openId = params.get('open');
+                        if (openId && !params.get('abpOpen')) {
+                            params.set('abpOpen', openId);
+                        }
+                        const qs = params.toString();
+                        window.location.href = qs ? 'admin?' + qs : 'admin';
                     } else if (currentUser.email !== ABP_EMAIL && !(typeof isAbpTeamEmail === 'function' && isAbpTeamEmail(currentUser.email))) {
                         // ABP 계정/ABP 팀 계정 외 → user.html
                         window.location.href = 'user.html';

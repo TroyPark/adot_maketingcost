@@ -281,7 +281,9 @@
                     }
                 } catch (e) { /* 잘못된 URL 무시 */ }
             }
-            return 'abp.html';
+            // returnUrl이 없으면 현재 query-string을 그대로 유지해서 abp.html로 전달
+            // (예: /abp?open=... 같은 진입 시 open 파라미터 유실 방지)
+            return 'abp.html' + (window.location.search || '');
         }
 
         function getAdminRedirectUrl() {
@@ -296,7 +298,15 @@
                     }
                 } catch (e) { /* 잘못된 URL 무시 */ }
             }
-            return 'admin.html';
+            // returnUrl이 없으면 현재 query-string을 유지해서 admin.html로 전달
+            // abp에서 쓰는 open= 이 있으면 admin에서 쓰는 abpOpen= 도 함께 세팅
+            const nextParams = new URLSearchParams(window.location.search);
+            const openId = nextParams.get('open');
+            if (openId && !nextParams.get('abpOpen')) {
+                nextParams.set('abpOpen', openId);
+            }
+            const qs = nextParams.toString();
+            return qs ? ('admin?' + qs) : 'admin';
         }
 
         // admin.html 접근 허용 이메일 (admin 계정 + biz_mk1/2)
