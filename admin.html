@@ -9830,7 +9830,7 @@
 
 
         // —— abp.html 이식: 전체·팀별 문의함 (TeamInquiryPage) ——
-        function TeamInquiryPage({ teamId, allTeams }) {
+        function TeamInquiryPage({ teamId, allTeams, openId }) {
             const [inquiries, setInquiries] = useState([]);
             const [loading, setLoading] = useState(true);
             const [showDetailModal, setShowDetailModal] = useState(false);
@@ -9969,6 +9969,16 @@
                         .catch((err) => console.warn('inquiries 보강 로드:', err));
                 }
             };
+
+            // 딥링크(openId): Slack 등에서 접근 시 "전체 문의함"에서 해당 문의 자동 오픈
+            const openHandledRef = useRef(false);
+            useEffect(() => {
+                if (!openId || loading || inquiries.length === 0 || openHandledRef.current) return;
+                const target = inquiries.find((inq) => inq.id === openId);
+                if (!target) return;
+                openHandledRef.current = true;
+                openDetail(target);
+            }, [openId, loading, inquiries]);
 
             const handleSaveInquiryCategoryRoute = async () => {
                 if (!selectedInquiry) return;
@@ -12637,7 +12647,7 @@
         function App() {
             const [abpOpenId] = useState(() => new URLSearchParams(window.location.search).get('abpOpen') || null);
             const [currentPage, setCurrentPage] = useState(() =>
-                new URLSearchParams(window.location.search).get('abpOpen') ? 'abpComm' : 'dashboard'
+                new URLSearchParams(window.location.search).get('abpOpen') ? 'abp_all_inquiries' : 'dashboard'
             );
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -12959,7 +12969,7 @@
                     case 'inquiry':
                         return <InquiryPage />;
                     case 'abp_all_inquiries':
-                        return <TeamInquiryPage allTeams />;
+                        return <TeamInquiryPage allTeams openId={abpOpenId} />;
                     case 'inquiryCategoryDept':
                         return <InquiryCategoryDeptPage user={user} />;
                     case 'abpComm':
