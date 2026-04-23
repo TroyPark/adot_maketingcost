@@ -12684,8 +12684,8 @@
                     }
 
                     if (!currentUser) {
-                        const returnUrl = encodeURIComponent(window.location.href);
-                        window.location.href = 'index.html?returnUrl=' + returnUrl;
+                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        window.location.href = 'index';
                     } else if (!isAdminAccess(currentUser.email)) {
                         window.location.href = 'user.html';
                     } else {
@@ -12929,7 +12929,7 @@
                 if (confirm('로그아웃 하시겠습니까?')) {
                     const result = await logout();
                     if (result.success) {
-                        window.location.href = 'index.html';
+                        window.location.href = 'index';
                     } else {
                         alert('로그아웃 실패: ' + result.message);
                     }

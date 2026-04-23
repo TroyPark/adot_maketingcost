@@ -4978,13 +4978,13 @@
                         console.error('🚨 Firestore에 등록되지 않은 계정입니다!');
                         alert('⚠️ 관리자가 승인하지 않은 계정입니다.\n\n계정 생성은 관리자에게 문의하세요.\n담당자: 학원사업마케팅팀 / 박영주');
                         await auth.signOut();
-                        window.location.href = 'index.html';
+                        window.location.href = 'index';
                     }
                 } catch (error) {
                     console.error('사용자 정보 가져오기 오류:', error);
                     alert('사용자 정보를 불러오는데 실패했습니다.\n관리자에게 문의하세요.');
                     await auth.signOut();
-                    window.location.href = 'index.html';
+                    window.location.href = 'index';
                 }
             };
 
@@ -5011,12 +5011,12 @@
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
                     if (!currentUser) {
-                        const returnUrl = encodeURIComponent(window.location.href);
-                        window.location.href = 'index.html?returnUrl=' + returnUrl;
+                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        window.location.href = 'index';
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
-                        window.location.href = 'admin.html';
+                        window.location.href = 'admin';
                     } else if (currentUser.email === ABP_EMAIL) {
-                        window.location.href = 'abp.html';
+                        window.location.href = 'abp';
                     } else {
 
                         setUser(currentUser);
@@ -5054,7 +5054,7 @@
                 if (confirm('로그아웃 하시겠습니까?')) {
                     const result = await logout();
                     if (result.success) {
-                        window.location.href = 'index.html';
+                        window.location.href = 'index';
                     } else {
                         alert('로그아웃 실패: ' + result.message);
                     }

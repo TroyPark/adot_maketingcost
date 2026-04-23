@@ -253,52 +253,34 @@
                 window.innerWidth <= 768;
         }
 
+        function getStoredReturnUrl() {
+            const stored = sessionStorage.getItem('loginReturnUrl');
+            if (!stored) return null;
+            sessionStorage.removeItem('loginReturnUrl');
+            // 직접 로그인(북마크, 주소창 입력 등)이면 무시 — 같은 origin에서 리다이렉트된 경우만 사용
+            try {
+                const ref = document.referrer ? new URL(document.referrer) : null;
+                if (!ref || ref.origin !== window.location.origin) return null;
+            } catch (e) { return null; }
+            try {
+                const url = new URL(stored);
+                if (url.origin === window.location.origin) return stored;
+            } catch (e) {}
+            return null;
+        }
+
         function getUserRedirectUrl() {
-            // returnUrl 파라미터가 있으면 우선 복귀 (같은 origin만 허용)
-            const params = new URLSearchParams(window.location.search);
-            const returnUrl = params.get('returnUrl');
-            if (returnUrl) {
-                try {
-                    const decoded = decodeURIComponent(returnUrl);
-                    const url = new URL(decoded);
-                    if (url.origin === window.location.origin) {
-                        return decoded;
-                    }
-                } catch (e) { /* 잘못된 URL 무시 */ }
-            }
-            return 'user.html';
+            return getStoredReturnUrl() || 'user.html';
         }
 
         function getAbpRedirectUrl() {
-            const params = new URLSearchParams(window.location.search);
-            const returnUrl = params.get('returnUrl');
-            if (returnUrl) {
-                try {
-                    const decoded = decodeURIComponent(returnUrl);
-                    const url = new URL(decoded);
-                    if (url.origin === window.location.origin) {
-                        return decoded;
-                    }
-                } catch (e) { /* 잘못된 URL 무시 */ }
-            }
-            // returnUrl이 없으면 현재 query-string을 그대로 유지해서 abp.html로 전달
-            // (예: /abp?open=... 같은 진입 시 open 파라미터 유실 방지)
-            return 'abp.html' + (window.location.search || '');
+            return getStoredReturnUrl() || ('abp' + (window.location.search || ''));
         }
 
         function getAdminRedirectUrl() {
-            const params = new URLSearchParams(window.location.search);
-            const returnUrl = params.get('returnUrl');
-            if (returnUrl) {
-                try {
-                    const decoded = decodeURIComponent(returnUrl);
-                    const url = new URL(decoded);
-                    if (url.origin === window.location.origin) {
-                        return decoded;
-                    }
-                } catch (e) { /* 잘못된 URL 무시 */ }
-            }
-            // returnUrl이 없으면 현재 query-string을 유지해서 admin.html로 전달
+            const stored = getStoredReturnUrl();
+            if (stored) return stored;
+            // returnUrl이 없으면 현재 query-string을 유지해서 admin으로 전달
             // abp에서 쓰는 open= 이 있으면 admin에서 쓰는 abpOpen= 도 함께 세팅
             const nextParams = new URLSearchParams(window.location.search);
             const openId = nextParams.get('open');

@@ -267,7 +267,7 @@ async function monitorEmailChanges() {
                 alert('⚠️ 계정 정보 변조가 감지되었습니다.\n보안을 위해 로그아웃됩니다.\n\n정상적인 접근을 원하시면 관리자에게 문의하세요.\n담당자: 박영주 / 010-4037-0928');
 
                 await auth.signOut();
-                window.location.href = 'index.html';
+                window.location.href = 'index';
                 return false;
             }
 
@@ -524,7 +524,7 @@ function checkAutoLogout() {
             auth.signOut().then(() => {
                 localStorage.removeItem('lastActivityTime');
                 alert('보안을 위해 자동 로그아웃되었습니다.\n(24시간 동안 활동 없음)\n\n다시 로그인해주세요.');
-                window.location.href = 'index.html';
+                window.location.href = 'index';
             });
             return false;
         }
@@ -542,8 +542,9 @@ auth.onAuthStateChanged((user) => {
         // 로그인 상태면 체크
         checkAutoLogout();
     } else {
-        // 로그아웃 시 활동 시간 삭제
+        // 로그아웃 시 활동 시간 및 저장된 returnUrl 삭제
         localStorage.removeItem('lastActivityTime');
+        sessionStorage.removeItem('loginReturnUrl');
     }
 });
 

@@ -2913,8 +2913,8 @@
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
                     if (!currentUser) {
-                        const returnUrl = encodeURIComponent(window.location.href);
-                        window.location.href = 'index.html?returnUrl=' + returnUrl;
+                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        window.location.href = 'index';
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
                         // admin / biz_mk1 / biz_mk2 → admin.html로 이동 (?open= 파라미터 전달)
                         const params = new URLSearchParams(window.location.search);
@@ -2926,8 +2926,9 @@
                         const qs = params.toString();
                         window.location.href = qs ? 'admin?' + qs : 'admin';
                     } else if (currentUser.email !== ABP_EMAIL && !(typeof isAbpTeamEmail === 'function' && isAbpTeamEmail(currentUser.email))) {
-                        // ABP 계정/ABP 팀 계정 외 → user.html
-                        window.location.href = 'user.html';
+                        // ABP 계정/ABP 팀 계정 외 → user.html (open= 파라미터 전달)
+                        const openId = new URLSearchParams(window.location.search).get('open');
+                        window.location.href = openId ? `user?path=inquiries&${encodeURIComponent(openId)}&open` : 'user';
                     } else {
                         setUser(currentUser);
                         setLoading(false);
@@ -2950,7 +2951,7 @@
                 if (confirm('로그아웃 하시겠습니까?')) {
                     const result = await logout();
                     if (result.success) {
-                        window.location.href = 'index.html';
+                        window.location.href = 'index';
                     } else {
                         alert('로그아웃 실패: ' + result.message);
                     }
