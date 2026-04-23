@@ -64,7 +64,13 @@
             majors.forEach((m) =>
                 m.minors.sort((a, b) => (a.minorLabel || '').localeCompare(b.minorLabel || '', 'ko'))
             );
-            majors.sort((a, b) => (a.majorLabel || '').localeCompare(b.majorLabel || '', 'ko'));
+            const isUnsetMajor = (m) => m?.majorId === 'unset' || (m?.majorLabel || '').trim() === '미정';
+            majors.sort((a, b) => {
+                const au = isUnsetMajor(a);
+                const bu = isUnsetMajor(b);
+                if (au !== bu) return au ? 1 : -1; // '미정'(unset)은 항상 맨 아래
+                return (a.majorLabel || '').localeCompare(b.majorLabel || '', 'ko');
+            });
             return majors;
         }
 
