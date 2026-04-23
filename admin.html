@@ -49,6 +49,8 @@
 
         // 사용자 생성 중 플래그 (전역 - onAuthStateChanged 콜백에서 접근 가능하도록)
         let isCreatingUser = false;
+        // 이 세션에서 로그인된 적 있는지 — 로그아웃 시 returnUrl 저장 방지
+        let wasLoggedIn = false;
 
         // 아이콘 컴포넌트
         const Icons = {
@@ -12684,11 +12686,17 @@
                     }
 
                     if (!currentUser) {
-                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        // 이 세션에서 한 번도 로그인된 적 없을 때만 returnUrl 저장
+                        // (로그아웃 직후에는 저장하지 않음)
+                        if (!wasLoggedIn) {
+                            sessionStorage.setItem('loginReturnUrl', window.location.href);
+                            sessionStorage.setItem('loginReturnUrlTs', Date.now().toString());
+                        }
                         window.location.href = 'index';
                     } else if (!isAdminAccess(currentUser.email)) {
                         window.location.href = 'user.html';
                     } else {
+                        wasLoggedIn = true;
                         setUser(currentUser);
                         setLoading(false);
                     }

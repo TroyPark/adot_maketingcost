@@ -2909,11 +2909,15 @@
             );
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
+            const wasLoggedIn = React.useRef(false);
 
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
                     if (!currentUser) {
-                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        if (!wasLoggedIn.current) {
+                            sessionStorage.setItem('loginReturnUrl', window.location.href);
+                            sessionStorage.setItem('loginReturnUrlTs', Date.now().toString());
+                        }
                         window.location.href = 'index';
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
                         // admin / biz_mk1 / biz_mk2 → admin.html로 이동 (?open= 파라미터 전달)
@@ -2930,6 +2934,7 @@
                         const openId = new URLSearchParams(window.location.search).get('open');
                         window.location.href = openId ? `user?path=inquiries&${encodeURIComponent(openId)}&open` : 'user';
                     } else {
+                        wasLoggedIn.current = true;
                         setUser(currentUser);
                         setLoading(false);
                     }

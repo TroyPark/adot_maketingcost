@@ -4949,6 +4949,7 @@
             const [user, setUser] = useState(null);
             const [userInfo, setUserInfo] = useState(null);
             const [loading, setLoading] = useState(true);
+            const wasLoggedIn = React.useRef(false);
 
             // 마케팅 비용 비밀번호 모달 상태
             const [showCostPasswordModal, setShowCostPasswordModal] = useState(false);
@@ -5011,7 +5012,10 @@
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((currentUser) => {
                     if (!currentUser) {
-                        sessionStorage.setItem('loginReturnUrl', window.location.href);
+                        if (!wasLoggedIn.current) {
+                            sessionStorage.setItem('loginReturnUrl', window.location.href);
+                            sessionStorage.setItem('loginReturnUrlTs', Date.now().toString());
+                        }
                         window.location.href = 'index';
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
                         window.location.href = 'admin';
@@ -5019,6 +5023,7 @@
                         window.location.href = 'abp';
                     } else {
 
+                        wasLoggedIn.current = true;
                         setUser(currentUser);
                         fetchUserInfo(currentUser.uid);
                         setLoading(false);

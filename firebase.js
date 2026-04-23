@@ -545,6 +545,7 @@ auth.onAuthStateChanged((user) => {
         // 로그아웃 시 활동 시간 및 저장된 returnUrl 삭제
         localStorage.removeItem('lastActivityTime');
         sessionStorage.removeItem('loginReturnUrl');
+        sessionStorage.removeItem('loginReturnUrlTs');
     }
 });
 

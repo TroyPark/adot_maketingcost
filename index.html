@@ -253,20 +253,33 @@
                 window.innerWidth <= 768;
         }
 
-        function getStoredReturnUrl() {
+        // 페이지 로드 시 단 한 번만 읽어 캐싱 — 이후 onAuthStateChange와의 race condition 방지
+        const _pendingReturnUrl = (() => {
             const stored = sessionStorage.getItem('loginReturnUrl');
+            const ts = sessionStorage.getItem('loginReturnUrlTs');
             if (!stored) return null;
             sessionStorage.removeItem('loginReturnUrl');
-            // 직접 로그인(북마크, 주소창 입력 등)이면 무시 — 같은 origin에서 리다이렉트된 경우만 사용
-            try {
-                const ref = document.referrer ? new URL(document.referrer) : null;
-                if (!ref || ref.origin !== window.location.origin) return null;
-            } catch (e) { return null; }
+            sessionStorage.removeItem('loginReturnUrlTs');
+            const hasValidReferrer = (() => {
+                try {
+                    const ref = document.referrer ? new URL(document.referrer) : null;
+                    return ref && ref.origin === window.location.origin;
+                } catch (e) { return false; }
+            })();
+            const isRecent = ts && (Date.now() - parseInt(ts)) < 2 * 60 * 1000;
+            if (!hasValidReferrer && !isRecent) return null;
             try {
                 const url = new URL(stored);
                 if (url.origin === window.location.origin) return stored;
             } catch (e) {}
             return null;
+        })();
+
+        // 로그인 후 redirect 완료 여부 — onAuthStateChange 재진입 방지
+        let _loginRedirectDone = false;
+
+        function getStoredReturnUrl() {
+            return _pendingReturnUrl;
         }
 
         function getUserRedirectUrl() {
@@ -384,6 +397,7 @@
 
             if (result.success) {
                 console.log('로그인 성공:', result.user.email);
+                _loginRedirectDone = true;
 
                 // 이메일 확인 후 페이지 분기
                 if (result.user.email === 'admin@dshare.co.kr' || BIZ_MK_EMAILS.has((result.user.email || '').toLowerCase())) {
@@ -403,7 +417,7 @@
 
         // 로그인 상태 확인 (이미 로그인되어 있으면 페이지 이동 — 폼 제출·검증 중이 아닐 때만)
         onAuthStateChange(function(user) {
-            if (loginFormAttemptInProgress) {
+            if (loginFormAttemptInProgress || _loginRedirectDone) {
                 return;
             }
             if (user) {
