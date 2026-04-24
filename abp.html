@@ -631,12 +631,8 @@
                                             <td style={{ fontSize: '13px', color: '#334155' }}>
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
-                                            <td style={{
-                                                maxWidth: '300px',
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'normal'
-                                            }}>
-                                                {inquiry.content}
+                                            <td className="abp-inquiry-td-content">
+                                                <div className="clamp-2">{inquiry.content}</div>
                                             </td>
                                             <td style={{fontSize: '13px'}}>{inquiry.authorName || '-'}</td>
                                             <td style={{fontSize: '13px', color: '#666'}}>{formatDate(inquiry.createdAt)}</td>

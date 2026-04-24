@@ -10277,7 +10277,7 @@
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
                                             <td className="abp-inquiry-td abp-inquiry-td-content">
-                                                {inquiry.content}
+                                                <div className="clamp-2">{inquiry.content}</div>
                                             </td>
                                             <td className="abp-inquiry-td abp-inquiry-td-author">{inquiry.authorName || '-'}</td>
                                             <td className="abp-inquiry-td abp-inquiry-td-date">{formatDate(inquiry.createdAt)}</td>
