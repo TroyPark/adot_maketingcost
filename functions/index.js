@@ -481,8 +481,32 @@ exports.remindPendingInquiries = functions.pubsub
     .timeZone("Asia/Seoul")
     .onRun(async () => {
         const now = admin.firestore.Timestamp.now();
-        const cutoffMs = 3 * 24 * 60 * 60 * 1000; // 3일(밀리초)
-        const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - cutoffMs);
+        const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // Asia/Seoul (DST 없음)
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const WEEKDAY_TARGET_DAYS = 3; // 평일 기준 3일(주말 제외, 공휴일 무시)
+
+        const toKstMidnightMs = (ms) => {
+            const kstMs = ms + KST_OFFSET_MS;
+            return Math.floor(kstMs / MS_PER_DAY) * MS_PER_DAY - KST_OFFSET_MS;
+        };
+
+        const isWeekdayKst = (ms) => {
+            const d = new Date(ms + KST_OFFSET_MS);
+            const day = d.getUTCDay(); // 0=일, 6=토 (KST 기준)
+            return day >= 1 && day <= 5;
+        };
+
+        // start(생성일/마지막 알림일) 다음날부터 end(오늘)까지의 '평일' 개수
+        const countWeekdaysSince = (startMs, endMs) => {
+            const startDay = toKstMidnightMs(startMs);
+            const endDay = toKstMidnightMs(endMs);
+            if (endDay <= startDay) return 0;
+            let count = 0;
+            for (let cur = startDay + MS_PER_DAY; cur <= endDay; cur += MS_PER_DAY) {
+                if (isWeekdayKst(cur)) count += 1;
+            }
+            return count;
+        };
 
         // NOTE(Firestore 인덱스)
         // - where('status','==','pending').where('createdAt','<=',cutoff) 조합은 composite index가 필요합니다.
@@ -505,23 +529,29 @@ exports.remindPendingInquiries = functions.pubsub
             // ABP로 접수되지 않은 문의는 스킵 (요구사항: ABP 문의함 링크 포함)
             if (!data.abpInquiryId) continue;
 
-            // createdAt이 없거나(구 데이터) cutoff(3일) 이후면 스킵
+            // createdAt이 없으면(구 데이터) 스킵
             if (!data.createdAt || typeof data.createdAt.toMillis !== "function") continue;
-            if (data.createdAt.toMillis() > cutoff.toMillis()) continue;
+            const createdAtMs = data.createdAt.toMillis();
+            const weekdayDaysPending = countWeekdaysSince(createdAtMs, now.toMillis());
+            if (weekdayDaysPending < WEEKDAY_TARGET_DAYS) continue;
 
-            // 마지막 재알림 이후 cutoffMs(3일) 이내면 스킵 (중복 방지)
+            // 마지막 재알림 이후 '평일 기준 3일' 이내면 스킵 (중복 방지)
             if (data.lastReminderAt) {
-                const msSinceLast = now.toMillis() - data.lastReminderAt.toMillis();
-                if (msSinceLast < cutoffMs) continue;
+                const lastMs = typeof data.lastReminderAt.toMillis === "function"
+                    ? data.lastReminderAt.toMillis()
+                    : null;
+                if (lastMs != null) {
+                    const weekdayDaysSinceLast = countWeekdaysSince(lastMs, now.toMillis());
+                    if (weekdayDaysSinceLast < WEEKDAY_TARGET_DAYS) continue;
+                }
             }
 
             const teamId = data.abpTargetTeam || data.targetTeam || null;
             const teamLabel = TEAM_LABEL[teamId] || "기획본부";
             const teamSlackId = teamId && TEAM_SLACK_MENTION[teamId];
             const categoryText = getCategoryText(data);
-            const daysPending = Math.floor(
-                (now.toMillis() - data.createdAt.toMillis()) / (24 * 60 * 60 * 1000)
-            );
+            // 슬랙 표시는 "평일 기준 N일"로 일관되게 표기
+            const daysPending = weekdayDaysPending;
             const reminderCount = (data.reminderCount || 0) + 1;
 
             const manager = await getManagerForBranch(data.branchName, data.manager);
