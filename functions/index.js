@@ -471,39 +471,45 @@ function sendSensAlimtalk(to, inquiryId) {
     });
 }
 
-// ⏰ 미답변 경과 Slack 재알림 (테스트용: 1분 / 매 1분 실행)
+// ⏰ 미답변 경과 Slack 재알림
+// - **언제**: 매일 오전 9시(KST) 실행
+// - **대상**: status=pending 이고 createdAt 기준 3일 이상 지난 문의
+// - **중복 방지**: lastReminderAt 이후 3일 이내면 스킵
+// - **전송 방식**: 원본 Slack 알림이 있으면 thread에 댓글로 재알림, 없으면 새 메시지
 exports.remindPendingInquiries = functions.pubsub
-    .schedule("*/1 * * * *")
+    .schedule("0 9 * * *")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
         const now = admin.firestore.Timestamp.now();
-        const cutoffMs = 1 * 60 * 1000; // 1분
+        const cutoffMs = 3 * 24 * 60 * 60 * 1000; // 3일(밀리초)
         const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - cutoffMs);
 
-        // 미답변 문의 조회
-        // NOTE: status + createdAt 복합 where는 Firestore composite index가 필요합니다.
-        // 테스트/운영에서 인덱스 이슈로 막히지 않도록 createdAt 조건은 앱 레벨에서 필터링합니다.
+        // NOTE(Firestore 인덱스)
+        // - where('status','==','pending').where('createdAt','<=',cutoff) 조합은 composite index가 필요합니다.
+        // - 인덱스 미구성 시에도 함수가 멈추지 않도록, 여기서는 status로만 조회하고
+        //   createdAt 조건은 아래에서 앱 레벨 필터링합니다.
+        // - 데이터가 매우 커지면(=pending 문서가 많아지면) 인덱스를 만들고 쿼리로 되돌리는 것을 권장합니다.
         const snapshot = await admin.firestore()
             .collection(COLLECTION_NAME)
             .where("status", "==", "pending")
             .get();
 
         if (snapshot.empty) {
-            console.log("미답변 경과 문의 없음");
+            console.log("미답변 경과 문의 없음 (pending=0)");
             return null;
         }
 
         for (const docSnap of snapshot.docs) {
             const data = docSnap.data();
 
-            // ABP로 접수되지 않은 문의는 스킵
+            // ABP로 접수되지 않은 문의는 스킵 (요구사항: ABP 문의함 링크 포함)
             if (!data.abpInquiryId) continue;
 
-            // createdAt이 없거나 cutoff 이후면 스킵
+            // createdAt이 없거나(구 데이터) cutoff(3일) 이후면 스킵
             if (!data.createdAt || typeof data.createdAt.toMillis !== "function") continue;
             if (data.createdAt.toMillis() > cutoff.toMillis()) continue;
 
-            // 마지막 재알림 이후 cutoffMs 이내면 스킵 (중복 방지)
+            // 마지막 재알림 이후 cutoffMs(3일) 이내면 스킵 (중복 방지)
             if (data.lastReminderAt) {
                 const msSinceLast = now.toMillis() - data.lastReminderAt.toMillis();
                 if (msSinceLast < cutoffMs) continue;
