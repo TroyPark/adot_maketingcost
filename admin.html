@@ -9802,7 +9802,9 @@
                                             value={abpContent}
                                             onChange={(e) => setAbpContent(e.target.value)}
                                             placeholder="기획본부에 문의할 내용을 입력하세요"
+                                            maxLength={800}
                                         />
+                                        <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{abpContent.length}/800</div>
                                     </div>
                                 </div>
                                 <div className="modal-actions inquiry-abp-actions">
@@ -10477,7 +10479,9 @@
                                                 onChange={(e) => setReplyText(e.target.value)}
                                                 placeholder="답변 내용을 입력하세요"
                                                 className="abp-inquiry-reply-textarea"
+                                                maxLength={1000}
                                             />
+                                            <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{replyText.length}/1,000</div>
                                         </div>
 
                                         <div className="form-group">
@@ -12312,7 +12316,9 @@
                                                 value={replyText}
                                                 onChange={(e) => setReplyText(e.target.value)}
                                                 placeholder="답변 내용을 입력하세요"
+                                                maxLength={1000}
                                             />
+                                            <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{replyText.length}/1,000</div>
                                         </div>
 
                                         <div className="form-group">
@@ -12461,7 +12467,9 @@
                                             value={newInquiry.content}
                                             onChange={(e) => setNewInquiry({...newInquiry, content: e.target.value})}
                                             placeholder="문의 내용을 입력하세요"
+                                            maxLength={800}
                                         />
+                                        <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{newInquiry.content.length}/800</div>
                                     </div>
                                 </div>
                                 <div className="modal-actions abp-comm-new-modal-actions">

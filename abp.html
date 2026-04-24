@@ -629,9 +629,8 @@
                                             </td>
                                             <td style={{
                                                 maxWidth: '300px',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
+                                                wordBreak: 'break-word',
+                                                whiteSpace: 'normal'
                                             }}>
                                                 {inquiry.content}
                                             </td>
@@ -847,7 +846,9 @@
                                                 onChange={(e) => setReplyText(e.target.value)}
                                                 placeholder="답변 내용을 입력하세요"
                                                 style={{resize: 'vertical'}}
+                                                maxLength={1000}
                                             />
+                                            <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{replyText.length}/1,000</div>
                                         </div>
 
                                         <div className="form-group">
