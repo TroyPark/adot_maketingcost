@@ -348,12 +348,12 @@
                 let invPayload;
                 if (isManual) {
                     if (!detailManualTargetTeamId) {
-                        alert('담당 부서를 선택해주세요.');
+                        alert('담당부서를 선택해주세요.');
                         setSavingCategoryRoute(false);
                         return;
                     }
                     if (!isKnownAbpTargetTeam(detailManualTargetTeamId)) {
-                        alert('유효한 담당 부서를 선택해주세요.');
+                        alert('유효한 담당부서를 선택해주세요.');
                         setSavingCategoryRoute(false);
                         return;
                     }
@@ -498,8 +498,12 @@
 
                     // 2) 지점 원본 문의(inquiries) 동기화 — 사용자 화면은 inquiries만 구독함
                     if (selectedInquiry.originalInquiryId) {
+                        // targetTeam을 포함해야 지점 화면에서 담당부서 답변 표시 가능
+                        const inquiriesPayload = selectedInquiry.targetTeam
+                            ? { ...payload, targetTeam: selectedInquiry.targetTeam }
+                            : payload;
                         try {
-                            await db.collection('inquiries').doc(selectedInquiry.originalInquiryId).update(payload);
+                            await db.collection('inquiries').doc(selectedInquiry.originalInquiryId).update(inquiriesPayload);
                         } catch (syncErr) {
                             console.error('inquiries 동기화 오류:', syncErr);
                             alert(
@@ -742,7 +746,7 @@
                                                 {detailRouteMajorId === ABP_MANUAL_TEAM_MAJOR_ID ? (
                                                     <div className="abp-inquiry-category-field">
                                                         <label className="abp-inquiry-category-sublabel" htmlFor="abpDetailManualTeamSelect">
-                                                            담당 부서
+                                                            담당부서
                                                         </label>
                                                         <select
                                                             id="abpDetailManualTeamSelect"
@@ -939,6 +943,20 @@
                                         </div>
                                     </div>
                                 </div>
+                                {selectedInquiry?.reply && (
+                                    <div style={{
+                                        background: '#fff7ed',
+                                        border: '1px solid #fed7aa',
+                                        borderRadius: '8px',
+                                        padding: '10px 14px',
+                                        fontSize: '13px',
+                                        color: '#c2410c',
+                                        fontWeight: '500',
+                                        marginTop: '12px'
+                                    }}>
+                                        ⚠️ 답변 수정 시 문의자에게 별도의 알림은 발송되지 않습니다.
+                                    </div>
+                                )}
                                 <div className="modal-actions" style={{padding: '15px 0 0', borderTop: '1px solid #eee'}}>
                                     <button
                                         className="btn btn-secondary btn-sm"
@@ -952,7 +970,7 @@
                                         onClick={handleReply}
                                         disabled={isReplying}
                                     >
-                                        {isReplying ? '저장 중...' : '답변 저장'}
+                                        {isReplying ? '저장 중...' : (selectedInquiry?.reply ? '답변 수정' : '답변 등록')}
                                     </button>
                                 </div>
                             </div>
@@ -2171,7 +2189,7 @@
             return u.email || '';
         }
 
-        // 문의 유형 카테고리 · 담당 부서 (Firestore inquiryCategoryDefinitions 단일 소스)
+        // 문의 유형 · 담당부서 (Firestore inquiryCategoryDefinitions 단일 소스)
         function InquiryCategoryDeptPage({ user }) {
             const [rows, setRows] = useState([]);
             const [firestoreError, setFirestoreError] = useState(null);
@@ -2293,15 +2311,15 @@
             const handleSave = async () => {
                 const minor = formMinorLabel.trim();
                 if (!minor) {
-                    alert('문의 유형 카테고리 명을 입력해주세요.');
+                    alert('문의 유형명을 입력해주세요.');
                     return;
                 }
                 if (!formTargetTeam) {
-                    alert('담당 부서를 선택해주세요.');
+                    alert('담당부서를 선택해주세요.');
                     return;
                 }
                 if (!isKnownAbpTargetTeam(formTargetTeam)) {
-                    alert('유효한 담당 부서를 선택해주세요.');
+                    alert('유효한 담당부서를 선택해주세요.');
                     return;
                 }
 
@@ -2407,7 +2425,7 @@
             return (
                 <div>
                     <div className="page-header">
-                        <h2 className="page-title">담당 부서 / 문의 유형</h2>
+                        <h2 className="page-title">문의 유형별 담당부서</h2>
                     </div>
 
                     {firestoreError && (
@@ -2456,7 +2474,7 @@
                                     />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <label style={{ fontSize: '12px', color: '#64748b' }}>팀 / 부서</label>
+                                    <label style={{ fontSize: '12px', color: '#64748b' }}>담당부서</label>
                                     <select
                                         value={filterTeam}
                                         onChange={(e) => setFilterTeam(e.target.value)}
@@ -2518,7 +2536,7 @@
                         </div>
 
                         <div className="inquiry-category-section-head">
-                            <h3 className="section-title">문의 유형 카테고리 ({filteredRows.length}건)</h3>
+                            <h3 className="section-title">문의 유형 목록 ({filteredRows.length}건)</h3>
                             <button type="button" className="btn btn-sm" onClick={openAdd} style={{ background: '#10b981' }}>
                                 + 분류 추가
                             </button>
@@ -2534,8 +2552,8 @@
                                     <thead>
                                         <tr>
                                             <th style={{ width: '44px', textAlign: 'center' }}>No</th>
-                                            <th style={{ minWidth: '240px' }}>문의 유형 카테고리</th>
-                                            <th style={{ width: '140px' }}>담당 부서</th>
+                                            <th style={{ minWidth: '240px' }}>문의 유형</th>
+                                            <th style={{ width: '140px' }}>담당부서</th>
                                             <th style={{ width: '100px', textAlign: 'center' }}>상태</th>
                                             <th style={{ width: '100px' }}>최종 수정자</th>
                                             <th style={{ width: '150px' }}>생성일</th>
@@ -2627,7 +2645,7 @@
                                                 />
                                             </div>
                                             <div className="form-group">
-                                                <label>대분류 표시명 *</label>
+                                                <label>대분류명 *</label>
                                                 <input
                                                     type="text"
                                                     value={formBootstrapMajorLabel}
@@ -2649,7 +2667,7 @@
                                                         }
                                                         onClick={() => setAddMajorSource('existing')}
                                                     >
-                                                        기존 대분류
+                                                        중분류 추가
                                                     </button>
                                                     <button
                                                         type="button"
@@ -2659,13 +2677,13 @@
                                                         }
                                                         onClick={() => setAddMajorSource('new')}
                                                     >
-                                                        새 대분류
+                                                        대분류 생성
                                                     </button>
                                                 </div>
                                             </div>
                                             {addMajorSource === 'existing' ? (
                                                 <div className="form-group">
-                                                    <label>선택한 대분류</label>
+                                                    <label>대분류 선택</label>
                                                     <select
                                                         value={formMajorId}
                                                         onChange={(e) => setFormMajorId(e.target.value)}
@@ -2701,7 +2719,7 @@
                                                         />
                                                     </div>
                                                     <div className="form-group">
-                                                        <label>대분류 표시명 *</label>
+                                                        <label>대분류명 *</label>
                                                         <input
                                                             type="text"
                                                             value={formBootstrapMajorLabel}
@@ -2735,7 +2753,7 @@
                                         </div>
                                     )}
                                     <div className="form-group">
-                                        <label>문의 유형 카테고리 명 (중분류 표시) *</label>
+                                        <label>문의 유형명 (중분류) *</label>
                                         <input
                                             type="text"
                                             value={formMinorLabel}
@@ -2745,7 +2763,7 @@
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>담당 부서 *</label>
+                                        <label>담당부서 *</label>
                                         <select
                                             value={formTargetTeam}
                                             onChange={(e) => setFormTargetTeam(e.target.value)}
@@ -2871,7 +2889,7 @@
                             onClick={() => setCurrentPage('inquiry_category_dept')}
                         >
                             <Icons.DeptCategory />
-                            <span>담당 부서 / 문의 유형</span>
+                            <span>문의 유형별 담당부서</span>
                         </div>
 
                         <div className="nav-section-title" style={{marginTop: '20px'}}>시스템</div>

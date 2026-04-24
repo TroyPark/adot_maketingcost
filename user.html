@@ -86,6 +86,24 @@
         const ABP_EMAIL = 'abp@dshare.co.kr';
         const BIZ_MK_EMAILS = new Set(['biz_mk1@kogrop.co.kr', 'biz_mk2@kogrop.co.kr']);
 
+        const ABP_TEAM_BY_ID = {
+            biz_plan:     { name: '사업기획팀' },
+            sales_ops:    { name: '영업지원팀' },
+            hrd_academy:  { name: '학원HRD팀' },
+            eng_lab:      { name: '영어연구소' },
+            content_prod: { name: '콘텐츠제작팀' },
+            it_dev:       { name: 'IT본부' },
+            corp_admin:   { name: '경영지원팀' },
+            biz_mk1:      { name: '사업마케팅1팀' },
+            biz_mk2:      { name: '사업마케팅2팀' },
+            // 구 시스템
+            planning:     { name: '학원사업기획팀' },
+            marketing:    { name: '학원사업마케팅팀' },
+            hrd:          { name: '학원사업HRD팀' },
+            production:   { name: '콘텐츠제작팀' },
+            rnd:          { name: '콘텐츠R&D팀' }
+        };
+
         // 아이콘 컴포넌트
         const Icons = {
             Dashboard: () => (
@@ -650,24 +668,13 @@
 
                     {/* 예산 정보 */}
                     {currentRound && branchBudget > 0 && (
-                        <div style={{
-                            background: 'linear-gradient(135deg, #001236 0%, #002856 100%)',
-                            borderRadius: '12px',
-                            padding: '24px',
-                            marginBottom: '20px',
-                            color: 'white'
-                        }}>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '16px'
-                            }}>
+                        <div className="budget-card">
+                            <div className="budget-card-header">
                                 <div>
-                                    <h3 style={{fontSize: '14px', opacity: 0.9, marginBottom: '4px'}}>
+                                    <h3 className="budget-card-round-name">
                                         {currentRound.name}
                                     </h3>
-                                    <p style={{fontSize: '12px', opacity: 0.7}}>
+                                    <p className="budget-card-round-date">
                                         {currentRound.startDate} ~ {currentRound.endDate}
                                     </p>
                                 </div>
@@ -683,13 +690,7 @@
                             </div>
 
                             {/* 프로그레스 바 */}
-                            <div style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                borderRadius: '10px',
-                                height: '12px',
-                                marginBottom: '16px',
-                                overflow: 'hidden'
-                            }}>
+                            <div className="budget-progress-track">
                                 <div style={{
                                     width: `${Math.min((totalSpent / branchBudget) * 100, 100)}%`,
                                     height: '100%',
@@ -698,21 +699,21 @@
                                 }} />
                             </div>
 
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px'}}>
+                            <div className="budget-stats-grid">
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 비용</div>
-                                    <div style={{fontSize: '20px', fontWeight: '700'}}>
+                                    <div className="budget-stat-label">배정 비용</div>
+                                    <div className="budget-stat-value">
                                         ₩{branchBudget.toLocaleString()}
                                     </div>
                                 </div>
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>사용 비용</div>
-                                    <div style={{fontSize: '20px', fontWeight: '700'}}>
+                                    <div className="budget-stat-label">사용 비용</div>
+                                    <div className="budget-stat-value">
                                         ₩{totalSpent.toLocaleString()}
                                     </div>
                                 </div>
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 비용</div>
+                                    <div className="budget-stat-label">잔여 비용</div>
                                     <div style={{
                                         fontSize: '20px',
                                         fontWeight: '700',
@@ -724,17 +725,7 @@
                             </div>
 
                             {remainingBudget < myTotalAmount && myTotalAmount > 0 && (
-                                <div style={{
-                                    marginTop: '16px',
-                                    padding: '12px 16px',
-                                    background: 'rgba(254, 202, 202, 0.2)',
-                                    borderRadius: '8px',
-                                    fontSize: '13px',
-                                    border: '1px solid rgba(254, 202, 202, 0.3)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}>
+                                <div className="budget-warning">
                                     <span>⚠️</span>
                                     툴킷 신청 금액이 잔여 예산을 초과합니다!
                                 </div>
@@ -743,16 +734,9 @@
                     )}
 
                     {/* 안내 사항 */}
-                    <div style={{
-                        marginBottom: '20px',
-                        padding: '20px',
-                        background: 'white',
-                        borderRadius: '10px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                        border: '1px solid #e5e7eb'
-                    }}>
-                        <h4 style={{fontSize: '14px', marginBottom: '12px', color: '#001236', fontWeight: '600'}}>📌 안내사항</h4>
-                        <ul style={{fontSize: '13px', color: '#666', lineHeight: '1.8', paddingLeft: '20px', margin: 0}}>
+                    <div className="toolkit-notice-box">
+                        <h4 className="toolkit-notice-title">📌 안내사항</h4>
+                        <ul className="toolkit-notice-list">
                             <li><strong>전체 지점의 주문 합계</strong>에 따라 개당 단가가 결정됩니다.</li>
                             <li>다른 지점의 신청 현황을 확인하여 <strong>예상 단가</strong>를 참고하세요.</li>
                             <li><strong style={{color: '#dc2626'}}>배송비는 별도로 청구됩니다.</strong></li>
@@ -763,24 +747,14 @@
 
                     {/* 내 주문 총 금액 */}
                     {myTotalAmount > 0 && (
-                        <div style={{
-                            marginBottom: '20px',
-                            padding: '20px',
-                            background: 'white',
-                            borderRadius: '10px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                            border: '1px solid #e5e7eb',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                        }}>
+                        <div className="toolkit-total-card">
                             <div>
-                                <div style={{fontSize: '13px', color: '#666', marginBottom: '6px'}}>내 지점 예상 총 금액</div>
-                                <div style={{fontSize: '26px', fontWeight: '700', color: '#f07c00'}}>
+                                <div className="toolkit-total-label">내 지점 예상 총 금액</div>
+                                <div className="toolkit-total-amount">
                                     {myTotalAmount.toLocaleString()}원
                                 </div>
                             </div>
-                            <div style={{fontSize: '12px', color: '#999', textAlign: 'right'}}>
+                            <div className="toolkit-total-note">
                                 (배송비 별도)
                             </div>
                         </div>
@@ -793,7 +767,7 @@
                                 <p>등록된 툴킷이 없습니다.</p>
                             </div>
                         ) : (
-                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px'}}>
+                            <div className="toolkit-grid">
                                 {toolkits.map(toolkit => {
                                 const totalQty = getTotalOrderQty(toolkit.id);
                                 const myQty = Number(myOrders[toolkit.id]?.quantity || 0);
@@ -801,40 +775,15 @@
                                 const myAmount = myQty * pricePerUnit;
 
                                 return (
-                                    <div key={toolkit.id} style={{
-                                        padding: '30px',
-                                        background: 'white',
-                                        borderRadius: '10px',
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                                        border: '1px solid #e5e7eb',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        transition: 'all 0.3s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-                                    }}>
+                                    <div key={toolkit.id} className="toolkit-card">
                                         {/* 이미지 */}
-                                        <div style={{textAlign: 'center', marginBottom: '15px'}}>
+                                        <div className="toolkit-image-center">
                                             {toolkit.imageUrl ? (
-                                                <div style={{position: 'relative', display: 'inline-block'}}>
+                                                <div className="toolkit-image-wrapper">
                                                     <img
                                                         src={toolkit.imageUrl}
                                                         alt={toolkit.name}
-                                                        style={{
-                                                            width: '100%',
-                                                            maxWidth: '360px',
-                                                            height: 'auto',
-                                                            aspectRatio: '360/450',
-                                                            objectFit: 'cover',
-                                                            borderRadius: '8px',
-                                                            border: '2px solid #ddd'
-                                                        }}
+                                                        className="toolkit-image"
                                                     />
                                                     {/* D-day 배지 */}
                                                     {toolkit.dueDate && (() => {
@@ -862,70 +811,52 @@
                                                             </div>
                                                         );
                                                     })()}
-                                                    <div style={{
-                                                        fontSize: '11px',
-                                                        color: '#999',
-                                                        marginTop: '6px',
-                                                        fontStyle: 'italic'
-                                                    }}>
+                                                    <div className="toolkit-image-caption">
                                                         #예시 이미지입니다.
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div style={{
-                                                    width: '100%',
-                                                    maxWidth: '360px',
-                                                    aspectRatio: '360/450',
-                                                    background: '#f3f4f6',
-                                                    borderRadius: '8px',
-                                                    border: '2px solid #ddd',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: '13px',
-                                                    color: '#9ca3af',
-                                                    margin: '0 auto'
-                                                }}>
+                                                <div className="toolkit-no-image">
                                                     이미지 없음
                                                 </div>
                                             )}
                                         </div>
 
                                         {/* 툴킷 이름 */}
-                                        <h3 style={{fontSize: '16px', fontWeight: '700', color: '#001236', marginBottom: '10px', textAlign: 'center', minHeight: '48px', lineHeight: '1.5', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                        <h3 className="toolkit-name">
                                             {toolkit.name}
                                         </h3>
 
                                         {/* 설명 */}
                                         {toolkit.description && (
-                                            <div style={{fontSize: '13px', color: '#666', marginBottom: '12px', textAlign: 'center', lineHeight: '1.6', padding: '0 10px', whiteSpace: 'pre-wrap'}}>
+                                            <div className="toolkit-description">
                                                 {toolkit.description}
                                             </div>
                                         )}
 
                                         {/* 주문 완료 표시 */}
-                                        <div style={{fontSize: '12px', color: '#16a34a', marginBottom: '10px', textAlign: 'center', minHeight: '18px'}}>
+                                        <div className="toolkit-order-complete">
                                             {myOrders[toolkit.id]?.id && '✓ 주문 완료'}
                                         </div>
 
                                         {/* 전체 현황 */}
                                         <div style={{display: 'grid', gridTemplateColumns: toolkit.showTotalOrders !== false ? '1fr 1fr' : '1fr', gap: '10px', alignItems: 'start', marginBottom: '15px'}}>
                                             {toolkit.showTotalOrders !== false && (
-                                                <div style={{padding: '12px', background: '#f9fafb', borderRadius: '8px', textAlign: 'center', border: '1px solid #e5e7eb'}}>
-                                                    <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>전 지점 현재 주문 수량 합계</div>
-                                                    <div style={{fontSize: '16px', fontWeight: '700', color: '#001236'}}>{totalQty.toLocaleString()}개</div>
+                                                <div className="toolkit-info-box">
+                                                    <div className="toolkit-info-label">전 지점 현재 주문 수량 합계</div>
+                                                    <div className="toolkit-info-value">{totalQty.toLocaleString()}개</div>
                                                 </div>
                                             )}
-                                            <div style={{padding: '12px', background: '#fff7ed', borderRadius: '8px', textAlign: 'center', border: '1px solid #fed7aa'}}>
-                                                <div style={{fontSize: '11px', color: '#666', marginBottom: '4px'}}>현재 개당 단가</div>
-                                                <div style={{fontSize: '16px', fontWeight: '700', color: '#f07c00'}}>{pricePerUnit.toLocaleString()}원</div>
+                                            <div className="toolkit-info-box-orange">
+                                                <div className="toolkit-info-label">현재 개당 단가</div>
+                                                <div className="toolkit-info-value-orange">{pricePerUnit.toLocaleString()}원</div>
                                             </div>
                                         </div>
 
                                         {/* 가격 구간 */}
-                                        <div style={{marginBottom: '15px', padding: '12px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb'}}>
-                                            <div style={{fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#001236'}}>가격 구간</div>
-                                            <div style={{fontSize: '11px', lineHeight: '1.7'}}>
+                                        <div className="toolkit-price-range-box">
+                                            <div className="toolkit-price-range-title">가격 구간</div>
+                                            <div className="toolkit-price-range-list">
                                                 {toolkit.priceRanges && toolkit.priceRanges.map((range, idx) => (
                                                     <div
                                                         key={idx}
@@ -942,15 +873,8 @@
 
                                         {/* 주문 제한 안내 */}
                                         {(toolkit.minOrderQty || toolkit.orderUnit) && (
-                                            <div style={{
-                                                padding: '10px',
-                                                background: '#fef3c7',
-                                                border: '1px solid #fcd34d',
-                                                borderRadius: '6px',
-                                                marginBottom: '12px',
-                                                textAlign: 'center'
-                                            }}>
-                                                <div style={{fontSize: '11px', color: '#92400e', fontWeight: '600', display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                            <div className="toolkit-order-limit">
+                                                <div className="toolkit-order-limit-text">
                                                     {toolkit.minOrderQty && (
                                                         <div>⚠️ 최소 주문 수량: {toolkit.minOrderQty.toLocaleString()}개</div>
                                                     )}
@@ -970,31 +894,23 @@
                                                 onChange={(e) => handleQuantityChange(toolkit.id, e.target.value)}
                                                 placeholder="0"
                                                 min="0"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    border: '1px solid #ddd',
-                                                    borderRadius: '6px',
-                                                    fontSize: '14px',
-                                                    textAlign: 'center'
-                                                }}
+                                                className="toolkit-qty-input"
                                             />
                                         </div>
 
                                         {/* 예상 금액 */}
-                                        <div style={{padding: '14px', background: '#fff7ed', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', border: '1px solid #fed7aa'}}>
-                                            <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>예상 금액</div>
-                                            <div style={{fontSize: '20px', fontWeight: '700', color: '#f07c00'}}>
+                                        <div className="toolkit-estimate-box">
+                                            <div className="toolkit-estimate-label">예상 금액</div>
+                                            <div className="toolkit-estimate-amount">
                                                 {myAmount.toLocaleString()}원
                                             </div>
                                         </div>
 
                                         {/* 버튼 영역 */}
-                                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                        <div className="toolkit-btn-area">
                                             {/* 저장 버튼 */}
                                             <button
-                                                className="btn"
-                                                style={{background: '#f07c00', width: '100%', padding: '12px', fontSize: '14px', fontWeight: '600'}}
+                                                className="btn toolkit-save-btn"
                                                 onClick={() => handleSaveOrder(toolkit)}
                                             >
                                                 💾 저장
@@ -1003,16 +919,7 @@
                                             {/* 신청 취소 버튼 - 기존 주문이 있을 때만 표시 */}
                                             {myOrders[toolkit.id]?.id && (
                                                 <button
-                                                    className="btn"
-                                                    style={{
-                                                        background: 'white',
-                                                        border: '2px solid #e94560',
-                                                        color: '#e94560',
-                                                        width: '100%',
-                                                        padding: '12px',
-                                                        fontSize: '14px',
-                                                        fontWeight: '600'
-                                                    }}
+                                                    className="btn toolkit-cancel-btn"
                                                     onClick={() => handleCancelOrder(toolkit)}
                                                 >
                                                     ✕ 신청 취소
@@ -1460,7 +1367,7 @@
 
             if (loading) {
                 return (
-                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
+                    <div className="loading-center">
                         <p>비용 목록을 불러오는 중...</p>
                     </div>
                 );
@@ -1475,24 +1382,13 @@
 
                     {/* Round 배정 비용 카드 */}
                     {currentRound && branchBudget > 0 && (
-                        <div style={{
-                            background: 'linear-gradient(135deg, #001236 0%, #002856 100%)',
-                            borderRadius: '12px',
-                            padding: '24px',
-                            marginBottom: '20px',
-                            color: 'white'
-                        }}>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '16px'
-                            }}>
+                        <div className="budget-card">
+                            <div className="budget-card-header">
                                 <div>
-                                    <h3 style={{fontSize: '14px', opacity: 0.9, marginBottom: '4px'}}>
+                                    <h3 className="budget-card-round-name">
                                         {currentRound.name}
                                     </h3>
-                                    <p style={{fontSize: '12px', opacity: 0.7}}>
+                                    <p className="budget-card-round-date">
                                         {currentRound.startDate} ~ {currentRound.endDate}
                                     </p>
                                 </div>
@@ -1508,13 +1404,7 @@
                             </div>
 
                             {/* 프로그레스 바 */}
-                            <div style={{
-                                background: 'rgba(255,255,255,0.2)',
-                                borderRadius: '10px',
-                                height: '12px',
-                                marginBottom: '16px',
-                                overflow: 'hidden'
-                            }}>
+                            <div className="budget-progress-track">
                                 <div style={{
                                     width: `${Math.min((getRoundUsedAmount() / branchBudget) * 100, 100)}%`,
                                     height: '100%',
@@ -1523,17 +1413,17 @@
                                 }} />
                             </div>
 
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px'}}>
+                            <div className="budget-stats-grid">
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>배정 비용</div>
-                                    <div style={{fontSize: '20px', fontWeight: '700'}}>{formatAmount(branchBudget)}</div>
+                                    <div className="budget-stat-label">배정 비용</div>
+                                    <div className="budget-stat-value">{formatAmount(branchBudget)}</div>
                                 </div>
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>사용 비용</div>
-                                    <div style={{fontSize: '20px', fontWeight: '700'}}>{formatAmount(getRoundUsedAmount())}</div>
+                                    <div className="budget-stat-label">사용 비용</div>
+                                    <div className="budget-stat-value">{formatAmount(getRoundUsedAmount())}</div>
                                 </div>
                                 <div>
-                                    <div style={{fontSize: '12px', opacity: 0.8, marginBottom: '4px'}}>잔여 비용</div>
+                                    <div className="budget-stat-label">잔여 비용</div>
                                     <div style={{
                                         fontSize: '20px',
                                         fontWeight: '700',
@@ -1563,7 +1453,7 @@
 
                     <div className="content-area">
                         <div className="table-header">
-                            <h3 className="section-title" style={{marginBottom: 0}}>비용 목록</h3>
+                            <h3 className="section-title section-title-no-mb">비용 목록</h3>
                             <button className="btn" onClick={() => setIsDrawerOpen(true)}>
                                 + 비용 등록
                             </button>
@@ -1576,7 +1466,7 @@
                                     <path d="M12 11v6M9 14h6"/>
                                 </svg>
                                 <p>등록된 비용이 없습니다.</p>
-                                <p style={{marginTop: '8px', color: '#bbb'}}>위의 '비용 등록' 버튼을 클릭하여 비용을 추가하세요.</p>
+                                <p className="empty-hint">위의 '비용 등록' 버튼을 클릭하여 비용을 추가하세요.</p>
                             </div>
                         ) : (
                             <>
@@ -1606,12 +1496,12 @@
                                                     style={{width: '18px', height: '18px', cursor: 'pointer'}}
                                                 />
                                             </th> */}
-                                            <th style={{textAlign: 'center'}}>날짜</th>
-                                            <th style={{textAlign: 'center'}}>항목</th>
-                                            <th style={{textAlign: 'center'}}>금액</th>
-                                            <th style={{textAlign: 'center'}}>설명</th>
-                                            <th style={{width: '80px', textAlign: 'center'}}>증빙</th>
-                                            <th style={{width: '80px', textAlign: 'center'}}>집행여부</th>
+                                            <th className="th-center">날짜</th>
+                                            <th className="th-center">항목</th>
+                                            <th className="th-center">금액</th>
+                                            <th className="th-center">설명</th>
+                                            <th className="th-w80">증빙</th>
+                                            <th className="th-w80">집행여부</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1639,25 +1529,17 @@
                                                         />
                                                     )}
                                                 </td> */}
-                                                <td style={{textAlign: 'center'}}>{formatDate(cost.date)}</td>
-                                                <td style={{textAlign: 'center'}}>
+                                                <td className="td-center">{formatDate(cost.date)}</td>
+                                                <td className="td-center">
                                                     <span className={`category-badge ${categories[cost.category]?.className}`}>
                                                         {categories[cost.category]?.label || cost.category}
                                                     </span>
                                                 </td>
-                                                <td className="amount" style={{textAlign: 'center'}}>{formatAmount(cost.amount)}</td>
+                                                <td className="amount td-center">{formatAmount(cost.amount)}</td>
                                                 <td>{cost.description || '-'}</td>
-                                                <td style={{textAlign: 'center'}}>
+                                                <td className="td-center">
                                                     {cost.canVerifyAtHQ ? (
-                                                        <span style={{
-                                                            background: '#fff3e0',
-                                                            color: '#f07c00',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '12px',
-                                                            fontWeight: '600',
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
+                                                        <span className="hq-proof-badge">
                                                             📋 본사증빙
                                                         </span>
                                                     ) : cost.images && cost.images.length > 0 ? (
@@ -1668,10 +1550,10 @@
                                                             📷 {cost.images.length}
                                                         </button>
                                                     ) : (
-                                                        <span style={{color: '#999', fontSize: '12px'}}>-</span>
+                                                        <span className="no-proof-text">-</span>
                                                     )}
                                                 </td>
-                                                <td style={{textAlign: 'center'}}>
+                                                <td className="td-center">
                                                     <span style={{
                                                         background: cost.isExecuted ? '#e3f2fd' : '#f5f5f5',
                                                         color: cost.isExecuted ? '#1976d2' : '#666',
@@ -1702,7 +1584,7 @@
                                 </div>
                                 <form onSubmit={handleConfirmDelete}>
                                     <div className="modal-body">
-                                        <p style={{marginBottom: '15px', color: '#666'}}>
+                                        <p className="delete-confirm-text">
                                             선택한 <strong style={{color: '#dc3545'}}>{selectedCosts.length}개</strong> 항목을 삭제하려면 비밀번호를 입력하세요.
                                         </p>
                                         <div className="form-group">
@@ -1795,17 +1677,9 @@
                         <form onSubmit={handleSubmit}>
                             <div className="drawer-content">
                                 {/* 지점명 표시 */}
-                                <div style={{
-                                    background: 'linear-gradient(135deg, #f07c00 0%, #ff9a3c 100%)',
-                                    color: 'white',
-                                    padding: '16px 20px',
-                                    borderRadius: '10px',
-                                    marginBottom: '24px',
-                                    textAlign: 'center',
-                                    boxShadow: '0 4px 15px rgba(240, 124, 0, 0.3)'
-                                }}>
-                                    <div style={{fontSize: '12px', opacity: 0.9, marginBottom: '4px'}}>등록 지점</div>
-                                    <div style={{fontSize: '18px', fontWeight: '700'}}>
+                                <div className="branch-display-card">
+                                    <div className="branch-display-label">등록 지점</div>
+                                    <div className="branch-display-name">
                                         {userInfo?.branchName || '지점 미설정'}
                                     </div>
                                 </div>
@@ -1835,7 +1709,7 @@
                                             onChange={handleAmountChange}
                                             required
                                             inputMode="numeric"
-                                            style={{textAlign: 'right'}}
+                                            className="input-right"
                                         />
                                     </div>
                                     <div className="form-group">
@@ -1862,12 +1736,7 @@
                                         <label>증빙 방식 선택 <span className="required">*</span></label>
 
                                         {/* 증빙 방식 체크박스 */}
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: '1fr 1fr',
-                                            gap: '12px',
-                                            marginBottom: '20px'
-                                        }}>
+                                        <div className="verify-type-grid">
                                             {/* 지점 증빙 */}
                                             <div
                                                 onClick={() => setVerifyType('branch')}
@@ -1881,38 +1750,20 @@
                                                     textAlign: 'center'
                                                 }}
                                             >
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '8px',
-                                                    marginBottom: '8px'
-                                                }}>
+                                                <div className="verify-type-header">
                                                     <input
                                                         type="checkbox"
                                                         checked={verifyType === 'branch'}
                                                         onChange={() => setVerifyType('branch')}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        style={{
-                                                            width: '20px',
-                                                            height: '20px',
-                                                            cursor: 'pointer',
-                                                            accentColor: '#1976d2'
-                                                        }}
+                                                        className="verify-type-checkbox"
+                                                        style={{accentColor: '#1976d2'}}
                                                     />
-                                                    <span style={{
-                                                        fontSize: '16px',
-                                                        fontWeight: '700',
-                                                        color: verifyType === 'branch' ? '#1976d2' : '#666'
-                                                    }}>
+                                                    <span className="verify-type-label" style={{color: verifyType === 'branch' ? '#1976d2' : '#666'}}>
                                                         📷 지점 증빙
                                                     </span>
                                                 </div>
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    color: verifyType === 'branch' ? '#1565c0' : '#999',
-                                                    lineHeight: '1.4'
-                                                }}>
+                                                <div className="verify-type-desc" style={{color: verifyType === 'branch' ? '#1565c0' : '#999'}}>
                                                     이미지 3~5장 업로드
                                                 </div>
                                             </div>
@@ -1930,38 +1781,20 @@
                                                     textAlign: 'center'
                                                 }}
                                             >
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '8px',
-                                                    marginBottom: '8px'
-                                                }}>
+                                                <div className="verify-type-header">
                                                     <input
                                                         type="checkbox"
                                                         checked={verifyType === 'hq'}
                                                         onChange={() => setVerifyType('hq')}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        style={{
-                                                            width: '20px',
-                                                            height: '20px',
-                                                            cursor: 'pointer',
-                                                            accentColor: '#f07c00'
-                                                        }}
+                                                        className="verify-type-checkbox"
+                                                        style={{accentColor: '#f07c00'}}
                                                     />
-                                                    <span style={{
-                                                        fontSize: '16px',
-                                                        fontWeight: '700',
-                                                        color: verifyType === 'hq' ? '#f07c00' : '#666'
-                                                    }}>
+                                                    <span className="verify-type-label" style={{color: verifyType === 'hq' ? '#f07c00' : '#666'}}>
                                                         📋 본사 증빙
                                                     </span>
                                                 </div>
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    color: verifyType === 'hq' ? '#e65100' : '#999',
-                                                    lineHeight: '1.4'
-                                                }}>
+                                                <div className="verify-type-desc" style={{color: verifyType === 'hq' ? '#e65100' : '#999'}}>
                                                     이미지 없이 등록
                                                 </div>
                                             </div>
@@ -1996,7 +1829,7 @@
                                                             accept="image/jpeg, image/png"
                                                             onChange={handleImageChange}
                                                             multiple
-                                                            style={{display: 'none'}}
+                                                            className="visually-hidden"
                                                         />
                                                         <svg className="image-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -2017,15 +1850,7 @@
 
                                         {/* 본사 증빙 선택 시 안내 메시지 */}
                                         {verifyType === 'hq' && (
-                                            <div style={{
-                                                padding: '16px',
-                                                background: '#fff3e0',
-                                                border: '1px solid #ffb74d',
-                                                borderRadius: '8px',
-                                                fontSize: '14px',
-                                                color: '#e65100',
-                                                lineHeight: '1.6'
-                                            }}>
+                                            <div className="hq-verify-notice">
                                                 ✓ 본사에서 증빙 가능한 비용입니다.<br/>
                                                 이미지 없이 등록됩니다.
                                             </div>
@@ -2376,7 +2201,7 @@
                             <h2 className="page-title">대시보드</h2>
                         </div>
                         <div className="content-area">
-                            <p style={{color: '#666'}}>지점 정보가 설정되지 않았습니다. 설정 페이지에서 지점명을 등록해주세요.</p>
+                            <p className="info-missing-text">지점 정보가 설정되지 않았습니다. 설정 페이지에서 지점명을 등록해주세요.</p>
                         </div>
                     </div>
                 );
@@ -2413,47 +2238,19 @@
                             {activeTab === 'overview' && (
                                 <div>
                                     {/* 날짜 선택 */}
-                                    <div style={{marginBottom: '20px'}}>
-                                        <div style={{display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
-                                            <label style={{fontWeight: '600'}}>기준 날짜:</label>
+                                    <div className="dashboard-date-picker">
+                                        <div className="dashboard-date-row">
+                                            <label className="dashboard-date-label">기준 날짜:</label>
                                             <input
                                                 type="date"
                                                 value={selectedDate}
                                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                                style={{
-                                                    padding: '8px 12px',
-                                                    borderRadius: '6px',
-                                                    border: '2px solid #e0e0e0',
-                                                    fontSize: '14px'
-                                                }}
+                                                className="dashboard-date-input"
                                             />
-                                            <div style={{
-                                                display: 'flex',
-                                                gap: '8px',
-                                                marginLeft: '15px',
-                                                flexWrap: 'wrap'
-                                            }}>
+                                            <div className="dashboard-quick-btns">
                                                 <button
                                                     onClick={() => setSelectedDate(getYesterdayStr())}
-                                                    style={{
-                                                        padding: '6px 14px',
-                                                        background: '#f3f4f6',
-                                                        color: '#374151',
-                                                        border: '1px solid #d1d5db',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        fontWeight: '500',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.target.style.background = '#e5e7eb';
-                                                        e.target.style.borderColor = '#9ca3af';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.target.style.background = '#f3f4f6';
-                                                        e.target.style.borderColor = '#d1d5db';
-                                                    }}
+                                                    className="dashboard-quick-btn"
                                                 >
                                                     어제
                                                 </button>
@@ -2466,25 +2263,7 @@
                                                         const day = String(date.getDate()).padStart(2, '0');
                                                         setSelectedDate(`${year}-${month}-${day}`);
                                                     }}
-                                                    style={{
-                                                        padding: '6px 14px',
-                                                        background: '#f3f4f6',
-                                                        color: '#374151',
-                                                        border: '1px solid #d1d5db',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        fontWeight: '500',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.target.style.background = '#e5e7eb';
-                                                        e.target.style.borderColor = '#9ca3af';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.target.style.background = '#f3f4f6';
-                                                        e.target.style.borderColor = '#d1d5db';
-                                                    }}
+                                                    className="dashboard-quick-btn"
                                                 >
                                                     7일 전
                                                 </button>
@@ -2499,25 +2278,7 @@
                                                         const day = String(prevMonth.getDate()).padStart(2, '0');
                                                         setSelectedDate(`${year}-${month}-${day}`);
                                                     }}
-                                                    style={{
-                                                        padding: '6px 14px',
-                                                        background: '#f3f4f6',
-                                                        color: '#374151',
-                                                        border: '1px solid #d1d5db',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        fontWeight: '500',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.target.style.background = '#e5e7eb';
-                                                        e.target.style.borderColor = '#9ca3af';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.target.style.background = '#f3f4f6';
-                                                        e.target.style.borderColor = '#d1d5db';
-                                                    }}
+                                                    className="dashboard-quick-btn"
                                                 >
                                                     전 월 동일
                                                 </button>
@@ -2532,37 +2293,19 @@
                                                         const day = String(prevYear.getDate()).padStart(2, '0');
                                                         setSelectedDate(`${year}-${month}-${day}`);
                                                     }}
-                                                    style={{
-                                                        padding: '6px 14px',
-                                                        background: '#f3f4f6',
-                                                        color: '#374151',
-                                                        border: '1px solid #d1d5db',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        fontWeight: '500',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.target.style.background = '#e5e7eb';
-                                                        e.target.style.borderColor = '#9ca3af';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.target.style.background = '#f3f4f6';
-                                                        e.target.style.borderColor = '#d1d5db';
-                                                    }}
+                                                    className="dashboard-quick-btn"
                                                 >
                                                     전 년 동일
                                                 </button>
                                             </div>
                                         </div>
-                                        <div style={{fontSize: '13px', color: '#666', paddingLeft: '85px', marginTop: '8px'}}>
+                                        <div className="dashboard-date-hint">
                                             * 선택한 날짜의 데이터와 최근 30일 추세를 표시합니다
                                         </div>
                                     </div>
 
                                     {/* 통계 카드 */}
-                                    <div className="stats-grid" style={{marginBottom: '30px'}}>
+                                    <div className="stats-grid stats-grid-mb">
                                         <div className="stat-card">
                                             <h3>재원생수</h3>
                                             <div className="value" style={{color: '#3b82f6'}}>{selectedData.students.toLocaleString()}</div>
@@ -2581,9 +2324,9 @@
                                     </div>
 
                                     {/* 추세 차트 */}
-                                    <div className="chart-container" style={{marginBottom: '30px'}}>
-                                        <h3 style={{marginBottom: '20px', color: '#001236'}}>최근 30일 추세</h3>
-                                        <div style={{height: '400px', position: 'relative'}}>
+                                    <div className="chart-container chart-container-mb">
+                                        <h3 className="chart-title">최근 30일 추세</h3>
+                                        <div className="chart-canvas-wrapper">
                                             <canvas ref={chartRefs.trend}></canvas>
                                         </div>
                                     </div>
@@ -2593,42 +2336,32 @@
                             {activeTab === 'compare' && (
                                 <div>
                                     {/* 날짜 선택 */}
-                                    <div style={{marginBottom: '30px'}}>
-                                        <div style={{display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px'}}>
+                                    <div className="compare-date-section">
+                                        <div className="compare-date-row">
                                             <div>
-                                                <label style={{display: 'block', marginBottom: '8px', fontWeight: '600'}}>기간 A:</label>
+                                                <label className="compare-date-label">기간 A:</label>
                                                 <input
                                                     type="date"
                                                     value={dateA}
                                                     onChange={(e) => setDateA(e.target.value)}
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        borderRadius: '6px',
-                                                        border: '2px solid #e0e0e0',
-                                                        fontSize: '14px'
-                                                    }}
+                                                    className="compare-date-input"
                                                 />
                                             </div>
                                             <div>
-                                                <label style={{display: 'block', marginBottom: '8px', fontWeight: '600'}}>기간 B:</label>
+                                                <label className="compare-date-label">기간 B:</label>
                                                 <input
                                                     type="date"
                                                     value={dateB}
                                                     onChange={(e) => setDateB(e.target.value)}
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        borderRadius: '6px',
-                                                        border: '2px solid #e0e0e0',
-                                                        fontSize: '14px'
-                                                    }}
+                                                    className="compare-date-input"
                                                 />
                                             </div>
                                         </div>
-                                        <div style={{marginBottom: '15px'}}>
-                                            <div style={{fontSize: '13px', fontWeight: '600', color: '#666', marginBottom: '8px'}}>
+                                        <div className="compare-quick-section">
+                                            <div className="compare-quick-label">
                                                 빠른 비교
                                             </div>
-                                            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                                            <div className="compare-quick-btns">
                                                 <button
                                                     onClick={() => {
                                                         const yesterday = getYesterdayStr();
@@ -2642,25 +2375,7 @@
                                                         setDateA(lastYearDate);
                                                         setDateB(yesterday);
                                                     }}
-                                                    style={{
-                                                        padding: '8px 16px',
-                                                        border: '1px solid #3b82f6',
-                                                        background: 'white',
-                                                        color: '#3b82f6',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: '500',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.currentTarget.style.background = '#3b82f6';
-                                                        e.currentTarget.style.color = 'white';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.currentTarget.style.background = 'white';
-                                                        e.currentTarget.style.color = '#3b82f6';
-                                                    }}
+                                                    className="compare-btn-blue"
                                                 >
                                                     📊 전년 동기 대비
                                                 </button>
@@ -2677,25 +2392,7 @@
                                                         setDateA(weekAgo);
                                                         setDateB(yesterday);
                                                     }}
-                                                    style={{
-                                                        padding: '8px 16px',
-                                                        border: '1px solid #10b981',
-                                                        background: 'white',
-                                                        color: '#10b981',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: '500',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.currentTarget.style.background = '#10b981';
-                                                        e.currentTarget.style.color = 'white';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.currentTarget.style.background = 'white';
-                                                        e.currentTarget.style.color = '#10b981';
-                                                    }}
+                                                    className="compare-btn-green"
                                                 >
                                                     📅 주간 비교 (7일 전)
                                                 </button>
@@ -2712,38 +2409,13 @@
                                                         setDateA(monthAgo);
                                                         setDateB(yesterday);
                                                     }}
-                                                    style={{
-                                                        padding: '8px 16px',
-                                                        border: '1px solid #f59e0b',
-                                                        background: 'white',
-                                                        color: '#f59e0b',
-                                                        borderRadius: '6px',
-                                                        fontSize: '13px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: '500',
-                                                        transition: 'all 0.2s'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.currentTarget.style.background = '#f59e0b';
-                                                        e.currentTarget.style.color = 'white';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.currentTarget.style.background = 'white';
-                                                        e.currentTarget.style.color = '#f59e0b';
-                                                    }}
+                                                    className="compare-btn-amber"
                                                 >
                                                     📆 월간 비교 (30일 전)
                                                 </button>
                                             </div>
                                         </div>
-                                        <div style={{
-                                            fontSize: '13px',
-                                            color: '#666',
-                                            padding: '10px 15px',
-                                            background: '#f9fafb',
-                                            borderRadius: '4px',
-                                            borderLeft: '3px solid #3b82f6'
-                                        }}>
+                                        <div className="compare-hint-box">
                                             💡 B 날짜와 A 날짜의 재원생수, 등록수, 퇴원수를 비교합니다
                                         </div>
                                     </div>
@@ -2777,157 +2449,95 @@
                                         return (
                                             <>
                                                 {/* 비교 결과 카드 */}
-                                                <div style={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: 'repeat(3, 1fr)',
-                                                    gap: '20px',
-                                                    marginBottom: '20px'
-                                                }}>
+                                                <div className="compare-cards-grid">
                                                     {/* 재원생수 비교 */}
-                                                    <div style={{
-                                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                                        padding: '25px',
-                                                        borderRadius: '12px',
-                                                        color: 'white',
-                                                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
-                                                    }}>
-                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                    <div className="compare-card-students">
+                                                        <div className="compare-card-title">
                                                             재원생수 비교
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                        <div className="compare-card-values">
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">A ({dateA})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataA.students.toLocaleString()}
                                                                 </div>
                                                             </div>
-                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div className="compare-card-arrow">→</div>
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">B ({dateB})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataB.students.toLocaleString()}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div style={{
-                                                            marginTop: '20px',
-                                                            paddingTop: '18px',
-                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
-                                                            <div style={{
-                                                                fontSize: '24px',
-                                                                fontWeight: '700'
-                                                            }}>
+                                                        <div className="compare-card-divider">
+                                                            <div className="compare-card-diff-label">차이</div>
+                                                            <div className="compare-card-diff-value">
                                                                 {diffValue.students > 0 ? '+' : ''}{diffValue.students.toLocaleString()}
                                                             </div>
-                                                            <div style={{
-                                                                fontSize: '16px',
-                                                                fontWeight: '600',
-                                                                opacity: '0.95',
-                                                                marginTop: '6px'
-                                                            }}>
+                                                            <div className="compare-card-diff-percent">
                                                                 ({diffPercent.students > 0 ? '+' : ''}{diffPercent.students.toFixed(1)}%)
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     {/* 등록수 비교 */}
-                                                    <div style={{
-                                                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                                                        padding: '25px',
-                                                        borderRadius: '12px',
-                                                        color: 'white',
-                                                        boxShadow: '0 4px 12px rgba(240, 147, 251, 0.3)'
-                                                    }}>
-                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                    <div className="compare-card-registrations">
+                                                        <div className="compare-card-title">
                                                             등록수 비교
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                        <div className="compare-card-values">
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">A ({dateA})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataA.registrations.toLocaleString()}
                                                                 </div>
                                                             </div>
-                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div className="compare-card-arrow">→</div>
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">B ({dateB})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataB.registrations.toLocaleString()}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div style={{
-                                                            marginTop: '20px',
-                                                            paddingTop: '18px',
-                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
-                                                            <div style={{
-                                                                fontSize: '24px',
-                                                                fontWeight: '700'
-                                                            }}>
+                                                        <div className="compare-card-divider">
+                                                            <div className="compare-card-diff-label">차이</div>
+                                                            <div className="compare-card-diff-value">
                                                                 {diffValue.registrations > 0 ? '+' : ''}{diffValue.registrations.toLocaleString()}
                                                             </div>
-                                                            <div style={{
-                                                                fontSize: '16px',
-                                                                fontWeight: '600',
-                                                                opacity: '0.95',
-                                                                marginTop: '6px'
-                                                            }}>
+                                                            <div className="compare-card-diff-percent">
                                                                 ({diffPercent.registrations > 0 ? '+' : ''}{diffPercent.registrations.toFixed(1)}%)
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     {/* 퇴원수 비교 */}
-                                                    <div style={{
-                                                        background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-                                                        padding: '25px',
-                                                        borderRadius: '12px',
-                                                        color: 'white',
-                                                        boxShadow: '0 4px 12px rgba(250, 112, 154, 0.3)'
-                                                    }}>
-                                                        <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '15px', fontWeight: '600' }}>
+                                                    <div className="compare-card-withdrawals">
+                                                        <div className="compare-card-title">
                                                             퇴원수 비교
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                        <div className="compare-card-values">
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>A ({dateA})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">A ({dateA})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataA.withdrawals.toLocaleString()}
                                                                 </div>
                                                             </div>
-                                                            <div style={{ fontSize: '24px', opacity: '0.6' }}>→</div>
+                                                            <div className="compare-card-arrow">→</div>
                                                             <div>
-                                                                <div style={{ fontSize: '12px', opacity: '0.8', marginBottom: '6px' }}>B ({dateB})</div>
-                                                                <div style={{ fontSize: '28px', fontWeight: '700' }}>
+                                                                <div className="compare-card-date-label">B ({dateB})</div>
+                                                                <div className="compare-card-number">
                                                                     {dataB.withdrawals.toLocaleString()}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div style={{
-                                                            marginTop: '20px',
-                                                            paddingTop: '18px',
-                                                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            <div style={{ fontSize: '13px', opacity: '0.9', marginBottom: '6px' }}>차이</div>
-                                                            <div style={{
-                                                                fontSize: '24px',
-                                                                fontWeight: '700'
-                                                            }}>
+                                                        <div className="compare-card-divider">
+                                                            <div className="compare-card-diff-label">차이</div>
+                                                            <div className="compare-card-diff-value">
                                                                 {diffValue.withdrawals > 0 ? '+' : ''}{diffValue.withdrawals.toLocaleString()}
                                                             </div>
-                                                            <div style={{
-                                                                fontSize: '16px',
-                                                                fontWeight: '600',
-                                                                opacity: '0.95',
-                                                                marginTop: '6px'
-                                                            }}>
+                                                            <div className="compare-card-diff-percent">
                                                                 ({diffPercent.withdrawals > 0 ? '+' : ''}{diffPercent.withdrawals.toFixed(1)}%)
                                                             </div>
                                                         </div>
@@ -2939,8 +2549,8 @@
 
                                     {/* 비교 차트 */}
                                     <div className="chart-container">
-                                        <h3 style={{marginBottom: '20px', color: '#001236'}}>기간 비교</h3>
-                                        <div style={{height: '400px', position: 'relative'}}>
+                                        <h3 className="chart-title">기간 비교</h3>
+                                        <div className="chart-canvas-wrapper">
                                             <canvas ref={chartRefs.compare}></canvas>
                                         </div>
                                     </div>
@@ -3233,8 +2843,7 @@
                                     <p>로그인 비밀번호를 변경합니다</p>
                                 </div>
                                 <button
-                                    className="btn"
-                                    style={{padding: '8px 16px', fontSize: '12px'}}
+                                    className="btn btn-settings-sm"
                                     onClick={() => setShowPasswordModal(true)}
                                 >
                                     변경
@@ -3246,29 +2855,14 @@
                                     <p>
                                         마케팅 비용 페이지 접근 비밀번호 [★원장님 전용]
                                         {userInfo?.marketingPassword ? (
-                                            <span style={{
-                                                background: '#e8f5e9',
-                                                color: '#388e3c',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '11px',
-                                                fontWeight: '600'
-                                            }}>설정됨</span>
+                                            <span className="password-set-badge">설정됨</span>
                                         ) : (
-                                            <span style={{
-                                                background: '#ffebee',
-                                                color: '#c62828',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                fontSize: '11px',
-                                                fontWeight: '600'
-                                            }}>미설정</span>
+                                            <span className="password-unset-badge">미설정</span>
                                         )}
                                     </p>
                                 </div>
                                 <button
-                                    className="btn"
-                                    style={{padding: '8px 16px', fontSize: '12px'}}
+                                    className="btn btn-settings-sm"
                                     onClick={openMarketingPasswordModal}
                                 >
                                     {userInfo?.marketingPassword ? '변경' : '설정'}
@@ -3343,33 +2937,22 @@
 
                     {/* 계정 비밀번호 재인증 모달 (이메일 링크 인증 후) */}
                     {showReauthModal && (
-                        <div className="modal-overlay" style={{zIndex: 1100}}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+                        <div className="modal-overlay modal-overlay-top">
+                            <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h3>🔐 계정 비밀번호 확인</h3>
                                 </div>
                                 <form onSubmit={handleReauthenticate}>
                                     <div className="modal-body">
-                                        <div style={{
-                                            background: '#e8f5e9',
-                                            padding: '16px',
-                                            borderRadius: '8px',
-                                            marginBottom: '20px',
-                                            textAlign: 'center'
-                                        }}>
-                                            <div style={{fontSize: '32px', marginBottom: '8px'}}>✅</div>
-                                            <p style={{fontSize: '14px', color: '#388e3c', fontWeight: '600'}}>
+                                        <div className="reauth-success-box">
+                                            <div className="reauth-success-icon">✅</div>
+                                            <p className="reauth-success-text">
                                                 이메일 인증이 완료되었습니다!
                                             </p>
                                         </div>
 
-                                        <div style={{
-                                            background: '#fff3e0',
-                                            padding: '14px',
-                                            borderRadius: '8px',
-                                            marginBottom: '20px'
-                                        }}>
-                                            <p style={{fontSize: '13px', color: '#e65100', lineHeight: '1.5'}}>
+                                        <div className="reauth-warning-box">
+                                            <p className="reauth-warning-text">
                                                 ⚠️ 보안을 위해 <strong>현재 계정 비밀번호</strong>를 한 번 더 입력해주세요.
                                             </p>
                                         </div>
@@ -3410,7 +2993,7 @@
                     {/* 마케팅 비용 비밀번호 설정 모달 */}
                     {showMarketingPasswordModal && (
                         <div className="modal-overlay" onClick={() => setShowMarketingPasswordModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+                            <div className="modal modal-md" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h3>🔒 마케팅 비용 비밀번호 {userInfo?.marketingPassword ? '변경' : '설정'}</h3>
                                     <button className="modal-close" onClick={() => setShowMarketingPasswordModal(false)}>×</button>
@@ -3419,45 +3002,27 @@
                                 {/* 이메일 인증이 완료되지 않은 경우 */}
                                 {!isEmailVerified ? (
                                     <div className="modal-body">
-                                        <div style={{
-                                            background: '#e3f2fd',
-                                            padding: '16px',
-                                            borderRadius: '8px',
-                                            marginBottom: '20px',
-                                            textAlign: 'center'
-                                        }}>
-                                            <div style={{fontSize: '40px', marginBottom: '12px'}}>📧</div>
-                                            <h4 style={{color: '#1565c0', marginBottom: '8px'}}>이메일 인증 필요</h4>
-                                            <p style={{fontSize: '13px', color: '#666', lineHeight: '1.5'}}>
+                                        <div className="email-verify-box">
+                                            <div className="email-verify-icon">📧</div>
+                                            <h4 className="email-verify-title">이메일 인증 필요</h4>
+                                            <p className="email-verify-desc">
                                                 마케팅 비용 비밀번호를 {userInfo?.marketingPassword ? '변경' : '설정'}하려면<br/>
                                                 이메일 인증이 필요합니다.
                                             </p>
                                         </div>
 
-                                        <div style={{
-                                            background: '#f8f9fa',
-                                            padding: '14px',
-                                            borderRadius: '8px',
-                                            marginBottom: '20px'
-                                        }}>
-                                            <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>인증 이메일 발송 주소</div>
-                                            <div style={{fontSize: '15px', fontWeight: '600', color: '#333'}}>{user?.email}</div>
+                                        <div className="email-address-box">
+                                            <div className="email-address-label">인증 이메일 발송 주소</div>
+                                            <div className="email-address-value">{user?.email}</div>
                                         </div>
 
                                         {emailSent && (
-                                            <div style={{
-                                                background: '#e8f5e9',
-                                                padding: '12px 16px',
-                                                borderRadius: '8px',
-                                                marginBottom: '20px',
-                                                fontSize: '13px',
-                                                color: '#2e7d32'
-                                            }}>
+                                            <div className="email-sent-box">
                                                 ✅ 인증 이메일이 전송되었습니다. 이메일을 확인해주세요.
                                             </div>
                                         )}
 
-                                        <div className="modal-footer" style={{borderTop: 'none', paddingTop: 0}}>
+                                        <div className="modal-footer modal-footer-no-border">
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary btn-sm"
@@ -3479,14 +3044,7 @@
                                     /* 이메일 인증 완료 후 비밀번호 설정 */
                                     <form onSubmit={handleMarketingPasswordChange}>
                                         <div className="modal-body">
-                                            <div style={{
-                                                background: '#e8f5e9',
-                                                padding: '12px 16px',
-                                                borderRadius: '8px',
-                                                marginBottom: '20px',
-                                                fontSize: '13px',
-                                                color: '#2e7d32'
-                                            }}>
+                                            <div className="email-verified-box">
                                                 ✅ 이메일 인증이 완료되었습니다. 새 비밀번호를 설정해주세요.
                                             </div>
                                             <div className="form-group">
@@ -4178,7 +3736,7 @@
 
             if (loading) {
                 return (
-                    <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh'}}>
+                    <div className="loading-center">
                         <p>문의 목록을 불러오는 중...</p>
                     </div>
                 );
@@ -4193,7 +3751,7 @@
 
                     <div className="content-area">
                         <div className="table-header">
-                            <h3 className="section-title" style={{marginBottom: 0}}>
+                            <h3 className="section-title section-title-no-mb">
                                 내 문의 목록 ({inquiries.length}건)
                             </h3>
                             <button
@@ -4216,18 +3774,18 @@
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                 </svg>
                                 <p>등록된 문의가 없습니다.</p>
-                                <p style={{marginTop: '8px', color: '#bbb'}}>위의 '문의 작성' 버튼을 클릭하여 문의를 남겨보세요.</p>
+                                <p className="empty-hint">위의 '문의 작성' 버튼을 클릭하여 문의를 남겨보세요.</p>
                             </div>
                         ) : (
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th style={{width: '50px', textAlign: 'center'}}>No</th>
-                                        <th style={{width: '100px', whiteSpace: 'nowrap', textAlign: 'center'}}>상태</th>
-                                        <th style={{width: '180px', whiteSpace: 'nowrap', textAlign: 'center'}}>문의유형</th>
-                                        <th style={{width: '40%', textAlign: 'center'}}>제목</th>
-                                        <th style={{width: '90px', textAlign: 'center'}}>작성자</th>
-                                        <th style={{width: '160px', textAlign: 'center'}}>작성일</th>
+                                        <th className="inquiry-th-no">No</th>
+                                        <th className="inquiry-th-status">상태</th>
+                                        <th className="inquiry-th-type">문의유형</th>
+                                        <th className="inquiry-th-title">제목</th>
+                                        <th className="inquiry-th-author">작성자</th>
+                                        <th className="inquiry-th-date">작성일</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -4235,20 +3793,20 @@
                                         <tr
                                             key={inquiry.id}
                                             onClick={() => openDetail(inquiry)}
-                                            style={{cursor: 'pointer'}}
+                                            className="inquiry-row"
                                         >
-                                            <td style={{textAlign: 'center', color: '#666', fontSize: '13px'}}>{index + 1}</td>
-                                            <td style={{textAlign: 'center'}}>{getStatusBadge(inquiry.status)}</td>
-                                            <td style={{textAlign: 'center'}}>
-                                                <span style={{ fontSize: '13px', color: '#334155' }}>
+                                            <td className="inquiry-td-no">{index + 1}</td>
+                                            <td className="inquiry-td-status">{getStatusBadge(inquiry.status)}</td>
+                                            <td className="inquiry-td-type">
+                                                <span className="inquiry-td-type-text">
                                                     {getInquiryCategoryText(inquiry)}
                                                 </span>
                                             </td>
-                                            <td style={{fontWeight: '500'}}>{inquiry.title}</td>
-                                            <td style={{textAlign: 'center', fontSize: '13px', color: '#334155'}}>
+                                            <td className="inquiry-td-title">{inquiry.title}</td>
+                                            <td className="inquiry-td-author">
                                                 {inquiry.inquirerName || ''}
                                             </td>
-                                            <td style={{fontSize: '13px', color: '#666', textAlign: 'center'}}>
+                                            <td className="inquiry-td-date">
                                                 {formatDate(inquiry.createdAt)}
                                             </td>
                                         </tr>
@@ -4261,26 +3819,19 @@
                     {/* 문의 작성 모달 */}
                     {showWriteModal && (
                         <div className="modal-overlay" onClick={() => setShowWriteModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                            <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h3>문의 작성</h3>
                                     <button className="modal-close" onClick={() => setShowWriteModal(false)}>×</button>
                                 </div>
                                 <form onSubmit={handleSubmit}>
                                     <div className="modal-body">
-                                        <div style={{
-                                            background: '#f07c00',
-                                            color: 'white',
-                                            padding: '10px 16px',
-                                            borderRadius: '8px',
-                                            fontSize: '14px',
-                                            fontWeight: '600'
-                                        }}>
+                                        <div className="inquiry-branch-banner">
                                             📍 {userInfo?.branchName || '지점 미설정'}
                                             {userInfo?.team && ` / ${userInfo.team}`}
                                         </div>
                                         <div className="form-group">
-                                            <label>이름 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>이름 <span className="required-star">*</span></label>
                                             <input
                                                 type="text"
                                                 value={formData.inquirerName}
@@ -4290,7 +3841,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>알림 수신 연락처 (휴대폰) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>알림 수신 연락처 (휴대폰) <span className="required-star">*</span></label>
                                             <input
                                                 type="tel"
                                                 inputMode="numeric"
@@ -4302,7 +3853,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>문의 유형 (대분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>문의 유형 (대분류) <span className="required-star">*</span></label>
                                             <select
                                                 value={formData.inquiryMajor}
                                                 onChange={(e) => {
@@ -4319,7 +3870,7 @@
                                         </div>
                                         {formData.inquiryMajor && formData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>문의 유형 (중분류) <span className="required-star">*</span></label>
                                                 <select
                                                     value={formData.inquiryMinor}
                                                     onChange={(e) => setFormData({...formData, inquiryMinor: e.target.value})}
@@ -4333,7 +3884,7 @@
                                             </div>
                                         )}
                                         <div className="form-group">
-                                            <label>작성자 (직책) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>작성자 (직책) <span className="required-star">*</span></label>
                                             <select
                                                 value={formData.position}
                                                 onChange={(e) => setFormData({...formData, position: e.target.value})}
@@ -4346,7 +3897,7 @@
                                             </select>
                                         </div>
                                         <div className="form-group">
-                                            <label>제목 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>제목 <span className="required-star">*</span></label>
                                             <input
                                                 type="text"
                                                 value={formData.title}
@@ -4356,7 +3907,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>내용 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>내용 <span className="required-star">*</span></label>
                                             <textarea
                                                 rows="6"
                                                 value={formData.content}
@@ -4365,7 +3916,7 @@
                                                 required
                                                 maxLength={800}
                                             />
-                                            <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{formData.content.length}/800</div>
+                                            <div className="textarea-counter">{formData.content.length}/800</div>
                                         </div>
                                         <div className="form-group">
                                             <label>이미지 첨부 (선택, 최대 5개)</label>
@@ -4388,16 +3939,16 @@
                                                 }}
                                             />
                                             {attachedFiles.length > 0 && (
-                                                <div style={{marginTop: '10px', fontSize: '13px', color: '#475569'}}>
-                                                    <div style={{fontWeight: '600', marginBottom: '6px'}}>선택된 파일</div>
-                                                    <ul style={{margin: 0, paddingLeft: '18px'}}>
+                                                <div className="file-list-wrapper">
+                                                    <div className="file-list-title">선택된 파일</div>
+                                                    <ul className="file-list">
                                                         {attachedFiles.map((f, i) => (
-                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                            <li key={`${f.name}_${i}`} className="file-list-item">
                                                                 <span>{f.name} ({Math.round((f.size || 0) / 1024)}KB)</span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                    className="file-remove-btn"
                                                                 >
                                                                     ✕
                                                                 </button>
@@ -4440,74 +3991,34 @@
                                 </div>
                                 <div className="modal-body">
                                     <div style={{marginBottom: '20px'}}>
-                                        <div style={{
-                                            display: 'flex',
-                                            flexWrap: 'wrap',
-                                            gap: '8px',
-                                            marginBottom: '12px'
-                                        }}>
-                                            <span style={{
-                                                background: '#f0f4f8',
-                                                color: '#334155',
-                                                padding: '6px 10px',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
+                                        <div className="inquiry-detail-badges">
+                                            <span className="inquiry-detail-badge-type">
                                                 문의유형: {selectedInquiry.inquiryMajorLabel || '미정'}
                                             </span>
-                                            <span style={{
-                                                background: '#f0f9ff',
-                                                color: '#0369a1',
-                                                padding: '6px 10px',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
+                                            <span className="inquiry-detail-badge-name">
                                                 이름: {selectedInquiry.inquirerName || ''}
                                             </span>
-                                            <span style={{
-                                                background: '#ecfeff',
-                                                color: '#0f766e',
-                                                padding: '6px 10px',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                                fontWeight: '600'
-                                            }}>
+                                            <span className="inquiry-detail-badge-contact">
                                                 연락처: {selectedInquiry.notifyContact || '-'}
                                             </span>
                                         </div>
-                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
-                                            <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                        <div className="inquiry-detail-meta">
+                                            <div className="inquiry-detail-meta-left">
                                                 {getStatusBadge(selectedInquiry.status)}
                                                 {selectedInquiry.position && (
-                                                    <span style={{
-                                                        background: '#e8f4fd',
-                                                        color: '#1976d2',
-                                                        padding: '4px 10px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '12px',
-                                                        fontWeight: '500'
-                                                    }}>
+                                                    <span className="inquiry-detail-position-badge">
                                                         {selectedInquiry.position}
                                                     </span>
                                                 )}
                                             </div>
-                                            <span style={{fontSize: '13px', color: '#666'}}>
+                                            <span className="inquiry-detail-date">
                                                 {formatDate(selectedInquiry.createdAt)}
                                             </span>
                                         </div>
-                                        <h4 style={{fontSize: '18px', fontWeight: '600', color: '#001236', marginBottom: '15px'}}>
+                                        <h4 className="inquiry-detail-title">
                                             {selectedInquiry.title}
                                         </h4>
-                                        <div style={{
-                                            background: '#f8f9fa',
-                                            padding: '16px',
-                                            borderRadius: '8px',
-                                            wordBreak:'break-all',
-                                            lineHeight: '1.6',
-                                            color: '#333'
-                                        }}>
+                                        <div className="inquiry-detail-content">
                                             {selectedInquiry.content}
                                         </div>
                                     </div>
@@ -4515,26 +4026,21 @@
                                 {/* 첨부파일 */}
                                 {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.length > 0 && (
                                     <div>
-                                        <div style={{
-                                            fontSize: '14px',
-                                            fontWeight: '700',
-                                            color: '#001236',
-                                            marginBottom: '10px'
-                                        }}>
+                                        <div className="attachment-section-title">
                                             첨부파일 ({selectedInquiry.attachments.length})
                                         </div>
-                                        <ul style={{margin: 0, paddingLeft: '18px'}}>
+                                        <ul className="attachment-list">
                                             {selectedInquiry.attachments.map((att, idx) => (
-                                                <li key={`${att.path || att.url || 'att'}_${idx}`} style={{marginBottom: '6px'}}>
+                                                <li key={`${att.path || att.url || 'att'}_${idx}`} className="attachment-item">
                                                     <a
                                                         href={att.url}
-                                                        style={{color: '#2563eb', textDecoration: 'underline', cursor: 'pointer'}}
+                                                        className="attachment-link"
                                                         onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                     >
                                                         {att.name || `첨부파일 ${idx + 1}`}
                                                     </a>
                                                     {typeof att.size === 'number' && att.size > 0 && (
-                                                        <span style={{marginLeft: '8px', color: '#64748b', fontSize: '12px'}}>
+                                                        <span className="attachment-size">
                                                             ({Math.round(att.size / 1024)}KB)
                                                         </span>
                                                     )}
@@ -4546,61 +4052,40 @@
 
                                     {/* 답변 */}
                                     {selectedInquiry.status === 'answered' && selectedInquiry.reply && (
-                                        <div style={{
-                                            borderTop: '1px solid #eee',
-                                            paddingTop: '20px'
-                                        }}>
-                                            <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                flexWrap: 'wrap',
-                                                gap: '8px',
-                                                marginBottom: '12px'
-                                            }}>
-                                                <span style={{
-                                                    background: '#001236',
-                                                    color: 'white',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    본사 답변
+                                        <div className="reply-section">
+                                            <div className="reply-header">
+                                                <span className="reply-badge">
+                                                    {(selectedInquiry.targetTeam && ABP_TEAM_BY_ID[selectedInquiry.targetTeam]?.name)
+                                                        ? `${ABP_TEAM_BY_ID[selectedInquiry.targetTeam].name} 답변`
+                                                        : '본사 답변'}
                                                 </span>
-                                                <span style={{fontSize: '13px', color: '#334155', fontWeight: '500'}}>
+                                                <span className="reply-author">
                                                     작성자: {selectedInquiry.replyAuthor || '-'}
                                                 </span>
-                                                <span style={{fontSize: '13px', color: '#666'}}>
+                                                <span className="reply-date">
                                                     {formatDate(selectedInquiry.repliedAt)}
                                                 </span>
                                             </div>
-                                            <div style={{
-                                                background: '#e3f2fd',
-                                                padding: '16px',
-                                                borderRadius: '8px',
-                                                whiteSpace: 'pre-wrap',
-                                                lineHeight: '1.6',
-                                                color: '#333'
-                                            }}>
+                                            <div className="reply-content">
                                                 {selectedInquiry.reply}
                                             </div>
                                             {Array.isArray(selectedInquiry.replyAttachments) && selectedInquiry.replyAttachments.length > 0 && (
-                                                <div style={{ marginTop: '14px' }}>
-                                                    <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                                                <div className="reply-attachment-section">
+                                                    <div className="reply-attachment-title">
                                                         답변 첨부파일 ({selectedInquiry.replyAttachments.length})
                                                     </div>
-                                                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                                                    <ul className="reply-attachment-list">
                                                         {selectedInquiry.replyAttachments.map((att, idx) => (
-                                                            <li key={att.path || att.url || idx} style={{ marginBottom: '6px' }}>
+                                                            <li key={att.path || att.url || idx} className="reply-attachment-item">
                                                                 <a
                                                                     href={att.url}
-                                                                    style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}
+                                                                    className="attachment-link"
                                                                     onClick={(e) => { e.preventDefault(); downloadAttachment(att.url, att.name || `첨부파일 ${idx + 1}`); }}
                                                                 >
                                                                     {att.name || `첨부파일 ${idx + 1}`}
                                                                 </a>
                                                                 {typeof att.size === 'number' && att.size > 0 && (
-                                                                    <span style={{ marginLeft: '8px', color: '#64748b', fontSize: '12px' }}>
+                                                                    <span className="attachment-size">
                                                                         ({Math.round(att.size / 1024)}KB)
                                                                     </span>
                                                                 )}
@@ -4612,8 +4097,8 @@
                                         </div>
                                     )}
                                 </div>
-                                <div className="modal-footer" style={{justifyContent: 'space-between'}}>
-                                    <div style={{display: 'flex', gap: '8px'}}>
+                                <div className="modal-footer modal-footer-space-between">
+                                    <div className="modal-footer-left-btns">
                                         {!inquiryHasReply(selectedInquiry) && (
                                             <>
                                                 <button
@@ -4647,7 +4132,7 @@
                     {/* 문의 수정 모달 */}
                     {showEditModal && selectedInquiry && (
                         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                            <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h3>문의 수정</h3>
                                     <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
@@ -4655,7 +4140,7 @@
                                 <form onSubmit={handleEdit}>
                                     <div className="modal-body">
                                         <div className="form-group">
-                                            <label>이름 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>이름 <span className="required-star">*</span></label>
                                             <input
                                                 type="text"
                                                 value={editFormData.inquirerName}
@@ -4665,7 +4150,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>알림 수신 연락처 (휴대폰) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>알림 수신 연락처 (휴대폰) <span className="required-star">*</span></label>
                                             <input
                                                 type="tel"
                                                 inputMode="numeric"
@@ -4677,7 +4162,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>문의 유형 (대분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>문의 유형 (대분류) <span className="required-star">*</span></label>
                                             <select
                                                 value={editFormData.inquiryMajor}
                                                 onChange={(e) => {
@@ -4694,7 +4179,7 @@
                                         </div>
                                         {editFormData.inquiryMajor && editFormData.inquiryMajor !== 'unset' && (
                                             <div className="form-group">
-                                                <label>문의 유형 (중분류) <span style={{color: '#dc3545'}}>*</span></label>
+                                                <label>문의 유형 (중분류) <span className="required-star">*</span></label>
                                                 <select
                                                     value={editFormData.inquiryMinor}
                                                     onChange={(e) => setEditFormData({...editFormData, inquiryMinor: e.target.value})}
@@ -4708,7 +4193,7 @@
                                             </div>
                                         )}
                                         <div className="form-group">
-                                            <label>작성자 (직책) <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>작성자 (직책) <span className="required-star">*</span></label>
                                             <select
                                                 value={editFormData.position}
                                                 onChange={(e) => setEditFormData({...editFormData, position: e.target.value})}
@@ -4721,7 +4206,7 @@
                                             </select>
                                         </div>
                                         <div className="form-group">
-                                            <label>제목 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>제목 <span className="required-star">*</span></label>
                                             <input
                                                 type="text"
                                                 value={editFormData.title}
@@ -4731,7 +4216,7 @@
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>내용 <span style={{color: '#dc3545'}}>*</span></label>
+                                            <label>내용 <span className="required-star">*</span></label>
                                             <textarea
                                                 rows="6"
                                                 value={editFormData.content}
@@ -4740,38 +4225,30 @@
                                                 required
                                                 maxLength={800}
                                             />
-                                            <div style={{textAlign: 'right', fontSize: '12px', color: '#999', marginTop: '4px'}}>{editFormData.content.length}/800</div>
+                                            <div className="textarea-counter">{editFormData.content.length}/800</div>
                                         </div>
                                         <div className="form-group">
                                             <label>이미지 첨부 (선택, 최대 5개)</label>
                                             {Array.isArray(selectedInquiry.attachments) && selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).length > 0 && (
-                                                <div style={{
-                                                    marginBottom: '10px',
-                                                    fontSize: '13px',
-                                                    color: '#475569',
-                                                    background: '#f8fafc',
-                                                    border: '1px solid #e2e8f0',
-                                                    padding: '10px 12px',
-                                                    borderRadius: '8px'
-                                                }}>
-                                                    <div style={{fontWeight: '700', marginBottom: '6px'}}>
+                                                <div className="existing-attachments-box">
+                                                    <div className="existing-attachments-title">
                                                         기존 첨부파일 ({selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).length})
                                                     </div>
-                                                    <ul style={{margin: 0, paddingLeft: '18px'}}>
+                                                    <ul className="file-list">
                                                         {selectedInquiry.attachments.filter(att => !removedAttachments.includes(att.path || att.url)).map((att, idx) => (
-                                                            <li key={`${att.path || att.url || 'att'}_${idx}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                            <li key={`${att.path || att.url || 'att'}_${idx}`} className="file-list-item">
                                                                 <a
                                                                     href={att.url}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    style={{color: '#2563eb', textDecoration: 'underline'}}
+                                                                    className="attachment-link"
                                                                 >
                                                                     {att.name || `첨부파일 ${idx + 1}`}
                                                                 </a>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setRemovedAttachments(prev => [...prev, att.path || att.url])}
-                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                    className="file-remove-btn"
                                                                 >
                                                                     ✕
                                                                 </button>
@@ -4800,16 +4277,16 @@
                                                 }}
                                             />
                                             {editAttachedFiles.length > 0 && (
-                                                <div style={{marginTop: '10px', fontSize: '13px', color: '#475569'}}>
-                                                    <div style={{fontWeight: '600', marginBottom: '6px'}}>추가 선택된 파일</div>
-                                                    <ul style={{margin: 0, paddingLeft: '18px'}}>
+                                                <div className="file-list-wrapper">
+                                                    <div className="file-list-title">추가 선택된 파일</div>
+                                                    <ul className="file-list">
                                                         {editAttachedFiles.map((f, i) => (
-                                                            <li key={`${f.name}_${i}`} style={{marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                            <li key={`${f.name}_${i}`} className="file-list-item">
                                                                 <span>{f.name} ({Math.round((f.size || 0) / 1024)}KB)</span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setEditAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                                                    style={{background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px', padding: '0 2px'}}
+                                                                    className="file-remove-btn"
                                                                 >
                                                                     ✕
                                                                 </button>

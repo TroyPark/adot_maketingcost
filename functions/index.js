@@ -471,6 +471,153 @@ function sendSensAlimtalk(to, inquiryId) {
     });
 }
 
+// ⏰ 미답변 3일 경과 Slack 재알림 (매일 오전 9시 KST)
+exports.remindPendingInquiries = functions.pubsub
+    .schedule("0 9 * * *")
+    .timeZone("Asia/Seoul")
+    .onRun(async () => {
+        const now = admin.firestore.Timestamp.now();
+        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+        const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - THREE_DAYS_MS);
+
+        // 미답변 + 3일 이상 경과 문의 조회 (abpInquiryId 있는 것만 — ABP 접수된 문의)
+        const snapshot = await admin.firestore()
+            .collection(COLLECTION_NAME)
+            .where("status", "==", "pending")
+            .where("createdAt", "<=", cutoff)
+            .get();
+
+        if (snapshot.empty) {
+            console.log("미답변 3일 경과 문의 없음");
+            return null;
+        }
+
+        for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+
+            // ABP로 접수되지 않은 문의는 스킵
+            if (!data.abpInquiryId) continue;
+
+            // 마지막 재알림 이후 3일 이내면 스킵 (중복 방지)
+            if (data.lastReminderAt) {
+                const msSinceLast = now.toMillis() - data.lastReminderAt.toMillis();
+                if (msSinceLast < THREE_DAYS_MS) continue;
+            }
+
+            const teamId = data.abpTargetTeam || data.targetTeam || null;
+            const teamLabel = TEAM_LABEL[teamId] || "기획본부";
+            const teamSlackId = teamId && TEAM_SLACK_MENTION[teamId];
+            const categoryText = getCategoryText(data);
+            const daysPending = Math.floor(
+                (now.toMillis() - data.createdAt.toMillis()) / (24 * 60 * 60 * 1000)
+            );
+            const reminderCount = (data.reminderCount || 0) + 1;
+
+            const manager = await getManagerForBranch(data.branchName, data.manager);
+            const managerSlackId = manager?.slackId;
+            const managerName = manager?.name || null;
+
+            const content = data.content || "";
+            const contentPreview = `${content.slice(0, 300)}${content.length > 300 ? "..." : ""}`;
+
+            const blocks = [
+                // 멘션
+                ...((teamSlackId || managerSlackId) ? [{
+                    type: "section",
+                    fields: [
+                        teamSlackId ? { type: "mrkdwn", text: `*담당부서*\n<@${teamSlackId}>` } : null,
+                        managerSlackId ? { type: "mrkdwn", text: `*지점 담당자*\n<@${managerSlackId}>` } : null,
+                    ].filter(Boolean),
+                }] : []),
+                {
+                    type: "header",
+                    text: {
+                        type: "plain_text",
+                        text: `⚠️ 미답변 ${daysPending}일 경과 (${reminderCount}차 알림)`.slice(0, 150),
+                    },
+                },
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `3일동안 해당 문의가 답변되지 않았어요.\n\n📌 *${categoryText}* | ${data.title || "(제목 없음)"}`,
+                    },
+                },
+                {
+                    type: "section",
+                    fields: [
+                        { type: "mrkdwn", text: `*담당부서*\n${teamLabel}` },
+                        { type: "mrkdwn", text: `*지점 담당자*\n${managerName || "-"}` },
+                        { type: "mrkdwn", text: `*지점*\n${data.branchName || "-"}` },
+                        { type: "mrkdwn", text: `*작성자*\n${data.inquirerName || data.userName || "-"}` },
+                    ],
+                },
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `*문의내용*\n${contentPreview || "-"}`,
+                    },
+                },
+                // 문의함으로 이동 버튼
+                {
+                    type: "actions",
+                    elements: [{
+                        type: "button",
+                        style: "danger",
+                        text: { type: "plain_text", text: "문의함 가기", emoji: true },
+                        url: (teamId === "biz_mk1" || teamId === "biz_mk2")
+                            ? `${BASE_URL}/admin?abpOpen=${data.abpInquiryId}`
+                            : `${BASE_URL}/abp?open=${data.abpInquiryId}`,
+                    }],
+                },
+                {
+                    type: "context",
+                    elements: [{
+                        type: "mrkdwn",
+                        text: `문서 ID: \`${docSnap.id}\` | 재알림: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+                    }],
+                },
+            ];
+
+            try {
+                let result;
+                const ts = data.slackMessageTs;
+                const channelId = data.slackChannelId || SLACK_CHANNEL_ID;
+
+                if (ts && channelId) {
+                    // 원본 메시지 thread에 재알림 댓글
+                    result = await callSlackApi("chat.postMessage", {
+                        channel: channelId,
+                        thread_ts: ts,
+                        text: `⚠️ 미답변 ${daysPending}일 경과 — ${teamLabel} 확인 필요`,
+                        blocks,
+                    });
+                } else {
+                    // 원본 Slack 메시지 없으면 새 메시지
+                    result = await postSlackMessage(
+                        blocks,
+                        `⚠️ 미답변 ${daysPending}일 경과 — ${teamLabel} 확인 필요`
+                    );
+                }
+
+                if (result && result.ok) {
+                    await docSnap.ref.update({
+                        lastReminderAt: now,
+                        reminderCount: admin.firestore.FieldValue.increment(1),
+                    });
+                    console.log(`재알림 발송 완료: ${docSnap.id} (${daysPending}일 경과)`);
+                } else {
+                    console.error(`재알림 Slack 발송 실패: ${docSnap.id}`, result);
+                }
+            } catch (err) {
+                console.error(`재알림 처리 오류: ${docSnap.id}`, err);
+            }
+        }
+
+        return null;
+    });
+
 // 👤 관리자용 사용자 생성
 exports.createUser = functions.https.onCall(async (data, context) => {
     // 관리자 인증 확인
