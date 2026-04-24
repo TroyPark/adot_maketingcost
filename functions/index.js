@@ -471,24 +471,25 @@ function sendSensAlimtalk(to, inquiryId) {
     });
 }
 
-// ⏰ 미답변 3일 경과 Slack 재알림 (매일 오전 9시 KST)
+// ⏰ 미답변 경과 Slack 재알림 (테스트용: 1분 / 매 1분 실행)
 exports.remindPendingInquiries = functions.pubsub
-    .schedule("0 9 * * *")
+    .schedule("*/1 * * * *")
     .timeZone("Asia/Seoul")
     .onRun(async () => {
         const now = admin.firestore.Timestamp.now();
-        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-        const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - THREE_DAYS_MS);
+        const cutoffMs = 1 * 60 * 1000; // 1분
+        const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - cutoffMs);
 
-        // 미답변 + 3일 이상 경과 문의 조회 (abpInquiryId 있는 것만 — ABP 접수된 문의)
+        // 미답변 문의 조회
+        // NOTE: status + createdAt 복합 where는 Firestore composite index가 필요합니다.
+        // 테스트/운영에서 인덱스 이슈로 막히지 않도록 createdAt 조건은 앱 레벨에서 필터링합니다.
         const snapshot = await admin.firestore()
             .collection(COLLECTION_NAME)
             .where("status", "==", "pending")
-            .where("createdAt", "<=", cutoff)
             .get();
 
         if (snapshot.empty) {
-            console.log("미답변 3일 경과 문의 없음");
+            console.log("미답변 경과 문의 없음");
             return null;
         }
 
@@ -498,10 +499,14 @@ exports.remindPendingInquiries = functions.pubsub
             // ABP로 접수되지 않은 문의는 스킵
             if (!data.abpInquiryId) continue;
 
-            // 마지막 재알림 이후 3일 이내면 스킵 (중복 방지)
+            // createdAt이 없거나 cutoff 이후면 스킵
+            if (!data.createdAt || typeof data.createdAt.toMillis !== "function") continue;
+            if (data.createdAt.toMillis() > cutoff.toMillis()) continue;
+
+            // 마지막 재알림 이후 cutoffMs 이내면 스킵 (중복 방지)
             if (data.lastReminderAt) {
                 const msSinceLast = now.toMillis() - data.lastReminderAt.toMillis();
-                if (msSinceLast < THREE_DAYS_MS) continue;
+                if (msSinceLast < cutoffMs) continue;
             }
 
             const teamId = data.abpTargetTeam || data.targetTeam || null;
