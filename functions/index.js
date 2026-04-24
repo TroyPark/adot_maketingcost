@@ -21,15 +21,15 @@ const KAKAO_TEMPLATE_CODE = process.env.KAKAO_TEMPLATE_CODE;
 
 // 팀별 Slack 멘션 ID (팀 Slack ID 확정 후 각 팀별로 교체)
 const TEAM_SLACK_MENTION = {
-    biz_plan: "U0ADXDR90QY", // 사업기획팀
-    sales_ops: "U0ADXDR90QY", // 영업지원팀
-    hrd_academy: "U0ADXDR90QY", // 학원HRD팀
-    eng_lab: "U0ADXDR90QY", // 영어연구소
-    content_prod: "U0ADXDR90QY", // 콘텐츠제작팀
-    it_dev: "U0ADXDR90QY", // IT본부
-    corp_admin: "U0ADXDR90QY", // 경영지원팀
-    biz_mk1: "U0ADXDR90QY", // 사업마케팅1팀
-    biz_mk2: "U0ADXDR90QY", // 사업마케팅2팀
+    biz_plan: "S05QM5QHPD2", // 사업기획팀
+    sales_ops: "S03RRE63EH5", // 영업지원팀
+    hrd_academy: "S0ASMPYS4JH", // 학원HRD팀
+    eng_lab: "S0ASMQEM37F", // 영어연구소
+    content_prod: "S0ASUQFAGUC", // 콘텐츠제작팀
+    it_dev: "S0AT45AMFA5", // IT본부
+    corp_admin: "S0ASP5HRVN2", // 경영지원팀
+    biz_mk1: "S0ASR7RMM42", // 사업마케팅1팀
+    biz_mk2: "S0ATKH2DG1E", // 사업마케팅2팀
 };
 
 // 팀 한국어 라벨
