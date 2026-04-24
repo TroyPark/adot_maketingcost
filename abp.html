@@ -2663,21 +2663,21 @@
                                                         type="button"
                                                         className={
                                                             'inquiry-major-mode-btn' +
-                                                            (addMajorSource === 'existing' ? ' is-active' : '')
-                                                        }
-                                                        onClick={() => setAddMajorSource('existing')}
-                                                    >
-                                                        중분류 추가
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={
-                                                            'inquiry-major-mode-btn' +
                                                             (addMajorSource === 'new' ? ' is-active' : '')
                                                         }
                                                         onClick={() => setAddMajorSource('new')}
                                                     >
                                                         대분류 생성
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={
+                                                            'inquiry-major-mode-btn' +
+                                                            (addMajorSource === 'existing' ? ' is-active' : '')
+                                                        }
+                                                        onClick={() => setAddMajorSource('existing')}
+                                                    >
+                                                        중분류 추가
                                                     </button>
                                                 </div>
                                             </div>
