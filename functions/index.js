@@ -484,6 +484,7 @@ exports.remindPendingInquiries = functions.pubsub
         const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // Asia/Seoul (DST 없음)
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
         const WEEKDAY_TARGET_DAYS = 3; // 평일 기준 3일(주말 제외, 공휴일 무시)
+        const WEEKDAY_MAX_DAYS = 9; // 9일 초과 시 재알림 중단 (3/6/9일까지만 발송)
 
         const toKstMidnightMs = (ms) => {
             const kstMs = ms + KST_OFFSET_MS;
@@ -534,6 +535,9 @@ exports.remindPendingInquiries = functions.pubsub
             const createdAtMs = data.createdAt.toMillis();
             const weekdayDaysPending = countWeekdaysSince(createdAtMs, now.toMillis());
             if (weekdayDaysPending < WEEKDAY_TARGET_DAYS) continue;
+            if (weekdayDaysPending > WEEKDAY_MAX_DAYS) continue;
+            // 3일/6일/9일… (평일 기준) 싸이클로만 재알림 발송
+            if (weekdayDaysPending % WEEKDAY_TARGET_DAYS !== 0) continue;
 
             // 마지막 재알림 이후 '평일 기준 3일' 이내면 스킵 (중복 방지)
             if (data.lastReminderAt) {
@@ -581,7 +585,7 @@ exports.remindPendingInquiries = functions.pubsub
                     type: "section",
                     text: {
                         type: "mrkdwn",
-                        text: `3일동안 해당 문의가 답변되지 않았어요.\n\n📌 *${categoryText}* | ${data.title || "(제목 없음)"}`,
+                        text: `${daysPending}일동안 해당 문의가 답변되지 않았어요.\n\n📌 *${categoryText}* | ${data.title || "(제목 없음)"}`,
                     },
                 },
                 {
