@@ -8,7 +8,7 @@ admin.initializeApp();
 // ⚙️ 설정값
 const COLLECTION_NAME = "inquiries";
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;   // Slack Bot OAuth Token (xoxb-...)
-const BASE_URL = process.env.BASE_URL || 'https://troypark.github.io';
+const BASE_URL = process.env.BASE_URL || 'https://troypark.github.io/adot_maketingcost';
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID; // 알림 받을 채널 ID (C...)
 
 // NCP SENS 알림톡 설정
@@ -431,8 +431,8 @@ function sendSensAlimtalk(to, inquiryId) {
                     {
                         type: "WL",
                         name: "답변확인하기",
-                        linkMobile: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
-                        linkPc: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
+                        linkMobile: `${BASE_URL}/user?path=inquiries&${inquiryId}&open`,
+                        linkPc: `${BASE_URL}/user?path=inquiries&${inquiryId}&open`,
                     },
                 ],
             },
