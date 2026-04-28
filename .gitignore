@@ -1,0 +1,8 @@
+*.md
+firestore.rules
+storage.rules
+node_modules/
+*.env
+*.env.local
+dist/
+.DS_Store
