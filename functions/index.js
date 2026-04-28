@@ -8,7 +8,7 @@ admin.initializeApp();
 // ⚙️ 설정값
 const COLLECTION_NAME = "inquiries";
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;   // Slack Bot OAuth Token (xoxb-...)
-const BASE_URL = process.env.BASE_URL || 'https://troypark.github.io';
+const BASE_URL = process.env.BASE_URL || 'https://troypark.github.io/adot_maketingcost';
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID; // 알림 받을 채널 ID (C...)
 
 // NCP SENS 알림톡 설정
@@ -96,7 +96,7 @@ function buildInquiryBlocks(doc, manager, docId, previousTeamId = null) {
     // 멘션 (답변완료 상태에서는 재멘션 생략)
     if (!isAnswered && (teamSlackId || managerSlackId)) {
         const mentionFields = [
-            teamSlackId ? { type: "mrkdwn", text: `*담당팀*\n<@${teamSlackId}>` } : null,
+            teamSlackId ? { type: "mrkdwn", text: `*담당팀*\n<!subteam^${teamSlackId}>` } : null,
             managerSlackId ? { type: "mrkdwn", text: `*지점 담당자*\n<@${managerSlackId}>` } : null,
         ].filter(Boolean);
         blocks.push({
@@ -431,8 +431,8 @@ function sendSensAlimtalk(to, inquiryId) {
                     {
                         type: "WL",
                         name: "답변확인하기",
-                        linkMobile: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
-                        linkPc: `https://troypark.github.io/user?path=inquiries&${inquiryId}&open`,
+                        linkMobile: `${BASE_URL}/user?path=inquiries&${inquiryId}&open`,
+                        linkPc: `${BASE_URL}/user?path=inquiries&${inquiryId}&open`,
                     },
                 ],
             },
@@ -570,7 +570,7 @@ exports.remindPendingInquiries = functions.pubsub
                 ...((teamSlackId || managerSlackId) ? [{
                     type: "section",
                     fields: [
-                        teamSlackId ? { type: "mrkdwn", text: `*담당부서*\n<@${teamSlackId}>` } : null,
+                        teamSlackId ? { type: "mrkdwn", text: `*담당부서*\n<!subteam^${teamSlackId}>` } : null,
                         managerSlackId ? { type: "mrkdwn", text: `*지점 담당자*\n<@${managerSlackId}>` } : null,
                     ].filter(Boolean),
                 }] : []),
