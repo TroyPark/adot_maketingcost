@@ -96,7 +96,7 @@ function buildInquiryBlocks(doc, manager, docId, previousTeamId = null) {
     // 멘션 (답변완료 상태에서는 재멘션 생략)
     if (!isAnswered && (teamSlackId || managerSlackId)) {
         const mentionFields = [
-            teamSlackId ? { type: "mrkdwn", text: `*담당팀*\n<@${teamSlackId}>` } : null,
+            teamSlackId ? { type: "mrkdwn", text: `*담당팀*\n<!subteam^${teamSlackId}>` } : null,
             managerSlackId ? { type: "mrkdwn", text: `*지점 담당자*\n<@${managerSlackId}>` } : null,
         ].filter(Boolean);
         blocks.push({
@@ -570,7 +570,7 @@ exports.remindPendingInquiries = functions.pubsub
                 ...((teamSlackId || managerSlackId) ? [{
                     type: "section",
                     fields: [
-                        teamSlackId ? { type: "mrkdwn", text: `*담당부서*\n<@${teamSlackId}>` } : null,
+                        teamSlackId ? { type: "mrkdwn", text: `*담당부서*\n<!subteam^${teamSlackId}>` } : null,
                         managerSlackId ? { type: "mrkdwn", text: `*지점 담당자*\n<@${managerSlackId}>` } : null,
                     ].filter(Boolean),
                 }] : []),
