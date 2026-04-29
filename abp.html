@@ -301,9 +301,8 @@
                 return () => unsubscribe();
             }, [teamId, allTeams]);
 
-            // 지점-담당자 매핑 로드 (전체 문의함 엑셀용)
+            // 지점-담당자 매핑 로드
             useEffect(() => {
-                if (!allTeams) return;
                 const unsub = db.collection('users').onSnapshot((snapshot) => {
                     const mapping = {};
                     snapshot.docs.forEach(doc => {
@@ -548,18 +547,14 @@
                 }
             };
 
-            // 전체 문의함 필터링
-            const managerOptions = allTeams
-                ? [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort()
-                : [];
+            // 필터링
+            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
 
-            const filteredInquiries = allTeams
-                ? inquiries.filter(i => {
-                    if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                    if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
-                    return true;
-                })
-                : inquiries;
+            const filteredInquiries = inquiries.filter(i => {
+                if (filterStatus !== 'all' && i.status !== filterStatus) return false;
+                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                return true;
+            });
 
             // 엑셀 다운로드 (전체 문의함 — admin.html 기획본부 소통 창구와 동일한 구조)
             const handleExcelDownload = () => {
@@ -664,7 +659,7 @@
                     <div className="content-area">
                         <div className="page-header-actions">
                             <h3 className="section-title" style={{ marginBottom: 0 }}>
-                                문의 목록 ({allTeams ? filteredInquiries.length : inquiries.length}건)
+                                문의 목록 ({filteredInquiries.length}건)
                             </h3>
                             {allTeams && (
                                 <button
@@ -676,46 +671,44 @@
                             )}
                         </div>
 
-                        {/* 전체 문의함 필터 */}
-                        {allTeams && (
-                            <div className="inquiry-filters">
-                                <div className="inquiry-filter">
-                                    <label className="inquiry-filter-label">상태:</label>
-                                    <select
-                                        value={filterStatus}
-                                        onChange={(e) => setFilterStatus(e.target.value)}
-                                        className="inquiry-filter-select"
-                                    >
-                                        <option value="all">전체</option>
-                                        <option value="pending">대기중</option>
-                                        <option value="answered">답변완료</option>
-                                    </select>
-                                </div>
-                                <div className="inquiry-filter">
-                                    <label className="inquiry-filter-label">지점 담당자:</label>
-                                    <select
-                                        value={filterAuthor}
-                                        onChange={(e) => setFilterAuthor(e.target.value)}
-                                        className="inquiry-filter-select"
-                                    >
-                                        <option value="all">전체 담당자</option>
-                                        {managerOptions.map(manager => (
-                                            <option key={manager} value={manager}>{manager}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                {(filterStatus !== 'all' || filterAuthor !== 'all') && (
-                                    <button
-                                        onClick={() => { setFilterStatus('all'); setFilterAuthor('all'); }}
-                                        className="inquiry-reset-btn"
-                                    >
-                                        필터 초기화
-                                    </button>
-                                )}
+                        {/* 필터 */}
+                        <div className="inquiry-filters">
+                            <div className="inquiry-filter">
+                                <label className="inquiry-filter-label">상태:</label>
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="inquiry-filter-select"
+                                >
+                                    <option value="all">전체</option>
+                                    <option value="pending">대기중</option>
+                                    <option value="answered">답변완료</option>
+                                </select>
                             </div>
-                        )}
+                            <div className="inquiry-filter">
+                                <label className="inquiry-filter-label">지점 담당자:</label>
+                                <select
+                                    value={filterAuthor}
+                                    onChange={(e) => setFilterAuthor(e.target.value)}
+                                    className="inquiry-filter-select"
+                                >
+                                    <option value="all">전체 담당자</option>
+                                    {managerOptions.map(manager => (
+                                        <option key={manager} value={manager}>{manager}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {(filterStatus !== 'all' || filterAuthor !== 'all') && (
+                                <button
+                                    onClick={() => { setFilterStatus('all'); setFilterAuthor('all'); }}
+                                    className="inquiry-reset-btn"
+                                >
+                                    필터 초기화
+                                </button>
+                            )}
+                        </div>
 
-                        {(allTeams ? filteredInquiries : inquiries).length === 0 ? (
+                        {filteredInquiries.length === 0 ? (
                             <div className="empty-state">
                                 <p>접수된 문의가 없습니다.</p>
                             </div>
@@ -728,9 +721,7 @@
                                         {allTeams && (
                                             <th style={{width: '120px'}}>담당 팀</th>
                                         )}
-                                        {allTeams && (
-                                            <th style={{width: '110px'}}>지점 담당자</th>
-                                        )}
+                                        <th style={{width: '110px'}}>지점 담당자</th>
                                         <th style={{width: '210px'}}>문의 유형</th>
                                         <th>문의 내용</th>
                                         <th style={{width: '100px'}}>작성자</th>
@@ -738,7 +729,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(allTeams ? filteredInquiries : inquiries).map((inquiry, index) => (
+                                    {filteredInquiries.map((inquiry, index) => (
                                         <tr
                                             key={inquiry.id}
                                             onClick={() => openDetail(inquiry)}
@@ -755,9 +746,7 @@
                                                     </span>
                                                 </td>
                                             )}
-                                            {allTeams && (
-                                                <td style={{fontSize: '13px'}}>{branchManagerMap[inquiry.branchName] || '-'}</td>
-                                            )}
+                                            <td style={{fontSize: '13px'}}>{branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td style={{ fontSize: '13px', color: '#334155' }}>
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
