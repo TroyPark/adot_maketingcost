@@ -549,14 +549,14 @@
             };
 
             // 전체 문의함 필터링
-            const authorOptions = allTeams
-                ? [...new Set(inquiries.map(i => i.authorName).filter(Boolean))].sort()
+            const managerOptions = allTeams
+                ? [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort()
                 : [];
 
             const filteredInquiries = allTeams
                 ? inquiries.filter(i => {
                     if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                    if (filterAuthor !== 'all' && i.authorName !== filterAuthor) return false;
+                    if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
                     return true;
                 })
                 : inquiries;
@@ -692,15 +692,15 @@
                                     </select>
                                 </div>
                                 <div className="inquiry-filter">
-                                    <label className="inquiry-filter-label">작성자:</label>
+                                    <label className="inquiry-filter-label">지점 담당자:</label>
                                     <select
                                         value={filterAuthor}
                                         onChange={(e) => setFilterAuthor(e.target.value)}
                                         className="inquiry-filter-select"
                                     >
-                                        <option value="all">전체 작성자</option>
-                                        {authorOptions.map(author => (
-                                            <option key={author} value={author}>{author}</option>
+                                        <option value="all">전체 담당자</option>
+                                        {managerOptions.map(manager => (
+                                            <option key={manager} value={manager}>{manager}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -728,6 +728,9 @@
                                         {allTeams && (
                                             <th style={{width: '120px'}}>담당 팀</th>
                                         )}
+                                        {allTeams && (
+                                            <th style={{width: '110px'}}>지점 담당자</th>
+                                        )}
                                         <th style={{width: '210px'}}>문의 유형</th>
                                         <th>문의 내용</th>
                                         <th style={{width: '100px'}}>작성자</th>
@@ -751,6 +754,9 @@
                                                         {getInquiryTeamMeta(inquiry).name}
                                                     </span>
                                                 </td>
+                                            )}
+                                            {allTeams && (
+                                                <td style={{fontSize: '13px'}}>{branchManagerMap[inquiry.branchName] || '-'}</td>
                                             )}
                                             <td style={{ fontSize: '13px', color: '#334155' }}>
                                                 {getInquiryCategoryText(inquiry)}
