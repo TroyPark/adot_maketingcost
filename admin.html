@@ -9849,6 +9849,11 @@
             const [savingCategoryRoute, setSavingCategoryRoute] = useState(false);
             const userPickedCategoryRef = useRef(false);
 
+            // 전체 문의함 필터 상태
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [filterAuthor, setFilterAuthor] = useState('all');
+            const [branchManagerMap, setBranchManagerMap] = useState({});
+
             const team = allTeams ? null : ABP_TEAMS_NAV.find(t => t.id === teamId);
 
             const routeMajorOptions = useMemo(() => {
@@ -9910,6 +9915,19 @@
                     setDetailManualTargetTeamId('');
                 }
             }, [showDetailModal, selectedInquiry, categoryDefRows]);
+
+            // 지점-담당자 매핑 로드
+            useEffect(() => {
+                const unsub = db.collection('users').onSnapshot((snapshot) => {
+                    const mapping = {};
+                    snapshot.docs.forEach(doc => {
+                        const d = doc.data();
+                        if (d.branchName && d.manager) mapping[d.branchName] = d.manager;
+                    });
+                    setBranchManagerMap(mapping);
+                }, (err) => console.error('지점-담당자 매핑 로드 오류:', err));
+                return () => unsub();
+            }, [allTeams]);
 
             // 해당 팀 또는 전체 문의글 로드
             useEffect(() => {
@@ -10196,6 +10214,49 @@
                 return `${major} › ${minor}`;
             };
 
+            // 전체 문의함 필터링
+            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
+
+            const filteredInquiries = inquiries.filter(i => {
+                if (filterStatus !== 'all' && i.status !== filterStatus) return false;
+                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                return true;
+            });
+
+            // 엑셀 다운로드 (전체 문의함 — 기획본부 소통 창구와 동일한 구조)
+            const handleExcelDownload = () => {
+                try {
+                    const excelData = filteredInquiries.map((inq, idx) => ({
+                        '번호': idx + 1,
+                        '담당부서': getInquiryTeamMeta(inq).name,
+                        '문의 유형': getInquiryCategoryText(inq),
+                        '지점명': inq.branchName || '-',
+                        '지점 담당자': branchManagerMap[inq.branchName] || '-',
+                        '직함': inq.position || '-',
+                        '문의 내용': inq.content || '-',
+                        '상태': inq.status === 'answered' ? '답변완료' : '대기중',
+                        '답변': inq.reply || '-',
+                        '작성일': formatDate(inq.createdAt),
+                        '답변 작성자': inq.replyAuthor || '-',
+                        '답변 작성일시': inq.repliedAt ? formatDate(inq.repliedAt) : '-'
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(excelData);
+                    ws['!cols'] = [
+                        { wch: 8 }, { wch: 20 }, { wch: 28 }, { wch: 20 },
+                        { wch: 15 }, { wch: 12 }, { wch: 50 }, { wch: 12 },
+                        { wch: 50 }, { wch: 18 }, { wch: 15 }, { wch: 18 }
+                    ];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, '기획본부 문의 목록');
+                    const today = new Date();
+                    const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+                    XLSX.writeFile(wb, `전체_지점_문의_${dateStr}.xlsx`);
+                } catch (err) {
+                    console.error('엑셀 다운로드 오류:', err);
+                    alert('엑셀 다운로드에 실패했습니다.');
+                }
+            };
+
             if (loading) {
                 return (
                     <div className="loading-spinner">
@@ -10234,11 +10295,56 @@
                     <div className="content-area">
                         <div className="page-header-actions">
                             <h3 className="section-title abp-inquiry-section-title">
-                                문의 목록 ({inquiries.length}건)
+                                문의 목록 ({filteredInquiries.length}건)
                             </h3>
+                            {allTeams && (
+                                <button
+                                    onClick={handleExcelDownload}
+                                    className="inquiry-excel-btn inquiry-excel-btn-green"
+                                >
+                                    📊 엑셀 다운로드
+                                </button>
+                            )}
                         </div>
 
-                        {inquiries.length === 0 ? (
+                        {/* 필터 */}
+                        <div className="inquiry-filters">
+                            <div className="inquiry-filter">
+                                <label className="inquiry-filter-label">상태:</label>
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="inquiry-filter-select"
+                                >
+                                    <option value="all">전체</option>
+                                    <option value="pending">대기중</option>
+                                    <option value="answered">답변완료</option>
+                                </select>
+                            </div>
+                            <div className="inquiry-filter">
+                                <label className="inquiry-filter-label">지점 담당자:</label>
+                                <select
+                                    value={filterAuthor}
+                                    onChange={(e) => setFilterAuthor(e.target.value)}
+                                    className="inquiry-filter-select"
+                                >
+                                    <option value="all">전체 담당자</option>
+                                    {managerOptions.map(manager => (
+                                        <option key={manager} value={manager}>{manager}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {(filterStatus !== 'all' || filterAuthor !== 'all') && (
+                                <button
+                                    onClick={() => { setFilterStatus('all'); setFilterAuthor('all'); }}
+                                    className="inquiry-reset-btn"
+                                >
+                                    필터 초기화
+                                </button>
+                            )}
+                        </div>
+
+                        {filteredInquiries.length === 0 ? (
                             <div className="empty-state">
                                 <p>접수된 문의가 없습니다.</p>
                             </div>
@@ -10251,6 +10357,7 @@
                                         {allTeams && (
                                             <th className="abp-inquiry-th abp-inquiry-th-team">담당 팀</th>
                                         )}
+                                        <th className="abp-inquiry-th">지점 담당자</th>
                                         <th className="abp-inquiry-th abp-inquiry-th-type">문의 유형</th>
                                         <th className="abp-inquiry-th abp-inquiry-th-content">문의 내용</th>
                                         <th className="abp-inquiry-th abp-inquiry-th-author">작성자</th>
@@ -10258,7 +10365,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {inquiries.map((inquiry, index) => (
+                                    {filteredInquiries.map((inquiry, index) => (
                                         <tr
                                             key={inquiry.id}
                                             onClick={() => openDetail(inquiry)}
@@ -10273,6 +10380,7 @@
                                                     </span>
                                                 </td>
                                             )}
+                                            <td className="abp-inquiry-td">{branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td className="abp-inquiry-td abp-inquiry-td-type">
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
