@@ -9061,7 +9061,7 @@
                         return false;
                     }
                 }
-                if (selectedManager !== 'all' && branchManagerMap[inquiry.branchName] !== selectedManager) return false;
+                if (selectedManager !== 'all' && (inquiry.manager || branchManagerMap[inquiry.branchName]) !== selectedManager) return false;
                 return true;
             });
 
@@ -9297,7 +9297,7 @@
                         'No': index + 1,
                         '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
                         '지점': inquiry.branchName || '-',
-                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '지점 담당자': inquiry.manager || branchManagerMap[inquiry.branchName] || '-',
                         '담당부서': getAbpDeptLabel(inquiry),
                         '문의 유형': getInquiryCategoryLabel(inquiry),
                         '제목': inquiry.title || '-',
@@ -9559,7 +9559,7 @@
                                                 </span>
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="inquiry-td inquiry-td-center inquiry-td-manager">
-                                                {branchManagerMap[inquiry.branchName] || '-'}
+                                                {inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="inquiry-td inquiry-td-center inquiry-td-dept">
                                                 <span className="inquiry-dept-pill" title={getAbpDeptLabel(inquiry)}>
@@ -9986,6 +9986,7 @@
                                     inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
                                     inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
                                     notifyContact: prev.notifyContact || d.notifyContact,
+                                    manager: prev.manager || d.manager,
                                     // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
                                     attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
                                 };
@@ -10220,11 +10221,11 @@
             };
 
             // 전체 문의함 필터링
-            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
+            const managerOptions = [...new Set(inquiries.map(i => i.manager || branchManagerMap[i.branchName]).filter(Boolean))].sort();
 
             const filteredInquiries = inquiries.filter(i => {
                 if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                if (filterAuthor !== 'all' && (i.manager || branchManagerMap[i.branchName]) !== filterAuthor) return false;
                 return true;
             });
 
@@ -10236,7 +10237,7 @@
                         '담당부서': getInquiryTeamMeta(inq).name,
                         '문의 유형': getInquiryCategoryText(inq),
                         '지점명': inq.branchName || '-',
-                        '지점 담당자': branchManagerMap[inq.branchName] || '-',
+                        '지점 담당자': inq.manager || branchManagerMap[inq.branchName] || '-',
                         '작성자': inq.authorName || '-',
                         '직함': inq.position || '-',
                         '연락처': inq.notifyContact || '-',
@@ -10390,7 +10391,7 @@
                                                 </td>
                                             )}
                                             <td className="abp-inquiry-td abp-inquiry-td-branch">{inquiry.branchName || '-'}</td>
-                                            <td className="abp-inquiry-td">{branchManagerMap[inquiry.branchName] || '-'}</td>
+                                            <td className="abp-inquiry-td">{inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td className="abp-inquiry-td abp-inquiry-td-type">
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
@@ -11902,7 +11903,7 @@
                         '담당부서': getTeamName(inquiry.targetTeam),
                         '문의 유형': getInquiryCategoryText(inquiry),
                         '지점명': inquiry.branchName || '-',
-                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '지점 담당자': inquiry.manager || branchManagerMap[inquiry.branchName] || '-',
                         '직함': inquiry.position || '-',
                         '문의 내용': inquiry.content || '-',
                         '원본 문의 제목': inquiry.originalInquiry?.title || '-',
@@ -12147,7 +12148,7 @@
                                                 </span>
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="abp-comm-td-mgr">
-                                                {branchManagerMap[inquiry.branchName] || '-'}
+                                                {inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="abp-comm-td-content">
                                                 {inquiry.content}

@@ -347,6 +347,7 @@
                                     inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
                                     inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
                                     notifyContact: prev.notifyContact || d.notifyContact,
+                                    manager: prev.manager || d.manager,
                                     // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
                                     attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
                                 };
@@ -549,11 +550,11 @@
             };
 
             // 필터링
-            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
+            const managerOptions = [...new Set(inquiries.map(i => i.manager || branchManagerMap[i.branchName]).filter(Boolean))].sort();
 
             const filteredInquiries = inquiries.filter(i => {
                 if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                if (filterAuthor !== 'all' && (i.manager || branchManagerMap[i.branchName]) !== filterAuthor) return false;
                 return true;
             });
 
@@ -565,7 +566,7 @@
                         '담당부서': getInquiryTeamMeta(inq).name,
                         '문의 유형': getInquiryCategoryText(inq),
                         '지점명': inq.branchName || '-',
-                        '지점 담당자': branchManagerMap[inq.branchName] || '-',
+                        '지점 담당자': inq.manager || branchManagerMap[inq.branchName] || '-',
                         '작성자': inq.authorName || '-',
                         '직함': inq.position || '-',
                         '연락처': inq.notifyContact || '-',
@@ -753,7 +754,7 @@
                                                 </td>
                                             )}
                                             <td style={{fontSize: '13px'}}>{inquiry.branchName || '-'}</td>
-                                            <td style={{fontSize: '13px'}}>{branchManagerMap[inquiry.branchName] || '-'}</td>
+                                            <td style={{fontSize: '13px'}}>{inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td style={{ fontSize: '13px', color: '#334155' }}>
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
