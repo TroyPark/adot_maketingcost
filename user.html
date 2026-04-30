@@ -3394,6 +3394,7 @@
                         targetTeam: abpTargetTeam,
                         content: formData.content.trim(),
                         authorName: formData.inquirerName.trim(),
+                        notifyContact: normalizePhoneNumber(formData.notifyContact),
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         abpRoutedBy: 'firestore',
