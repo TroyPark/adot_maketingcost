@@ -9061,7 +9061,7 @@
                         return false;
                     }
                 }
-                if (selectedManager !== 'all' && branchManagerMap[inquiry.branchName] !== selectedManager) return false;
+                if (selectedManager !== 'all' && (inquiry.manager || branchManagerMap[inquiry.branchName]) !== selectedManager) return false;
                 return true;
             });
 
@@ -9297,11 +9297,13 @@
                         'No': index + 1,
                         '상태': inquiry.status === 'answered' ? '답변완료' : '대기중',
                         '지점': inquiry.branchName || '-',
-                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '지점 담당자': inquiry.manager || branchManagerMap[inquiry.branchName] || '-',
                         '담당부서': getAbpDeptLabel(inquiry),
                         '문의 유형': getInquiryCategoryLabel(inquiry),
                         '제목': inquiry.title || '-',
+                        '작성자': inquiry.inquirerName || '-',
                         '직함': inquiry.position || '-',
+                        '연락처': inquiry.notifyContact || '-',
                         '작성일': formatDateLocal(inquiry.createdAt),
                         '답변 작성자': inquiry.replyAuthor || '-',
                         '답변 작성일시': inquiry.repliedAt ? formatDateLocal(inquiry.repliedAt) : '-',
@@ -9321,7 +9323,9 @@
                         { wch: 14 },
                         { wch: 28 },
                         { wch: 24 },
+                        { wch: 12 },
                         { wch: 10 },
+                        { wch: 15 },
                         { wch: 18 },
                         { wch: 12 },
                         { wch: 18 },
@@ -9555,7 +9559,7 @@
                                                 </span>
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="inquiry-td inquiry-td-center inquiry-td-manager">
-                                                {branchManagerMap[inquiry.branchName] || '-'}
+                                                {inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="inquiry-td inquiry-td-center inquiry-td-dept">
                                                 <span className="inquiry-dept-pill" title={getAbpDeptLabel(inquiry)}>
@@ -9699,7 +9703,7 @@
                                             <strong>문의 유형:</strong> {getInquiryCategoryLabel(selectedInquiry)}
                                         </div>
                                         <div className="inquiry-detail-submeta">
-                                            문의자: {selectedInquiry.inquirerName || '-'} · 직함: {selectedInquiry.position || '-'} ({selectedInquiry.userEmail})
+                                            문의자: {selectedInquiry.inquirerName || '-'} · 직함: {selectedInquiry.position || '-'} · 지점명: {selectedInquiry.branchName || '-'} · 연락처: {selectedInquiry.notifyContact || '-'} ({selectedInquiry.userEmail})
                                         </div>
                                         <h4 className="inquiry-detail-title">
                                             {selectedInquiry.title}
@@ -9981,6 +9985,8 @@
                                     inquiryMinor: prev.inquiryMinor || d.inquiryMinor,
                                     inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
                                     inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
+                                    notifyContact: prev.notifyContact || d.notifyContact,
+                                    manager: prev.manager || d.manager,
                                     // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
                                     attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
                                 };
@@ -10215,11 +10221,11 @@
             };
 
             // 전체 문의함 필터링
-            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
+            const managerOptions = [...new Set(inquiries.map(i => i.manager || branchManagerMap[i.branchName]).filter(Boolean))].sort();
 
             const filteredInquiries = inquiries.filter(i => {
                 if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                if (filterAuthor !== 'all' && (i.manager || branchManagerMap[i.branchName]) !== filterAuthor) return false;
                 return true;
             });
 
@@ -10231,8 +10237,10 @@
                         '담당부서': getInquiryTeamMeta(inq).name,
                         '문의 유형': getInquiryCategoryText(inq),
                         '지점명': inq.branchName || '-',
-                        '지점 담당자': branchManagerMap[inq.branchName] || '-',
+                        '지점 담당자': inq.manager || branchManagerMap[inq.branchName] || '-',
+                        '작성자': inq.authorName || '-',
                         '직함': inq.position || '-',
+                        '연락처': inq.notifyContact || '-',
                         '문의 내용': inq.content || '-',
                         '상태': inq.status === 'answered' ? '답변완료' : '대기중',
                         '답변': inq.reply || '-',
@@ -10243,8 +10251,9 @@
                     const ws = XLSX.utils.json_to_sheet(excelData);
                     ws['!cols'] = [
                         { wch: 8 }, { wch: 20 }, { wch: 28 }, { wch: 20 },
-                        { wch: 15 }, { wch: 12 }, { wch: 50 }, { wch: 12 },
-                        { wch: 50 }, { wch: 18 }, { wch: 15 }, { wch: 18 }
+                        { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 },
+                        { wch: 50 }, { wch: 12 }, { wch: 50 }, { wch: 18 },
+                        { wch: 15 }, { wch: 18 }
                     ];
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, '기획본부 문의 목록');
@@ -10357,6 +10366,7 @@
                                         {allTeams && (
                                             <th className="abp-inquiry-th abp-inquiry-th-team">담당 팀</th>
                                         )}
+                                        <th className="abp-inquiry-th abp-inquiry-th-branch">지점</th>
                                         <th className="abp-inquiry-th">지점 담당자</th>
                                         <th className="abp-inquiry-th abp-inquiry-th-type">문의 유형</th>
                                         <th className="abp-inquiry-th abp-inquiry-th-content">문의 내용</th>
@@ -10380,7 +10390,8 @@
                                                     </span>
                                                 </td>
                                             )}
-                                            <td className="abp-inquiry-td">{branchManagerMap[inquiry.branchName] || '-'}</td>
+                                            <td className="abp-inquiry-td abp-inquiry-td-branch">{inquiry.branchName || '-'}</td>
+                                            <td className="abp-inquiry-td">{inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td className="abp-inquiry-td abp-inquiry-td-type">
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
@@ -10451,6 +10462,9 @@
 
                                         <div className="abp-inquiry-detail-author">
                                             작성자: {selectedInquiry.authorName || '-'}
+                                            {selectedInquiry.branchName && <span style={{marginLeft: '12px'}}>지점명: {selectedInquiry.branchName}</span>}
+                                            {selectedInquiry.position && <span style={{marginLeft: '12px'}}>직책: {selectedInquiry.position}</span>}
+                                            {selectedInquiry.notifyContact && <span style={{marginLeft: '12px'}}>연락처: {selectedInquiry.notifyContact}</span>}
                                         </div>
 
                                         <div className="abp-inquiry-category-row">
@@ -11889,7 +11903,7 @@
                         '담당부서': getTeamName(inquiry.targetTeam),
                         '문의 유형': getInquiryCategoryText(inquiry),
                         '지점명': inquiry.branchName || '-',
-                        '지점 담당자': branchManagerMap[inquiry.branchName] || '-',
+                        '지점 담당자': inquiry.manager || branchManagerMap[inquiry.branchName] || '-',
                         '직함': inquiry.position || '-',
                         '문의 내용': inquiry.content || '-',
                         '원본 문의 제목': inquiry.originalInquiry?.title || '-',
@@ -12134,7 +12148,7 @@
                                                 </span>
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="abp-comm-td-mgr">
-                                                {branchManagerMap[inquiry.branchName] || '-'}
+                                                {inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}
                                             </td>
                                             <td onClick={() => openDetail(inquiry)} className="abp-comm-td-content">
                                                 {inquiry.content}
@@ -12299,6 +12313,9 @@
 
                                         <div className="abp-comm-author-line">
                                             문의 작성자: {selectedInquiry.authorName || '-'}
+                                            {selectedInquiry.branchName && <span style={{marginLeft: '12px'}}>지점명: {selectedInquiry.branchName}</span>}
+                                            {selectedInquiry.position && <span style={{marginLeft: '12px'}}>직책: {selectedInquiry.position}</span>}
+                                            {selectedInquiry.notifyContact && <span style={{marginLeft: '12px'}}>연락처: {selectedInquiry.notifyContact}</span>}
                                         </div>
 
                                         <div className="abp-comm-content-box">

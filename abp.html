@@ -346,6 +346,8 @@
                                     inquiryMinor: prev.inquiryMinor || d.inquiryMinor,
                                     inquiryMajorLabel: prev.inquiryMajorLabel || d.inquiryMajorLabel,
                                     inquiryMinorLabel: prev.inquiryMinorLabel || d.inquiryMinorLabel,
+                                    notifyContact: prev.notifyContact || d.notifyContact,
+                                    manager: prev.manager || d.manager,
                                     // 문의자 첨부는 Firestore inquiries 에만 있음 — 상세 표시용 병합
                                     attachments: Array.isArray(d.attachments) ? d.attachments : prev.attachments
                                 };
@@ -548,11 +550,11 @@
             };
 
             // 필터링
-            const managerOptions = [...new Set(inquiries.map(i => branchManagerMap[i.branchName]).filter(Boolean))].sort();
+            const managerOptions = [...new Set(inquiries.map(i => i.manager || branchManagerMap[i.branchName]).filter(Boolean))].sort();
 
             const filteredInquiries = inquiries.filter(i => {
                 if (filterStatus !== 'all' && i.status !== filterStatus) return false;
-                if (filterAuthor !== 'all' && branchManagerMap[i.branchName] !== filterAuthor) return false;
+                if (filterAuthor !== 'all' && (i.manager || branchManagerMap[i.branchName]) !== filterAuthor) return false;
                 return true;
             });
 
@@ -564,8 +566,10 @@
                         '담당부서': getInquiryTeamMeta(inq).name,
                         '문의 유형': getInquiryCategoryText(inq),
                         '지점명': inq.branchName || '-',
-                        '지점 담당자': branchManagerMap[inq.branchName] || '-',
+                        '지점 담당자': inq.manager || branchManagerMap[inq.branchName] || '-',
+                        '작성자': inq.authorName || '-',
                         '직함': inq.position || '-',
+                        '연락처': inq.notifyContact || '-',
                         '문의 내용': inq.content || '-',
                         '상태': inq.status === 'answered' ? '답변완료' : '대기중',
                         '답변': inq.reply || '-',
@@ -580,7 +584,9 @@
                         { wch: 28 },  // 문의 유형
                         { wch: 20 },  // 지점명
                         { wch: 15 },  // 지점 담당자
+                        { wch: 12 },  // 작성자
                         { wch: 12 },  // 직함
+                        { wch: 15 },  // 연락처
                         { wch: 50 },  // 문의 내용
                         { wch: 12 },  // 상태
                         { wch: 50 },  // 답변
@@ -721,6 +727,7 @@
                                         {allTeams && (
                                             <th style={{width: '120px'}}>담당 팀</th>
                                         )}
+                                        <th style={{width: '110px'}}>지점</th>
                                         <th style={{width: '110px'}}>지점 담당자</th>
                                         <th style={{width: '210px'}}>문의 유형</th>
                                         <th>문의 내용</th>
@@ -746,7 +753,8 @@
                                                     </span>
                                                 </td>
                                             )}
-                                            <td style={{fontSize: '13px'}}>{branchManagerMap[inquiry.branchName] || '-'}</td>
+                                            <td style={{fontSize: '13px'}}>{inquiry.branchName || '-'}</td>
+                                            <td style={{fontSize: '13px'}}>{inquiry.manager || branchManagerMap[inquiry.branchName] || '-'}</td>
                                             <td style={{ fontSize: '13px', color: '#334155' }}>
                                                 {getInquiryCategoryText(inquiry)}
                                             </td>
@@ -816,6 +824,9 @@
 
                                         <div style={{fontSize: '13px', color: '#666', marginBottom: '10px'}}>
                                             작성자: {selectedInquiry.authorName || '-'}
+                                            {selectedInquiry.branchName && <span style={{marginLeft: '12px'}}>지점명: {selectedInquiry.branchName}</span>}
+                                            {selectedInquiry.position && <span style={{marginLeft: '12px'}}>직책: {selectedInquiry.position}</span>}
+                                            {selectedInquiry.notifyContact && <span style={{marginLeft: '12px'}}>연락처: {selectedInquiry.notifyContact}</span>}
                                         </div>
 
                                         <div className="abp-inquiry-category-row">
