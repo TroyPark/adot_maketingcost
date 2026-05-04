@@ -378,6 +378,10 @@ async function createUserByAdmin(newUserEmail, newUserPassword, adminEmail, uniq
             errorMessage = error.message || '입력값이 올바르지 않습니다.';
         } else if (error.code === 'functions/unauthenticated') {
             errorMessage = '관리자 인증이 필요합니다. 다시 로그인해주세요.';
+        } else if (error.code === 'functions/permission-denied') {
+            errorMessage = '고유 비밀번호가 올바르지 않습니다.';
+        } else if (error.code === 'functions/failed-precondition') {
+            errorMessage = error.message || '사전 조건이 충족되지 않았습니다.';
         } else if (error.message) {
             errorMessage = error.message;
         }

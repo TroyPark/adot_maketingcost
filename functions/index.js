@@ -1,4 +1,5 @@
 const functions = require("firebase-functions/v1");
+const corsHandler = require("cors")({ origin: true });
 const https = require("https");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
@@ -664,55 +665,80 @@ exports.remindPendingInquiries = functions.pubsub
     });
 
 // 👤 관리자용 사용자 생성
-exports.createUser = functions.https.onCall(async (data, context) => {
-    // 관리자 인증 확인
-    if (!context.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-
-    const { email, password, displayName, branchName, team, manager, uniquePassword } = data;
-
-    if (!email || !password) {
-        throw new functions.https.HttpsError("invalid-argument", "이메일과 비밀번호는 필수입니다.");
-    }
-
-    try {
-        // Firebase Auth에 사용자 생성
-        const userRecord = await admin.auth().createUser({
-            email,
-            password,
-            displayName: displayName || email.split("@")[0],
-        });
-
-        // Firestore에 사용자 정보 저장
-        await admin.firestore().collection("users").doc(userRecord.uid).set({
-            uid: userRecord.uid,
-            email,
-            displayName: displayName || email.split("@")[0],
-            branchName: branchName || "",
-            team: team || "",
-            manager: manager || "",
-            role: "user",
-            isActive: true,
-            marketingPassword: uniquePassword || "0000",
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            lastLoginAt: null,
-        });
-
-        return { success: true, uid: userRecord.uid, email: userRecord.email };
-    } catch (error) {
-        console.error("createUser 오류:", error);
-
-        if (error.code === "auth/email-already-exists") {
-            throw new functions.https.HttpsError("already-exists", "이미 사용 중인 이메일입니다.");
-        } else if (error.code === "auth/invalid-email") {
-            throw new functions.https.HttpsError("invalid-argument", "유효하지 않은 이메일 형식입니다.");
-        } else if (error.code === "auth/invalid-password") {
-            throw new functions.https.HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
-        } else if (error.code === "auth/weak-password") {
-            throw new functions.https.HttpsError("invalid-argument", "비밀번호가 너무 약합니다. 6자 이상 입력해주세요.");
-        } else {
-            throw new functions.https.HttpsError("internal", error.message || "사용자 생성 중 오류가 발생했습니다.");
+exports.createUser = functions.https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        if (req.method !== "POST") {
+            return res.status(405).send("Method Not Allowed");
         }
-    }
+
+        // Firebase callable protocol: Authorization 헤더에서 토큰 추출
+        const authHeader = req.headers.authorization || "";
+        if (!authHeader.startsWith("Bearer ")) {
+            return res.status(200).json({ error: { status: "UNAUTHENTICATED", message: "로그인이 필요합니다." } });
+        }
+
+        let decodedToken;
+        try {
+            const idToken = authHeader.split("Bearer ")[1];
+            decodedToken = await admin.auth().verifyIdToken(idToken);
+        } catch (e) {
+            return res.status(200).json({ error: { status: "UNAUTHENTICATED", message: "인증에 실패했습니다." } });
+        }
+
+        // Firebase callable protocol: body는 { data: {...} } 형식
+        const { email, password, displayName, branchName, team, manager, uniquePassword } = req.body.data || {};
+
+        if (!email || !password) {
+            return res.status(200).json({ error: { status: "INVALID_ARGUMENT", message: "이메일과 비밀번호는 필수입니다." } });
+        }
+        if (!uniquePassword) {
+            return res.status(200).json({ error: { status: "INVALID_ARGUMENT", message: "고유 비밀번호를 입력해주세요." } });
+        }
+
+        try {
+            const roundPasswordDoc = await admin.firestore().collection("settings").doc("roundPassword").get();
+            if (!roundPasswordDoc.exists) {
+                return res.status(200).json({ error: { status: "FAILED_PRECONDITION", message: "고유 비밀번호가 설정되지 않았습니다. Firebase Console에서 설정해주세요." } });
+            }
+            const storedPassword = roundPasswordDoc.data().password;
+            if (uniquePassword !== storedPassword) {
+                return res.status(200).json({ error: { status: "PERMISSION_DENIED", message: "고유 비밀번호가 올바르지 않습니다." } });
+            }
+
+            const userRecord = await admin.auth().createUser({
+                email,
+                password,
+                displayName: displayName || email.split("@")[0],
+            });
+
+            await admin.firestore().collection("users").doc(userRecord.uid).set({
+                uid: userRecord.uid,
+                email,
+                displayName: displayName || email.split("@")[0],
+                branchName: branchName || "",
+                team: team || "",
+                manager: manager || "",
+                role: "user",
+                isActive: true,
+                marketingPassword: storedPassword,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                lastLoginAt: null,
+            });
+
+            // Firebase callable protocol: 성공 응답은 { result: {...} } 형식
+            return res.status(200).json({ result: { success: true, uid: userRecord.uid, email: userRecord.email } });
+        } catch (error) {
+            console.error("createUser 오류:", error);
+
+            if (error.code === "auth/email-already-exists") {
+                return res.status(200).json({ error: { status: "ALREADY_EXISTS", message: "이미 사용 중인 이메일입니다." } });
+            } else if (error.code === "auth/invalid-email") {
+                return res.status(200).json({ error: { status: "INVALID_ARGUMENT", message: "유효하지 않은 이메일 형식입니다." } });
+            } else if (error.code === "auth/invalid-password" || error.code === "auth/weak-password") {
+                return res.status(200).json({ error: { status: "INVALID_ARGUMENT", message: "비밀번호는 6자 이상이어야 합니다." } });
+            } else {
+                return res.status(200).json({ error: { status: "INTERNAL", message: error.message || "사용자 생성 중 오류가 발생했습니다." } });
+            }
+        }
+    });
 });
