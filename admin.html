@@ -12868,6 +12868,10 @@
                             sessionStorage.setItem('loginReturnUrlTs', Date.now().toString());
                         }
                         window.location.href = 'index';
+                    } else if ((currentUser.email || '').toLowerCase() !== 'admin@dshare.co.kr') {
+                        // 도메인 이관: admin 외 세션(biz_mk 등)은 로그아웃 후 index로 (안내 모달 노출)
+                        logout();
+                        window.location.href = 'index';
                     } else if (!isAdminAccess(currentUser.email)) {
                         window.location.href = 'user.html';
                     } else {
