@@ -4506,6 +4506,10 @@
                             sessionStorage.setItem('loginReturnUrlTs', Date.now().toString());
                         }
                         window.location.href = 'index';
+                    } else if ((currentUser.email || '').toLowerCase() !== 'admin@dshare.co.kr') {
+                        // 도메인 이관: admin 외 세션은 로그아웃 후 index로 (안내 모달 노출)
+                        logout();
+                        window.location.href = 'index';
                     } else if (currentUser.email === ADMIN_EMAIL || BIZ_MK_EMAILS.has((currentUser.email || '').toLowerCase())) {
                         window.location.href = 'admin';
                     } else if (currentUser.email === ABP_EMAIL) {

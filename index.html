@@ -188,6 +188,79 @@
                 font-size: 24px;
             }
         }
+
+        /* 도메인 이관 안내 모달 */
+        .migration-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 18, 54, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .migration-overlay.show {
+            display: flex;
+        }
+
+        .migration-modal {
+            background: #fff;
+            border-radius: 16px;
+            max-width: 420px;
+            width: 100%;
+            padding: 36px 32px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .migration-modal h3 {
+            color: #001236;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .migration-modal p {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .migration-modal .target {
+            color: #f07c00;
+            font-weight: 600;
+            font-size: 16px;
+            word-break: break-all;
+        }
+
+        .migration-modal button {
+            margin-top: 24px;
+            width: 100%;
+            padding: 14px;
+            background: #f07c00;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .migration-modal button:hover {
+            background: #e07000;
+        }
+
+        .migration-modal .close-link {
+            display: inline-block;
+            margin-top: 14px;
+            color: #999;
+            font-size: 13px;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -239,10 +312,33 @@
         <img src="image/logd_white.png" alt="Logo">
     </div>
 
+    <!-- 도메인 이관 안내 모달 -->
+    <div class="migration-overlay" id="migrationOverlay">
+        <div class="migration-modal">
+            <h3>서비스가 이전되었습니다</h3>
+            <p>본 시스템은 아래 새 주소로 이관되었습니다.<br>새 사이트에서 이용해 주세요.</p>
+            <p class="target">voc.dshare.co.kr</p>
+            <button type="button" id="migrationGoBtn">새 사이트로 이동</button>
+            <a class="close-link" id="migrationCloseBtn">닫기</a>
+        </div>
+    </div>
+
     <!-- Firebase 설정 -->
     <script src="firebase.js"></script>
 
     <script>
+        // 도메인 이관 안내 모달
+        const migrationOverlay = document.getElementById('migrationOverlay');
+        function showMigrationModal() { migrationOverlay.classList.add('show'); }
+        document.getElementById('migrationGoBtn').addEventListener('click', function() {
+            window.location.href = 'https://voc.dshare.co.kr';
+        });
+        document.getElementById('migrationCloseBtn').addEventListener('click', function() {
+            migrationOverlay.classList.remove('show');
+        });
+        // 로그인 페이지 진입 시 기본 안내 (admin은 닫고 로그인 가능)
+        showMigrationModal();
+
         // 비밀번호 보기/숨기기 토글
         const passwordToggle = document.getElementById('passwordToggle');
         const passwordInput = document.getElementById('password');
@@ -397,6 +493,16 @@
 
             if (result.success) {
                 console.log('로그인 성공:', result.user.email);
+
+                // 도메인 이관: admin 외 계정은 로그아웃 + 안내 (접속 차단)
+                if ((result.user.email || '').toLowerCase() !== 'admin@dshare.co.kr') {
+                    await logout();
+                    loginButton.disabled = false;
+                    loginButton.textContent = '로그인';
+                    showMigrationModal();
+                    return;
+                }
+
                 _loginRedirectDone = true;
 
                 // 이메일 확인 후 페이지 분기
@@ -422,6 +528,13 @@
             }
             if (user) {
                 console.log('이미 로그인됨:', user.email);
+
+                // 도메인 이관: admin 외 기존 세션은 로그아웃 + 안내 (접속 차단)
+                if ((user.email || '').toLowerCase() !== 'admin@dshare.co.kr') {
+                    logout();
+                    showMigrationModal();
+                    return;
+                }
 
                 // 이메일 확인 후 페이지 분기
                 if (user.email === 'admin@dshare.co.kr' || BIZ_MK_EMAILS.has((user.email || '').toLowerCase())) {
